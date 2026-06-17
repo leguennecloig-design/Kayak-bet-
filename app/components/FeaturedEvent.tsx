@@ -48,10 +48,10 @@ export default function FeaturedEvent() {
               <span className="inline-flex items-center gap-2 font-grotesk font-bold text-[11px] leading-none tracking-[.12em] uppercase text-cyan bg-[rgba(40,215,230,.1)] border border-[rgba(40,215,230,.32)] rounded-[9px] px-3 py-2">
                 <span className="w-[13px] h-[13px]">
                   <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2 4 13.5h6.2L9 22l10-12.2h-6.3L14 2Z" fill="#28D7E6" />
+                    <path d="M13 2 4 13.5h6.2L9 22l10-12.2h-6.3L14 2Z" fill="#FF7A45" />
                   </svg>
                 </span>
-                En cours · 16 juin 2026
+                En approche · 16 juillet 2026
               </span>
               <h3 className="font-anton italic uppercase text-white text-[30px] min-[881px]:text-[38px] leading-[0.94] my-4">
                 Championnats de France de Descente
@@ -90,12 +90,12 @@ export default function FeaturedEvent() {
 
             <div className="flex-none text-center bg-[rgba(7,31,45,.5)] border border-[var(--border-2)] rounded-[14px] px-5 py-[13px] min-w-[104px]">
               <div className="font-anton italic text-[36px] leading-[0.85] text-cyan">
-                J2
+                29
               </div>
               <div className="font-grotesk font-bold text-[8px] leading-[1.3] tracking-[.13em] uppercase text-[#7C9AAA] mt-[7px]">
-                en cours
+                jours avant
                 <br />
-                aujourd'hui
+                le départ
               </div>
             </div>
           </div>
