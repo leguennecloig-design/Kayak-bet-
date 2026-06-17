@@ -30,7 +30,7 @@ export default function LoginPage() {
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(error.message);
-      else location.href = "/";
+      else location.href = "/app";
     }
 
     setLoading(false);
