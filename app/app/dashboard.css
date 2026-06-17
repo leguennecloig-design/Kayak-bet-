@@ -892,7 +892,7 @@
     justify-content: space-around;
     align-items: stretch;
   }
-  .kb-app .botnav a {
+  .kb-app .botnav button {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -905,26 +905,26 @@
     background: none;
     border: none;
   }
-  .kb-app .botnav a svg {
+  .kb-app .botnav button svg {
     width: 22px;
     height: 22px;
   }
-  .kb-app .botnav a svg [data-s] {
+  .kb-app .botnav button svg [data-s] {
     stroke: var(--mute);
     transition: stroke 0.15s;
   }
-  .kb-app .botnav a .bl {
+  .kb-app .botnav button .bl {
     font: 700 9px/1 var(--font-grotesk), monospace;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
-  .kb-app .botnav a.active {
+  .kb-app .botnav button.active {
     color: var(--cyan);
   }
-  .kb-app .botnav a.active svg [data-s] {
+  .kb-app .botnav button.active svg [data-s] {
     stroke: var(--cyan);
   }
-  .kb-app .botnav a .bdot {
+  .kb-app .botnav button .bdot {
     position: absolute;
     top: 2px;
     right: calc(50% - 18px);
@@ -938,7 +938,7 @@
     padding: 0 4px;
     display: none;
   }
-  .kb-app .botnav a .bdot.on {
+  .kb-app .botnav button .bdot.on {
     display: block;
   }
   .kb-app .fab {
