@@ -65,7 +65,7 @@ export default function Hero() {
             Déjà membre ?{" "}
             <a
               className="text-cyan font-bold cursor-pointer"
-              onClick={() => toast("Connexion — démo")}
+              href="/login"
             >
               Connexion
             </a>

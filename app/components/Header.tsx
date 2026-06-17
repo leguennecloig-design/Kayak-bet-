@@ -30,13 +30,13 @@ export default function Header() {
         </nav>
 
         <div className="hidden min-[881px]:flex items-center gap-[14px]">
-          <span
-            className="font-archivo font-bold text-[14px] text-white px-[6px] py-[11px] cursor-pointer hover:text-cyan"
-            onClick={() => toast("Connexion — démo")}
+          <a
+            className="font-archivo font-bold text-[14px] text-white px-[6px] py-[11px] hover:text-cyan"
+            href="/login"
           >
             Connexion
-          </span>
-          <a className="btn btn-primary" href="#cta">
+          </a>
+          <a className="btn btn-primary" href="/login">
             Créer mon compte
           </a>
         </div>
@@ -67,20 +67,18 @@ export default function Header() {
           <div className="flex flex-col gap-[11px] mt-[18px]">
             <a
               className="btn btn-primary"
-              href="#cta"
+              href="/login"
               onClick={() => setOpen(false)}
             >
               Créer mon compte
             </a>
-            <button
+            <a
               className="btn btn-ghost"
-              onClick={() => {
-                setOpen(false);
-                toast("Connexion — démo");
-              }}
+              href="/login"
+              onClick={() => setOpen(false)}
             >
               Connexion
-            </button>
+            </a>
           </div>
         </div>
       )}
