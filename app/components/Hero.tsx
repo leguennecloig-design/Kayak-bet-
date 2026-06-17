@@ -144,17 +144,17 @@ export default function Hero() {
 
           <OddsFloat
             cls="top-[30px] right-[-8px] min-[561px]:right-[-8px] animate-bob-a"
-            initials="TC"
-            name="T. Castryck"
-            sub="FRANCE · C1"
+            initials="DT"
+            name="D. Tostain"
+            sub="FRANCE · K1"
             odd="1.65"
           />
           <OddsFloat
             cls="bottom-[42px] left-[-16px] animate-bob-b"
-            initials="JP"
-            name="J. Prskavec"
-            sub="TCHÉQUIE · K1"
-            odd="2.10"
+            initials="CF"
+            name="C. Ferrion"
+            sub="France · C1"
+            odd="1.39"
             avBg="linear-gradient(140deg,#11C2C2,#1F73FF)"
           />
         </div>
