@@ -34,9 +34,9 @@ export default function Hero() {
             the <span className="text-cyan">rankings.</span>
           </h1>
           <p className="text-[18px] leading-[1.6] text-soft max-w-[466px] mt-6">
-            Pronostique sur le circuit mondial de kayak de slalom et de
-            descente. Crédits fictifs, sensations réelles — sans dépôt, sans
-            risque.
+            Suivez et pronostiquez chaque course du circuit mondial de descente. Sans argent réel, sans risque — juste le sport.
+
+
           </p>
 
           <div className="flex flex-col min-[561px]:flex-row gap-[13px] mt-[34px] flex-wrap">
