@@ -1,7 +1,7 @@
 const FEATURES = [
   {
     title: "Suis le circuit mondial",
-    body: "Coupe du Monde, Championnats, slalom et descente : toutes les épreuves, en direct et à venir, au même endroit.",
+    body: "Coupe du Monde, Championnats : toutes les épreuves, au même endroit.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="8.6" stroke="#28D7E6" strokeWidth="1.8" />
