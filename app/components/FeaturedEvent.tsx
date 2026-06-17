@@ -1,8 +1,8 @@
 const ODDS = [
-  { nm: "T. Castryck", ct: "FR", v: "1.65", fav: true },
-  { nm: "J. Prskavec", ct: "CZ", v: "2.10", fav: false },
-  { nm: "A. Slafkovský", ct: "SK", v: "3.50", fav: false },
-  { nm: "H. Aigner", ct: "DE", v: "6.00", fav: false },
+  { nm: "D. Tostain",  ct: "FR", v: "1.65", fav: false },
+  { nm: "N. Zerouga",  ct: "FR", v: "2.87", fav: false },
+  { nm: "L. Fontaine", ct: "FR", v: "1.32", fav: true  },
+  { nm: "E. Lacoste",  ct: "FR", v: "1.96", fav: false },
 ];
 
 const Water = () => (
@@ -51,10 +51,10 @@ export default function FeaturedEvent() {
                     <path d="M13 2 4 13.5h6.2L9 22l10-12.2h-6.3L14 2Z" fill="#FF7A45" />
                   </svg>
                 </span>
-                En approche · 21 juin 2026
+                En approche · 28 juin 2026
               </span>
               <h3 className="font-anton italic uppercase text-white text-[30px] min-[881px]:text-[38px] leading-[0.94] my-4">
-                Coupe du Monde d'Augsburg
+                Championnats de France de Descente
               </h3>
               <div className="flex items-center gap-[18px] flex-wrap text-[#9FBAC6] font-archivo font-semibold text-[13px]">
                 <span className="flex items-center gap-[7px]">
@@ -67,9 +67,9 @@ export default function FeaturedEvent() {
                     />
                     <circle cx="12" cy="10.6" r="2.2" stroke="#28D7E6" strokeWidth="1.7" />
                   </svg>
-                  Canal olympique, Augsburg
+                  La Plagne
                   <span className="font-grotesk font-bold text-[9px] bg-[rgba(255,255,255,.1)] rounded-[4px] px-[5px] py-[3px] text-[#bcd2db] tracking-[.04em]">
-                    GER
+                    FR
                   </span>
                 </span>
                 <span className="flex items-center gap-[7px]">
@@ -83,14 +83,14 @@ export default function FeaturedEvent() {
                     />
                     <circle cx="12" cy="14.5" r="5.2" stroke="#28D7E6" strokeWidth="1.7" />
                   </svg>
-                  C1 Hommes · Finale
+                  Toutes catégories
                 </span>
               </div>
             </div>
 
             <div className="flex-none text-center bg-[rgba(7,31,45,.5)] border border-[var(--border-2)] rounded-[14px] px-5 py-[13px] min-w-[104px]">
               <div className="font-anton italic text-[36px] leading-[0.85] text-cyan">
-                7
+                11
               </div>
               <div className="font-grotesk font-bold text-[8px] leading-[1.3] tracking-[.13em] uppercase text-[#7C9AAA] mt-[7px]">
                 jours avant
