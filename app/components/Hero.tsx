@@ -34,9 +34,9 @@ export default function Hero() {
             the <span className="text-cyan">rankings.</span>
           </h1>
           <p className="text-[18px] leading-[1.6] text-soft max-w-[466px] mt-6">
-            Suivez et pronostiquez chaque course du circuit mondial de descente. Sans argent réel, sans risque — juste le sport.
-
-
+            Pronostique sur le circuit mondial de kayak de slalom et de
+            descente. Crédits fictifs, sensations réelles — sans dépôt, sans
+            risque.
           </p>
 
           <div className="flex flex-col min-[561px]:flex-row gap-[13px] mt-[34px] flex-wrap">
@@ -63,7 +63,7 @@ export default function Hero() {
 
           <p className="mt-4 font-archivo font-semibold text-[13.5px] leading-[1.5] text-mute">
             Déjà membre ?{" "}
-            <a
+            
               className="text-cyan font-bold cursor-pointer"
               onClick={() => toast("Connexion — démo")}
             >
@@ -71,25 +71,6 @@ export default function Hero() {
             </a>
           </p>
 
-          <div className="flex items-center gap-[11px] mt-7 font-archivo font-semibold text-[13px] leading-[1.4] text-mute">
-            <span className="flex">
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  className="w-7 h-7 rounded-full border-2 border-deep"
-                  style={{
-                    marginLeft: i === 0 ? 0 : -9,
-                    background:
-                      "linear-gradient(135deg,#28D7E6,#1F73FF)",
-                  }}
-                />
-              ))}
-            </span>
-            <span>
-              Déjà <b className="text-white">12 000+ parieurs</b> sur la ligne
-              de départ
-            </span>
-          </div>
         </div>
 
         {/* visual */}
@@ -145,15 +126,15 @@ export default function Hero() {
           <OddsFloat
             cls="top-[30px] right-[-8px] min-[561px]:right-[-8px] animate-bob-a"
             initials="DT"
-            name="D. Tostain"
+            name="Dimitri Tostain"
             sub="FRANCE · K1"
             odd="1.65"
           />
           <OddsFloat
             cls="bottom-[42px] left-[-16px] animate-bob-b"
             initials="CF"
-            name="C. Ferrion"
-            sub="France · C1"
+            name="Charles Ferrion"
+            sub="FRANCE · C1"
             odd="1.39"
             avBg="linear-gradient(140deg,#11C2C2,#1F73FF)"
           />
