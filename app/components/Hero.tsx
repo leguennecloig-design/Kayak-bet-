@@ -63,7 +63,7 @@ export default function Hero() {
 
           <p className="mt-4 font-archivo font-semibold text-[13.5px] leading-[1.5] text-mute">
             Déjà membre ?{" "}
-            
+            <a
               className="text-cyan font-bold cursor-pointer"
               onClick={() => toast("Connexion — démo")}
             >
