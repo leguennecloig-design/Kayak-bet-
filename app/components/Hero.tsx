@@ -31,7 +31,7 @@ export default function Hero() {
           <h1 className="font-anton italic uppercase text-white mt-[22px] text-[58px] min-[561px]:text-[72px] min-[921px]:text-[92px] leading-[0.82] tracking-[.005em]">
             Ride
             <br />
-            the <span className="text-cyan">line.</span>
+            the <span className="text-cyan">rankings.</span>
           </h1>
           <p className="text-[18px] leading-[1.6] text-soft max-w-[466px] mt-6">
             Pronostique sur le circuit mondial de kayak de slalom et de
