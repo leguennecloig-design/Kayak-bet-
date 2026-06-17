@@ -1,6 +1,6 @@
 const ODDS = [
   { nm: "D. Tostain",  ct: "FR", v: "1.65", fav: false },
-  { nm: "N. Zerouga",  ct: "FR", v: "99", fav: false },
+  { nm: "N. Zerouga",  ct: "FR", v: "1.98", fav: false },
   { nm: "L. Fontaine", ct: "FR", v: "1.32", fav: true  },
   { nm: "E. Lacoste",  ct: "FR", v: "1.96", fav: false },
 ];
