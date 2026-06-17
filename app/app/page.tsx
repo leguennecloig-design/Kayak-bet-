@@ -146,15 +146,15 @@ type Odd = {
   fav?: boolean;
 };
 
-const EVENT = "Coupe du Monde · Augsburg";
+const EVENT = "Championnats de France · La Plagne";
 const ODDS: Odd[] = [
-  { id: "castryck", nm: "T. Castryck", ctry: "FR", note: "France · Favori", val: 1.65, fav: true },
-  { id: "prskavec", nm: "J. Prskavec", ctry: "CZ", note: "Tchéquie · Champion du monde", val: 2.1 },
-  { id: "slafkovsky", nm: "A. Slafkovský", ctry: "SK", note: "Slovaquie", val: 3.5 },
-  { id: "aigner", nm: "H. Aigner", ctry: "DE", note: "Allemagne · Outsider", val: 6.0 },
+  { id: "tostain", nm: "D. Tostain", ctry: "FR", note: "France · Favori", val: 1.65 },
+  { id: "zerouga", nm: "N. Zerouga", ctry: "FR", note: "France", val: 2.87 },
+  { id: "fontaine", nm: "L. Fontaine", ctry: "FR", note: "France · Favorite", val: 1.32, fav: true },
+  { id: "lacoste", nm: "E. Lacoste", ctry: "FR", note: "France", val: 1.96 },
 ];
 
-const TARGET = new Date("2026-06-21T10:00:00");
+const TARGET = new Date("2026-07-16T10:00:00");
 const pad = (n: number) => String(n).padStart(2, "0");
 
 const TOPNAV = [
@@ -396,18 +396,18 @@ export default function DashboardPage() {
                   <span className="bolt">
                     <Bolt c="#FF7A45" />
                   </span>{" "}
-                  Prochaine grande compétition · 21 juin 2026
+                  Prochaine grande compétition · 16 juillet 2026
                 </span>
-                <h2>Coupe du Monde d&apos;Augsburg</h2>
+                <h2>Championnats de France de Descente</h2>
                 <div className="ft-meta">
                   <span className="m">
                     <ColPin />
-                    <span>Canal olympique, Augsburg</span>
-                    <span className="flag">GER</span>
+                    <span>La Plagne</span>
+                    <span className="flag">FR</span>
                   </span>
                   <span className="m">
                     <ColMedal />
-                    <span>C1 Hommes · Finale</span>
+                    <span>Toutes catégories</span>
                   </span>
                   <span className="m">
                     <ColUsers />
@@ -438,7 +438,7 @@ export default function DashboardPage() {
 
             <div className="ft-line">
               <span className="lab">
-                <span className="bar" /> Vainqueur — C1 Hommes
+                <span className="bar" /> Vainqueur — Classement général
               </span>
               <button className="all">
                 Tous les paris <Arrow />
