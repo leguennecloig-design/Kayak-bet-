@@ -562,24 +562,21 @@ export default function DashboardPage() {
   const ProfilView = () => (
     <>
       <div className="profil-hero">
-        <div className="profil-avatar"><span>{initials}</span></div>
-        <h1 className="profil-name">{name}</h1>
-        <p className="profil-email">{userEmail}</p>
-      </div>
-
-      <div className="profil-stats">
-        {[
-          { l: "Classement",    v: "247e",           sub: "général" },
-          { l: "Taux de réussite", v: `${winRate}%`, sub: `${totalWins}/${totalBets} paris` },
-          { l: "Série actuelle", v: "3 victoires",   sub: "en cours" },
-          { l: "Solde",         v: `${balance.toLocaleString("fr-FR")}`, sub: "crédits fictifs" },
-        ].map(({ l, v, sub }) => (
-          <div key={l} className="profil-stat">
-            <span className="ps-val">{v}</span>
-            <span className="ps-label">{l}</span>
-            <span className="ps-sub">{sub}</span>
-          </div>
-        ))}
+        <div className="glow" />
+        <svg className="water" viewBox="0 0 1130 140" preserveAspectRatio="none" fill="none">
+          <path d="M0 74c142 0 142-32 284-32s142 32 284 32 142-32 284-32 142 32 284 32v66H0Z" fill="#0E3A52" opacity=".6" />
+          <path d="M0 92c142 0 142-24 284-24s142 24 284 24 142-24 284-24 142 24 284 24v48H0Z" fill="#11C2C2" opacity=".1" />
+        </svg>
+        <div className="profil-hero-inner">
+          <div className="profil-avatar"><span>{initials}</span></div>
+          <span className="profil-eyebrow">Mon profil · Saison 2026</span>
+          <h1 className="profil-name">{name}</h1>
+          <p className="profil-email">{userEmail}</p>
+          <span className="profil-rank">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+            Rang 247 · Coupe du Monde
+          </span>
+        </div>
       </div>
 
       <div className="profil-section">
