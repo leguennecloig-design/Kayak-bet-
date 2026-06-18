@@ -657,6 +657,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {userEmail === "leguennecvinted@gmail.com" && (
+        <a
+          href="/admin"
+          className="profil-signout"
+          style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none", marginBottom: "12px" }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: "17px", height: "17px" }}>
+            <path d="M12 3l8 4.5v5c0 4-3.3 7.7-8 9-4.7-1.3-8-5-8-9v-5L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Panneau admin
+        </a>
+      )}
+
       <button className="profil-signout" onClick={signOut}>
         <LogOutIcon /> Se déconnecter
       </button>
