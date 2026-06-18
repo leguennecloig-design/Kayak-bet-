@@ -272,6 +272,8 @@ export default function DashboardPage() {
   const [stake,       setStake]       = useState(50);
   const [drawerOpen,  setDrawerOpen]  = useState(false);
   const [cd,          setCd]          = useState({ d: "00", h: "00", m: "00", s: "00" });
+  const [dbComps,     setDbComps]     = useState<Competition[] | null>(null);
+  const [cdTarget,    setCdTarget]    = useState<Date>(new Date("2026-07-16T10:00:00"));
   const [name,        setName]        = useState("Alex");
   const [initials,    setInitials]    = useState("AX");
   const [userEmail,   setUserEmail]   = useState("");
@@ -295,10 +297,48 @@ export default function DashboardPage() {
     });
   }, [supabase]);
 
+  /* fetch competitions from Supabase */
+  useEffect(() => {
+    async function fetchComps() {
+      const { data } = await supabase
+        .from("competitions")
+        .select("id, nom, date, discipline, lieu, participants(id, nom, pays, cote)")
+        .eq("status", "published")
+        .order("date", { ascending: true });
+      if (!data || data.length === 0) return;
+      const mapped: Competition[] = data.map((c: any, i: number) => {
+        const parts: any[] = c.participants ?? [];
+        parts.sort((a: any, b: any) => (a.cote ?? 99) - (b.cote ?? 99));
+        const minCote = parts[0]?.cote ?? null;
+        return {
+          id: c.id,
+          name: c.nom,
+          location: c.lieu ?? "",
+          flag: "FR",
+          date: c.date ?? "",
+          category: c.discipline ?? "",
+          bettors: 0,
+          featured: i === 0,
+          odds: parts.map((p: any) => ({
+            id: p.id,
+            nm: p.nom,
+            ctry: p.pays ?? "",
+            note: p.pays ?? p.nom,
+            val: p.cote != null ? parseFloat(p.cote) : 1.00,
+            fav: minCote != null && p.cote === minCote,
+          })),
+        };
+      });
+      setDbComps(mapped);
+      if (mapped[0]?.date) setCdTarget(new Date(mapped[0].date + "T10:00:00"));
+    }
+    fetchComps();
+  }, [supabase]);
+
   /* countdown */
   useEffect(() => {
     const tick = () => {
-      let diff = Math.max(0, TARGET.getTime() - Date.now());
+      let diff = Math.max(0, cdTarget.getTime() - Date.now());
       const d = Math.floor(diff / 864e5); diff -= d * 864e5;
       const h = Math.floor(diff / 36e5);  diff -= h * 36e5;
       const m = Math.floor(diff / 6e4);   diff -= m * 6e4;
@@ -308,7 +348,10 @@ export default function DashboardPage() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [cdTarget]);
+
+  /* competitions — Supabase si disponible, sinon données statiques */
+  const competitions = dbComps ?? COMPETITIONS;
 
   /* dérivés coupon */
   const selected   = Object.values(coupon);
@@ -392,72 +435,80 @@ export default function DashboardPage() {
   ================================================================ */
 
   /* ---- HOME ---- */
-  const HomeView = () => (
-    <>
-      <div className="greet">
-        <div>
-          <h1>Salut {name}, la <span className="c">ligne</span> t&apos;attend.</h1>
-          <p>Une grosse manche se prépare. Compose ton coupon avant le départ.</p>
-        </div>
-        <div className="quick">
-          <div className="chip-stat">
-            <span className="ic"><ColRank /></span>
-            <span className="tx"><span className="l">Classement</span><span className="v">247<em>e</em></span></span>
+  const HomeView = () => {
+    const feat = competitions[0];
+    return (
+      <>
+        <div className="greet">
+          <div>
+            <h1>Salut {name}, la <span className="c">ligne</span> t&apos;attend.</h1>
+            <p>Une grosse manche se prépare. Compose ton coupon avant le départ.</p>
           </div>
-          <div className="chip-stat">
-            <span className="ic"><ColTicket /></span>
-            <span className="tx"><span className="l">Paris en cours</span><span className="v">2</span></span>
-          </div>
-          <div className="chip-stat">
-            <span className="ic"><ColFlame /></span>
-            <span className="tx"><span className="l">Série</span><span className="v">3 victoires</span></span>
-          </div>
-        </div>
-      </div>
-
-      <section className="feature">
-        <div className="glow" />
-        <svg className="water" viewBox="0 0 1130 140" preserveAspectRatio="none" fill="none">
-          <path d="M0 74c142 0 142-32 284-32s142 32 284 32 142-32 284-32 142 32 284 32v66H0Z" fill="#0E3A52" opacity=".6" />
-          <path d="M0 92c142 0 142-24 284-24s142 24 284 24 142-24 284-24 142 24 284 24v48H0Z" fill="#11C2C2" opacity=".1" />
-        </svg>
-        <div className="ft-top">
-          <div className="ft-head">
-            <span className="live">
-              <span className="bolt"><Bolt c="#FF7A45" /></span>
-              Prochaine grande compétition · 16 juillet 2026
-            </span>
-            <h2>Championnats de France de Descente</h2>
-            <div className="ft-meta">
-              <span className="m"><ColPin /><span>La Plagne</span><span className="flag">FR</span></span>
-              <span className="m"><ColMedal /><span>Toutes catégories</span></span>
-              <span className="m"><ColUsers /><span>2 480 parieurs engagés</span></span>
+          <div className="quick">
+            <div className="chip-stat">
+              <span className="ic"><ColRank /></span>
+              <span className="tx"><span className="l">Classement</span><span className="v">247<em>e</em></span></span>
+            </div>
+            <div className="chip-stat">
+              <span className="ic"><ColTicket /></span>
+              <span className="tx"><span className="l">Paris en cours</span><span className="v">2</span></span>
+            </div>
+            <div className="chip-stat">
+              <span className="ic"><ColFlame /></span>
+              <span className="tx"><span className="l">Série</span><span className="v">3 victoires</span></span>
             </div>
           </div>
-          <div className="cd" aria-label="Compte à rebours">
-            {[{ n: cd.d, l: "Jours" }, { n: cd.h, l: "Heures" }, { n: cd.m, l: "Min" }, { n: cd.s, l: "Sec" }].map(({ n, l }) => (
-              <div className="unit" key={l}><div className="n">{n}</div><div className="l">{l}</div></div>
-            ))}
-          </div>
         </div>
-        <div className="ft-line">
-          <span className="lab"><span className="bar" /> Vainqueur — Classement général</span>
-          <button className="all" onClick={() => navigate("competitions")}>Toutes les compétitions <Arrow /></button>
-        </div>
-        <OddsGrid odds={COMPETITIONS[0].odds} eventName={COMPETITIONS[0].name} />
-      </section>
-    </>
-  );
+
+        {feat && (
+          <section className="feature">
+            <div className="glow" />
+            <svg className="water" viewBox="0 0 1130 140" preserveAspectRatio="none" fill="none">
+              <path d="M0 74c142 0 142-32 284-32s142 32 284 32 142-32 284-32 142 32 284 32v66H0Z" fill="#0E3A52" opacity=".6" />
+              <path d="M0 92c142 0 142-24 284-24s142 24 284 24 142-24 284-24 142 24 284 24v48H0Z" fill="#11C2C2" opacity=".1" />
+            </svg>
+            <div className="ft-top">
+              <div className="ft-head">
+                <span className="live">
+                  <span className="bolt"><Bolt c="#FF7A45" /></span>
+                  Prochaine grande compétition{feat.date ? ` · ${fmtDate(feat.date)}` : ""}
+                </span>
+                <h2>{feat.name}</h2>
+                <div className="ft-meta">
+                  {feat.location && <span className="m"><ColPin /><span>{feat.location}</span>{feat.flag && <span className="flag">{feat.flag}</span>}</span>}
+                  {feat.category && <span className="m"><ColMedal /><span>{feat.category}</span></span>}
+                  {feat.bettors > 0 && <span className="m"><ColUsers /><span>{feat.bettors.toLocaleString("fr-FR")} parieurs engagés</span></span>}
+                </div>
+              </div>
+              <div className="cd" aria-label="Compte à rebours">
+                {[{ n: cd.d, l: "Jours" }, { n: cd.h, l: "Heures" }, { n: cd.m, l: "Min" }, { n: cd.s, l: "Sec" }].map(({ n, l }) => (
+                  <div className="unit" key={l}><div className="n">{n}</div><div className="l">{l}</div></div>
+                ))}
+              </div>
+            </div>
+            <div className="ft-line">
+              <span className="lab"><span className="bar" /> Vainqueur — Classement général</span>
+              <button className="all" onClick={() => navigate("competitions")}>Toutes les compétitions <Arrow /></button>
+            </div>
+            {feat.odds.length > 0
+              ? <OddsGrid odds={feat.odds} eventName={feat.name} />
+              : <p className="no-odds">Les cotes seront disponibles bientôt.</p>
+            }
+          </section>
+        )}
+      </>
+    );
+  };
 
   /* ---- COMPÉTITIONS ---- */
   const CompetitionsView = () => (
     <>
       <div className="view-header">
         <h1>Compétitions</h1>
-        <p>5 événements à venir · Sélectionne une cote pour parier</p>
+        <p>{competitions.length} événement{competitions.length !== 1 ? "s" : ""} à venir · Sélectionne une cote pour parier</p>
       </div>
       <div className="comp-list">
-        {COMPETITIONS.map((c) => {
+        {competitions.map((c) => {
           const isOpen = expandedComp === c.id;
           return (
             <div key={c.id} className={`comp-card${c.featured ? " comp-featured" : ""}${isOpen ? " comp-open" : ""}`}>
