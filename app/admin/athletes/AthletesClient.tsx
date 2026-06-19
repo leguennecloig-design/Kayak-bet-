@@ -131,15 +131,16 @@ export default function AthletesClient({
         ) : (
           <div className="divide-y divide-[var(--border)]">
             {filtered.map((a) => (
-              <div
+              <a
                 key={a.code_bateau}
-                className="grid grid-cols-[3.5rem_1fr_1fr_5.5rem_5rem] gap-4 px-5 py-3.5 hover:bg-[rgba(255,255,255,.03)] transition-colors"
+                href={`/admin/athletes/${encodeURIComponent(a.code_bateau)}`}
+                className="grid grid-cols-[3.5rem_1fr_1fr_5.5rem_5rem] gap-4 px-5 py-3.5 hover:bg-[rgba(40,215,230,.04)] hover:border-l-2 hover:border-l-[rgba(40,215,230,.4)] transition-colors group"
               >
                 <div className="font-anton italic text-[20px] text-[#28D7E6] leading-tight self-center">
                   {a.rang}
                 </div>
                 <div className="self-center">
-                  <div className="font-archivo font-extrabold text-[13.5px] text-white">
+                  <div className="font-archivo font-extrabold text-[13.5px] text-white group-hover:text-[#28D7E6] transition-colors">
                     {a.nom_prenom}
                   </div>
                   <div className="font-grotesk font-bold text-[9px] tracking-[.06em] text-[#5c7c8c] mt-0.5">
@@ -155,7 +156,7 @@ export default function AthletesClient({
                 <div className="font-archivo text-[13px] text-[#7c9aaa] self-center">
                   {a.nb_courses}
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         )}
