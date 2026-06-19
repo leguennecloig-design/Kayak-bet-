@@ -657,7 +657,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {userEmail === "leguennecvinted@gmail.com" && (
+      {["loig.le.guennec@icloud.com", "leguennec.loig@gmail.com"].includes(userEmail ?? "") && (
         <a
           href="/admin"
           className="profil-signout"
