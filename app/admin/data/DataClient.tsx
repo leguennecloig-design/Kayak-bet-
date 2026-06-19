@@ -52,6 +52,7 @@ export default function DataClient({
   const [classementState, setClassementState] = useSyncState();
   const [compState, setCompState] = useSyncState();
   const [resultatsState, setResultatsState] = useSyncState();
+  const [resetState, setResetState] = useSyncState();
   const [compAnnee, setCompAnnee] = useState(2026);
   const [copied, setCopied] = useState(false);
 
@@ -134,6 +135,26 @@ export default function DataClient({
       }
     } catch {
       setResultatsState({ loading: false, msg: "❌ Erreur réseau", ok: false });
+    }
+  }
+
+  async function resetCompetitions() {
+    if (!confirm("Supprimer toutes les compétitions, courses et résultats FFCK ? Les athlètes sont conservés.")) return;
+    setResetState({ loading: true, msg: "Reset en cours…", ok: null });
+    try {
+      const res = await fetch("/api/admin/sync/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "competitions" }),
+      });
+      if (res.ok) {
+        setResetState({ loading: false, msg: "✅ Données réinitialisées", ok: true });
+        setStats((s) => ({ ...s, competitions: 0, courses: 0, resultats: 0, courses_pending: 0 }));
+      } else {
+        setResetState({ loading: false, msg: "❌ Erreur lors du reset", ok: false });
+      }
+    } catch {
+      setResetState({ loading: false, msg: "❌ Erreur réseau", ok: false });
     }
   }
 
@@ -367,13 +388,37 @@ export default function DataClient({
               <code className="flex-1 font-mono text-[13px] text-[#28D7E6] bg-[rgba(40,215,230,.06)] border border-[rgba(40,215,230,.2)] rounded-[8px] px-4 py-2.5">
                 npx tsx scripts/sync/run-all.ts
               </code>
-              <button
-                onClick={copyCommand}
-                className={`${btnGhost} flex-none`}
-              >
+              <button onClick={copyCommand} className={`${btnGhost} flex-none`}>
                 {copied ? "✓ Copié" : "Copier"}
               </button>
             </div>
+          </div>
+
+          {/* Zone danger — Reset */}
+          <div className="bg-[rgba(255,122,69,.04)] border border-[rgba(255,122,69,.2)] rounded-[16px] p-5">
+            <div className="font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#FF7A45] mb-2">
+              Zone danger
+            </div>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <div className="font-archivo font-bold text-[14px] text-white">Réinitialiser les données FFCK</div>
+                <div className="font-archivo text-[12.5px] text-[#7c9aaa] mt-0.5">
+                  Supprime toutes les compétitions, courses et résultats. Les athlètes sont conservés.
+                </div>
+              </div>
+              <button
+                onClick={resetCompetitions}
+                disabled={resetState.loading}
+                className={`${btnBase} bg-[rgba(255,122,69,.12)] border border-[rgba(255,122,69,.3)] text-[#FF7A45] hover:bg-[rgba(255,122,69,.2)] disabled:opacity-40`}
+              >
+                {resetState.loading ? "Reset…" : "Réinitialiser"}
+              </button>
+            </div>
+            {resetState.msg && (
+              <div className={`mt-3 font-archivo text-[12.5px] ${resetState.ok ? "text-[#28D7E6]" : "text-[#FF7A45]"}`}>
+                {resetState.msg}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -405,13 +450,14 @@ export default function DataClient({
                 const synced = c.courses_synced === c.courses_total && c.courses_total > 0;
                 const partial = c.courses_synced > 0 && c.courses_synced < c.courses_total;
                 return (
-                  <div
+                  <a
                     key={c.id}
-                    className="grid grid-cols-[5rem_1fr_6rem_5rem_5rem_5rem] gap-3 px-5 py-3.5 hover:bg-[rgba(255,255,255,.03)] transition-colors"
+                    href={`/admin/data/competitions/${c.id}`}
+                    className="grid grid-cols-[5rem_1fr_6rem_5rem_5rem_5rem] gap-3 px-5 py-3.5 hover:bg-[rgba(40,215,230,.04)] hover:border-l-2 hover:border-l-[rgba(40,215,230,.4)] transition-colors group"
                   >
                     <div className="font-mono text-[11px] text-[#5c7c8c] self-center">{c.code_ffck}</div>
                     <div className="self-center min-w-0">
-                      <div className="font-archivo font-extrabold text-[13.5px] text-white truncate">{c.nom}</div>
+                      <div className="font-archivo font-extrabold text-[13.5px] text-white truncate group-hover:text-[#28D7E6] transition-colors">{c.nom}</div>
                       {c.ville && (
                         <div className="font-archivo text-[11.5px] text-[#5c7c8c] mt-0.5">{c.ville}</div>
                       )}
@@ -438,7 +484,7 @@ export default function DataClient({
                         <span className="font-grotesk font-bold text-[9px] tracking-[.1em] uppercase text-[#FF7A45]">en attente</span>
                       )}
                     </div>
-                  </div>
+                  </a>
                 );
               })}
             </div>
