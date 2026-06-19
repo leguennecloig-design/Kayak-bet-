@@ -112,6 +112,97 @@ export async function calculateCotesForCourse(
   return results;
 }
 
+type StartlistRow = {
+  nom: string;
+  prenom: string;
+  code_bateau: string | null;
+  athlete_id: string;
+  categorie: string;
+  athletes: AthRow;
+};
+
+// Calcule les cotes depuis startlist_entries (compétition future)
+export async function calculateCotesFromStartlist(
+  courseId: string,
+  categorie: string,
+  supabase: SupabaseAny
+): Promise<CoteResult[]> {
+  const { data } = await supabase
+    .from("startlist_entries")
+    .select(`
+      nom,
+      prenom,
+      code_bateau,
+      athlete_id,
+      categorie,
+      athletes (
+        rang_national,
+        points_classement,
+        nb_courses_classement
+      )
+    `)
+    .eq("course_id", courseId)
+    .eq("categorie", categorie)
+    .not("athlete_id", "is", null);
+
+  const entries = (data ?? []) as StartlistRow[];
+  if (entries.length < 2) return [];
+
+  const startlist: AthleteInStartlist[] = entries
+    .filter((e) => e.athletes)
+    .map((e) => ({
+      code_bateau: e.code_bateau ?? e.athlete_id,
+      athlete_id: e.athlete_id,
+      nom: `${e.nom} ${e.prenom}`.trim(),
+      categorie: e.categorie,
+      rang_national: (e.athletes as AthRow)?.rang_national ?? 999,
+      points_classement: (e.athletes as AthRow)?.points_classement ?? 0,
+      nb_courses_classement: (e.athletes as AthRow)?.nb_courses_classement ?? 1,
+    }));
+
+  if (startlist.length < 2) return [];
+
+  const forces = new Map<string, number>();
+  for (const athlete of startlist) {
+    forces.set(athlete.code_bateau, calculerForce(athlete, startlist));
+  }
+
+  const results: CoteResult[] = [];
+  for (const athlete of startlist) {
+    const rangEspere = calculerRangEspere(athlete, forces);
+    const sigma      = sigmaFor(rangEspere);
+    const force      = forces.get(athlete.code_bateau)!;
+
+    const p1  = probTopN(rangEspere, sigma, 1);
+    const p3  = probTopN(rangEspere, sigma, 3);
+    const p5  = probTopN(rangEspere, sigma, 5);
+    const p10 = probTopN(rangEspere, sigma, 10);
+    const p20 = probTopN(rangEspere, sigma, 20);
+
+    results.push({
+      code_bateau:           athlete.code_bateau,
+      athlete_id:            athlete.athlete_id,
+      nom:                   athlete.nom,
+      categorie:             athlete.categorie,
+      nb_athletes_startlist: startlist.length,
+      rang_national:         athlete.rang_national,
+      points_classement:     athlete.points_classement,
+      force_score:           force,
+      rang_espere:           rangEspere,
+      sigma,
+      prob_top1:  p1,  cote_top1:  probToCote(p1),
+      prob_top3:  p3,  cote_top3:  probToCote(p3),
+      prob_top5:  p5,  cote_top5:  probToCote(p5),
+      prob_top10: p10, cote_top10: probToCote(p10),
+      prob_top20: p20, cote_top20: probToCote(p20),
+      cote_exact_place: 3.0,
+      cote_exact_time:  10.0,
+    });
+  }
+
+  return results;
+}
+
 export async function saveCotes(
   courseId: string,
   cotes: CoteResult[],
