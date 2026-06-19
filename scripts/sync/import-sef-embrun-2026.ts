@@ -237,6 +237,7 @@ async function run() {
         date_fin: "2026-04-10",
         code_niveau: "NAT",
         code_type: "SEF",
+        annee: 2026,
         nb_courses: 3,
       })
       .select("id")
@@ -283,7 +284,7 @@ async function run() {
       code_bateau:     r.code_bateau,
       rang:            r.rang ?? null,
       categorie:       r.categorie,
-      temps_chrono:    r.temps_ms != null ? r.temps_ms / 1000 : null,
+      temps_chrono:    r.temps_ms ?? null,
       points:          null,
       dsq:             r.dsq ?? false,
       coureur1_nom:    r.coureur1 ?? null,
