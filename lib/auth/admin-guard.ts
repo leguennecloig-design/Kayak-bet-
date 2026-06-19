@@ -10,26 +10,22 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
 
+function getAdminEmails(): string[] {
+  return (process.env.ADMIN_EMAIL ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+}
+
 export async function adminGuard(): Promise<void> {
   const supabase = createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const adminEmail = process.env.ADMIN_EMAIL;
-
-  if (!user || user.email !== adminEmail) {
+  if (!user || !getAdminEmails().includes(user.email ?? "")) {
     redirect("/");
   }
 }
 
-// Version pour les Route Handlers (qui ne peuvent pas utiliser redirect())
-// Retourne true si admin, false sinon
 export async function isAdmin(): Promise<boolean> {
   const supabase = createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  return !!user && user.email === process.env.ADMIN_EMAIL;
+  return !!user && getAdminEmails().includes(user.email ?? "");
 }
