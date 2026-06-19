@@ -15,7 +15,16 @@ type ApiResultat = {
   categorie: string;
   temps_chrono: number | null;
   points: number | null;
-  dsq: boolean;
+  dsq: boolean | null;
+};
+
+// L'API renvoie un objet wrapper, pas un tableau direct
+type ApiRaceResponse = {
+  competition_code: number;
+  course_code: number;
+  course_libelle: string;
+  categories: string[];
+  results: ApiResultat[];
 };
 
 async function fetchJSON<T>(url: string): Promise<T | null> {
@@ -35,6 +44,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const limit: number = body.limit ?? 10;
+  const force: boolean = body.force ?? false;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,6 +52,11 @@ export async function POST(req: NextRequest) {
   );
 
   const start = Date.now();
+
+  // Si force: reset synced_at sur toutes les courses
+  if (force) {
+    await supabase.from("ffck_courses").update({ synced_at: null }).neq("id", "00000000-0000-0000-0000-000000000000");
+  }
 
   // Cache athletes en mémoire
   const { data: allAthletes } = await supabase.from("athletes").select("id, code_bateau");
@@ -64,12 +79,14 @@ export async function POST(req: NextRequest) {
     const comp = course.ffck_competitions as unknown as { code_ffck: number; nom: string } | null;
     if (!comp) continue;
 
-    const resultats = await fetchJSON<ApiResultat[]>(
+    // L'API renvoie un objet { results: [...] }, pas un tableau direct
+    const data = await fetchJSON<ApiRaceResponse>(
       `${API_BASE}/competitions/${comp.code_ffck}/races/${course.code_course}`
     );
+    const resultats = data?.results ?? [];
     await sleep(150);
 
-    if (!resultats?.length) {
+    if (!resultats.length) {
       await supabase.from("ffck_courses").update({ synced_at: new Date().toISOString() }).eq("id", course.id);
       coursesDone++;
       continue;

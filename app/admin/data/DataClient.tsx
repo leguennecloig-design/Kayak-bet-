@@ -105,13 +105,17 @@ export default function DataClient({
     }
   }
 
-  async function syncResultats() {
-    setResultatsState({ loading: true, msg: "Sync en cours…", ok: null });
+  async function syncResultats(force = false) {
+    setResultatsState({
+      loading: true,
+      msg: force ? "Reset + sync en cours…" : "Sync en cours…",
+      ok: null,
+    });
     try {
       const res = await fetch("/api/admin/sync/resultats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limit: 10 }),
+        body: JSON.stringify({ limit: 10, force }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -315,27 +319,37 @@ export default function DataClient({
                   </div>
                 )}
               </div>
-              <button
-                onClick={syncResultats}
-                disabled={resultatsState.loading || stats.courses_pending === 0}
-                className={btnPrimary}
-              >
-                {resultatsState.loading ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 60" />
-                    </svg>
-                    Sync…
-                  </>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5">
-                      <path d="M4 12a8 8 0 0 1 14.93-3.86M20 12a8 8 0 0 1-14.93 3.86M4 5v5h5M20 19v-5h-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Sync 10 courses
-                  </>
-                )}
-              </button>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => syncResultats(false)}
+                  disabled={resultatsState.loading || stats.courses_pending === 0}
+                  className={btnPrimary}
+                >
+                  {resultatsState.loading ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 60" />
+                      </svg>
+                      Sync…
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5">
+                        <path d="M4 12a8 8 0 0 1 14.93-3.86M20 12a8 8 0 0 1-14.93 3.86M4 5v5h5M20 19v-5h-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Sync 10 courses
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => syncResultats(true)}
+                  disabled={resultatsState.loading}
+                  className={btnGhost}
+                  title="Remet toutes les courses à 0 et re-sync les 10 premières"
+                >
+                  Force re-sync
+                </button>
+              </div>
             </div>
             {resultatsState.msg && (
               <div className={`mt-3 font-archivo text-[12.5px] ${resultatsState.ok ? "text-[#28D7E6]" : "text-[#FF7A45]"}`}>

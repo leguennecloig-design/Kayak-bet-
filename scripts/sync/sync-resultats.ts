@@ -23,7 +23,16 @@ type ApiResultat = {
   categorie: string;
   temps_chrono: number | null;
   points: number | null;
-  dsq: boolean;
+  dsq: boolean | null;
+};
+
+// L'API renvoie un objet wrapper, pas un tableau direct
+type ApiRaceResponse = {
+  competition_code: number;
+  course_code: number;
+  course_libelle: string;
+  categories: string[];
+  results: ApiResultat[];
 };
 
 async function fetchJSON<T>(url: string): Promise<T | null> {
@@ -73,16 +82,18 @@ export async function run(limit?: number): Promise<{ resultats: number; courses:
     if (!comp) continue;
 
     const url = `${API_BASE}/competitions/${comp.code_ffck}/races/${course.code_course}`;
-    const resultats = await fetchJSON<ApiResultat[]>(url);
+    // L'API renvoie { results: [...] }, pas un tableau direct
+    const data = await fetchJSON<ApiRaceResponse>(url);
+    const resultats = data?.results ?? [];
     await sleep(DELAY_MS);
 
-    if (!resultats?.length) {
+    if (!resultats.length) {
       await supabase.from("ffck_courses").update({ synced_at: new Date().toISOString() }).eq("id", course.id);
       coursesDone++;
       continue;
     }
 
-    const rows = resultats.map((r) => {
+    const rows = resultats.map((r: ApiResultat) => {
       const coureur1 = r.coureurs[0] ?? null;
       const coureur2 = r.coureurs[1] ?? null;
       return {
