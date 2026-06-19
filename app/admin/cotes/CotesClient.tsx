@@ -5,7 +5,7 @@ import { useState, useCallback } from "react";
 type Course = {
   id: string;
   code_course: string;
-  nom: string | null;
+  libelle: string | null;
   nb_participants: number | null;
   cotes_count: number;
 };

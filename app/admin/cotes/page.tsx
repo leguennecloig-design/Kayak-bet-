@@ -7,15 +7,19 @@ export default async function CotesPage() {
 
   const supabase = createAdminSupabase();
 
-  const { data: comps } = await supabase
+  const { data: comps, error: compsError } = await supabase
     .from("ffck_competitions")
     .select(`
       id, nom, date_debut, code_niveau, code_type, nb_courses,
-      ffck_courses ( id, code_course, nom, nb_participants )
+      ffck_courses ( id, code_course, libelle, nb_participants )
     `)
     .order("date_debut", { ascending: false });
 
-  // Cotes existantes : count par course_id
+  if (compsError) {
+    console.error("[cotes/page] ffck_competitions:", compsError.message);
+  }
+
+  // Cotes existantes — ignoré si la table n'existe pas encore
   const { data: cotesCountRaw } = await supabase
     .from("cotes")
     .select("course_id");
@@ -36,7 +40,7 @@ export default async function CotesPage() {
     courses: ((c.ffck_courses ?? []) as {
       id: string;
       code_course: string;
-      nom: string | null;
+      libelle: string | null;
       nb_participants: number | null;
     }[]).map((course) => ({
       ...course,
