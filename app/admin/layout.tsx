@@ -45,6 +45,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               Données FFCK
             </a>
             <a
+              href="/admin/cotes"
+              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              Cotes
+            </a>
+            <a
               href="/app"
               className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
             >

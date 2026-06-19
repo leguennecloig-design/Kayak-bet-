@@ -12,7 +12,9 @@
     "sync:classement": "npx tsx scripts/sync/import-classement.ts",
     "sync:competitions": "npx tsx scripts/sync/sync-competitions.ts",
     "sync:resultats": "npx tsx scripts/sync/sync-resultats.ts",
-    "sync:sef-embrun-2026": "npx tsx scripts/sync/import-sef-embrun-2026.ts"
+    "sync:sef-embrun-2026": "npx tsx scripts/sync/import-sef-embrun-2026.ts",
+    "cotes": "npx tsx scripts/sync/calculate-cotes.ts",
+    "cotes:year": "npx tsx scripts/sync/calculate-cotes.ts --year=2026"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
