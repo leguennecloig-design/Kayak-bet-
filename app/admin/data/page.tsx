@@ -9,6 +9,7 @@ type CompRow = {
   date_debut: string;
   ville: string | null;
   code_niveau: string;
+  code_type: string | null;
   nb_courses: number;
   est_national: boolean;
   ffck_courses: { synced_at: string | null }[];
@@ -44,7 +45,7 @@ export default async function DataPage() {
   const { data: compsRaw } = await supabase
     .from("ffck_competitions")
     .select(`
-      id, code_ffck, nom, date_debut, ville, code_niveau, nb_courses, est_national,
+      id, code_ffck, nom, date_debut, ville, code_niveau, code_type, nb_courses, est_national,
       ffck_courses ( synced_at )
     `)
     .order("date_debut", { ascending: false })
@@ -57,6 +58,7 @@ export default async function DataPage() {
     date_debut: c.date_debut,
     ville: c.ville,
     code_niveau: c.code_niveau,
+    code_type: c.code_type ?? null,
     nb_courses: c.nb_courses,
     est_national: c.est_national,
     courses_total: c.ffck_courses.length,

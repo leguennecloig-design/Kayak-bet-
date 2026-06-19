@@ -11,7 +11,8 @@
     "sync": "npx tsx scripts/sync/run-all.ts",
     "sync:classement": "npx tsx scripts/sync/import-classement.ts",
     "sync:competitions": "npx tsx scripts/sync/sync-competitions.ts",
-    "sync:resultats": "npx tsx scripts/sync/sync-resultats.ts"
+    "sync:resultats": "npx tsx scripts/sync/sync-resultats.ts",
+    "sync:sef-embrun-2026": "npx tsx scripts/sync/import-sef-embrun-2026.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

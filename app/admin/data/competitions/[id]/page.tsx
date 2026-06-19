@@ -15,7 +15,7 @@ export default async function CompetitionDetailPage({
   const { data: comp, error } = await supabase
     .from("ffck_competitions")
     .select(`
-      id, code_ffck, nom, ville, riviere, date_debut, code_niveau, est_national,
+      id, code_ffck, nom, ville, riviere, date_debut, code_niveau, code_type, est_national,
       ffck_courses (
         id, code_course, libelle, nb_participants, synced_at,
         ffck_resultats (

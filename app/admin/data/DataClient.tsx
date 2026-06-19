@@ -17,6 +17,7 @@ type Competition = {
   date_debut: string;
   ville: string | null;
   code_niveau: string;
+  code_type: string | null;
   nb_courses: number;
   est_national: boolean;
   courses_synced: number;
@@ -37,6 +38,7 @@ const NIVEAU_STYLE: Record<string, string> = {
   NAT: "text-[#28D7E6] bg-[rgba(40,215,230,.12)] border-[rgba(40,215,230,.3)]",
   REG: "text-[#9fbac6] bg-[rgba(255,255,255,.06)] border-[rgba(255,255,255,.1)]",
   INR: "text-[#7c9aaa] bg-[rgba(255,255,255,.04)] border-[rgba(255,255,255,.07)]",
+  SEF: "text-[#FF7A45] bg-[rgba(255,122,69,.12)] border-[rgba(255,122,69,.3)]",
 };
 
 export default function DataClient({
@@ -466,9 +468,11 @@ export default function DataClient({
                       {new Date(c.date_debut).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
                     </div>
                     <div className="self-center">
-                      <span className={`font-grotesk font-bold text-[9px] tracking-[.1em] uppercase border rounded-[5px] px-[6px] py-[3px] ${NIVEAU_STYLE[c.code_niveau] ?? NIVEAU_STYLE.INR}`}>
-                        {c.code_niveau}
-                      </span>
+                      {(() => { const badge = c.code_type ?? c.code_niveau; return (
+                        <span className={`font-grotesk font-bold text-[9px] tracking-[.1em] uppercase border rounded-[5px] px-[6px] py-[3px] ${NIVEAU_STYLE[badge] ?? NIVEAU_STYLE.INR}`}>
+                          {badge}
+                        </span>
+                      ); })()}
                     </div>
                     <div className="font-archivo text-[13px] text-white self-center">{c.nb_courses}</div>
                     <div className="self-center">

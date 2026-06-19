@@ -34,6 +34,7 @@ type Competition = {
   riviere: string | null;
   date_debut: string;
   code_niveau: string;
+  code_type: string | null;
   est_national: boolean;
   courses: Course[];
 };
@@ -42,6 +43,7 @@ const NIVEAU_STYLE: Record<string, string> = {
   NAT: "text-[#28D7E6] bg-[rgba(40,215,230,.12)] border-[rgba(40,215,230,.3)]",
   REG: "text-[#9fbac6] bg-[rgba(255,255,255,.06)] border-[rgba(255,255,255,.1)]",
   INR: "text-[#7c9aaa] bg-[rgba(255,255,255,.04)] border-[rgba(255,255,255,.07)]",
+  SEF: "text-[#FF7A45] bg-[rgba(255,122,69,.12)] border-[rgba(255,122,69,.3)]",
 };
 
 function formatTime(seconds: number | null): string {
@@ -91,10 +93,14 @@ export default function CompetitionDetail({ competition }: { competition: Compet
       {/* Header */}
       <div className="mt-5 mb-8">
         <div className="flex items-center gap-2 mb-2">
-          <span className={`font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase border rounded-[5px] px-[7px] py-[3px] ${NIVEAU_STYLE[competition.code_niveau] ?? NIVEAU_STYLE.INR}`}>
-            {competition.code_niveau}
-          </span>
-          <span className="font-mono text-[11px] text-[#5c7c8c]">{competition.code_ffck}</span>
+          {(() => { const badge = competition.code_type ?? competition.code_niveau; return (
+            <span className={`font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase border rounded-[5px] px-[7px] py-[3px] ${NIVEAU_STYLE[badge] ?? NIVEAU_STYLE.INR}`}>
+              {badge}
+            </span>
+          ); })()}
+          {competition.code_ffck && (
+            <span className="font-mono text-[11px] text-[#5c7c8c]">{competition.code_ffck}</span>
+          )}
         </div>
         <h1 className="font-anton italic uppercase text-white text-[28px] leading-[0.95]">
           {competition.nom}
