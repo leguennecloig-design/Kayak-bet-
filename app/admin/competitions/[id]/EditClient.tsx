@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type Competition = {
@@ -19,7 +19,25 @@ type Participant = {
   cote: number | null;
 };
 
+type AthleteResult = {
+  rang: number;
+  nom_prenom: string;
+  club: string;
+  code_bateau: string;
+  points: number;
+  nb_courses: number;
+  categorie: string;
+};
+
 const DISCIPLINES = ["K1 Descente", "C1 Descente", "K1 Slalom", "C1 Slalom", "K1 Sprint", "C2 Descente"];
+
+const ATHLETE_CATEGORIES = [
+  "C1D", "C1DU15", "C1DU18", "C1HM1", "C1HM2", "C1HM22", "C1HM3",
+  "C1HU15", "C1HU18", "C1HU21", "C2D", "C2DU15", "C2H", "C2HM",
+  "C2HU15", "C2HU18", "C2M", "C2MU15", "K1DM", "K1DM22", "K1DU15",
+  "K1DU18", "K1DU21", "K1HM1", "K1HM2", "K1HM22", "K1HM3", "K1HU15",
+  "K1HU18", "K1HU21",
+];
 
 const STATUS_STYLE: Record<string, string> = {
   draft:     "bg-[rgba(255,122,69,.15)] text-[#FF7A45] border-[rgba(255,122,69,.3)]",
@@ -60,7 +78,35 @@ export default function EditClient({
   const [editId,   setEditId]   = useState<string | null>(null);
   const [editCote, setEditCote] = useState("");
 
+  // Athlete search
+  const [showAthleteSearch, setShowAthleteSearch] = useState(false);
+  const [athleteQ,          setAthleteQ]          = useState("");
+  const [athleteCat,        setAthleteCat]        = useState("");
+  const [athleteResults,    setAthleteResults]    = useState<AthleteResult[]>([]);
+  const [athleteSearching,  setAthleteSearching]  = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const compId = competition.id;
+
+  /* ---- Recherche athlètes (debounced 300ms) ---- */
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!athleteQ.trim() && !athleteCat) {
+      setAthleteResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setAthleteSearching(true);
+      const params = new URLSearchParams();
+      if (athleteQ.trim()) params.set("q", athleteQ.trim());
+      if (athleteCat)       params.set("cat", athleteCat);
+      const res = await fetch(`/api/admin/athletes/search?${params}`);
+      const data: AthleteResult[] = await res.json();
+      setAthleteResults(data);
+      setAthleteSearching(false);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [athleteQ, athleteCat]);
 
   /* ---- Sauvegarder les infos de la compétition ---- */
   async function saveComp() {
@@ -84,9 +130,7 @@ export default function EditClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
-    if (res.ok) {
-      setStatus(newStatus);
-    }
+    if (res.ok) setStatus(newStatus);
   }
 
   /* ---- Supprimer la compétition ---- */
@@ -96,7 +140,7 @@ export default function EditClient({
     if (res.ok) router.push("/admin");
   }
 
-  /* ---- Ajouter un participant ---- */
+  /* ---- Ajouter un participant (formulaire manuel) ---- */
   async function addParticipant(e: React.FormEvent) {
     e.preventDefault();
     setPError("");
@@ -115,6 +159,20 @@ export default function EditClient({
 
     setParticipants((prev) => [...prev, json].sort((a, b) => (a.cote ?? 99) - (b.cote ?? 99)));
     setPNom(""); setPPays(""); setPCote("");
+  }
+
+  /* ---- Importer un athlète depuis la base FFCK ---- */
+  async function addAthlete(a: AthleteResult) {
+    setPLoading(true);
+    const res = await fetch(`/api/admin/competitions/${compId}/participants`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom: a.nom_prenom, pays: a.club, cote: null }),
+    });
+    const json = await res.json();
+    setPLoading(false);
+    if (!res.ok) { setPError(json.error ?? "Erreur"); return; }
+    setParticipants((prev) => [...prev, json].sort((x, y) => (x.cote ?? 99) - (y.cote ?? 99)));
   }
 
   /* ---- Supprimer un participant ---- */
@@ -281,11 +339,11 @@ export default function EditClient({
                   </button>
                 )}
 
-                {/* Nom + pays */}
+                {/* Nom + club/pays */}
                 <div className="flex-1 min-w-0">
                   <div className="font-archivo font-extrabold text-[14px] text-white truncate">{p.nom}</div>
                   {p.pays && (
-                    <div className="font-grotesk font-bold text-[9px] tracking-[.1em] text-[#7c9aaa] mt-0.5 uppercase">{p.pays}</div>
+                    <div className="font-grotesk font-bold text-[9px] tracking-[.1em] text-[#7c9aaa] mt-0.5 uppercase truncate">{p.pays}</div>
                   )}
                 </div>
 
@@ -307,10 +365,10 @@ export default function EditClient({
           </p>
         )}
 
-        {/* Formulaire ajout participant */}
+        {/* Formulaire ajout manuel */}
         <form onSubmit={addParticipant} className="border-t border-[var(--border)] pt-5">
           <p className="font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#7c9aaa] mb-3">
-            Ajouter un participant
+            Ajouter manuellement
           </p>
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-5 flex flex-col gap-1.5">
@@ -325,12 +383,12 @@ export default function EditClient({
               />
             </div>
             <div className="col-span-3 flex flex-col gap-1.5">
-              <label className={labelCls}>Pays</label>
+              <label className={labelCls}>Club / Pays</label>
               <input
                 type="text"
                 value={pPays}
                 onChange={(e) => setPPays(e.target.value)}
-                placeholder="FR"
+                placeholder="Club ou FR"
                 className={inputCls}
               />
             </div>
@@ -361,6 +419,109 @@ export default function EditClient({
             <p className="mt-3 font-archivo text-[12.5px] text-[#FF7A45]">{pError}</p>
           )}
         </form>
+
+        {/* ---- Recherche dans la base FFCK ---- */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => { setShowAthleteSearch((v) => !v); setAthleteQ(""); setAthleteCat(""); setAthleteResults([]); }}
+            className="flex items-center gap-2 font-archivo font-semibold text-[12.5px] text-[#7c9aaa] hover:text-[#28D7E6] transition-colors"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5">
+              <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            {showAthleteSearch ? "Masquer la base FFCK" : "Importer depuis la base FFCK 2026"}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className={`w-3.5 h-3.5 transition-transform ${showAthleteSearch ? "rotate-180" : ""}`}
+            >
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {showAthleteSearch && (
+            <div className="mt-4 bg-[rgba(40,215,230,.04)] border border-[rgba(40,215,230,.2)] rounded-[14px] p-4">
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                {/* Recherche nom */}
+                <div className="relative flex-1">
+                  <svg viewBox="0 0 24 24" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4a6a7a] pointer-events-none">
+                    <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Nom de l'athlète…"
+                    value={athleteQ}
+                    onChange={(e) => setAthleteQ(e.target.value)}
+                    className={`${inputCls} pl-9`}
+                    autoFocus
+                  />
+                </div>
+                {/* Filtre catégorie */}
+                <div className="relative sm:w-52">
+                  <select
+                    value={athleteCat}
+                    onChange={(e) => setAthleteCat(e.target.value)}
+                    className={`${inputCls} w-full appearance-none pr-8`}
+                  >
+                    <option value="" className="bg-[#0a2a3d]">Toutes catégories</option>
+                    {ATHLETE_CATEGORIES.map((c) => (
+                      <option key={c} value={c} className="bg-[#0a2a3d]">{c}</option>
+                    ))}
+                  </select>
+                  <svg viewBox="0 0 24 24" fill="none" className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4a6a7a] pointer-events-none">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Résultats */}
+              {athleteSearching && (
+                <p className="font-archivo text-[12.5px] text-[#7c9aaa] text-center py-4">Recherche…</p>
+              )}
+              {!athleteSearching && (athleteQ.trim() || athleteCat) && athleteResults.length === 0 && (
+                <p className="font-archivo text-[12.5px] text-[#5c7c8c] text-center py-4">Aucun athlète trouvé.</p>
+              )}
+              {!athleteSearching && !athleteQ.trim() && !athleteCat && (
+                <p className="font-archivo text-[12.5px] text-[#5c7c8c] text-center py-3">
+                  Saisissez un nom ou sélectionnez une catégorie.
+                </p>
+              )}
+
+              {athleteResults.length > 0 && (
+                <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+                  {athleteResults.map((a) => (
+                    <button
+                      key={`${a.code_bateau}-${a.categorie}`}
+                      type="button"
+                      onClick={() => addAthlete(a)}
+                      disabled={pLoading}
+                      className="flex items-center gap-3 text-left w-full bg-[rgba(255,255,255,.04)] hover:bg-[rgba(40,215,230,.1)] border border-[var(--border)] hover:border-[rgba(40,215,230,.4)] rounded-[10px] px-4 py-3 transition-colors group disabled:opacity-40"
+                    >
+                      <span className="font-anton italic text-[16px] text-[#28D7E6] w-8 text-center flex-none">
+                        {a.rang}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-archivo font-extrabold text-[13px] text-white truncate">
+                          {a.nom_prenom}
+                        </div>
+                        <div className="font-grotesk font-bold text-[9px] tracking-[.06em] text-[#7c9aaa] mt-0.5 truncate">
+                          {a.club}
+                        </div>
+                      </div>
+                      <span className="font-grotesk font-bold text-[9px] tracking-[.1em] uppercase text-[#28D7E6] bg-[rgba(40,215,230,.12)] border border-[rgba(40,215,230,.25)] rounded-[5px] px-[6px] py-[3px] flex-none">
+                        {a.categorie}
+                      </span>
+                      <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-[#5c7c8c] group-hover:text-[#28D7E6] transition-colors flex-none">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
