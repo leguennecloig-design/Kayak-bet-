@@ -18,20 +18,31 @@ export async function POST(req: NextRequest) {
 
   // Parse PDF
   const buffer = Buffer.from(await file.arrayBuffer());
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (b: Buffer) => Promise<{ text: string }>;
-  const { text } = await pdfParse(buffer);
+  let text: string;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse") as (b: Buffer) => Promise<{ text: string }>;
+    const result = await pdfParse(buffer);
+    text = result.text;
+  } catch {
+    return NextResponse.json({ error: "PDF invalide ou corrompu" }, { status: 400 });
+  }
 
   const startlist = parseStartlistText(text);
 
-  // Charger tous les athlètes pour le matching
+  // Charger tous les athlètes pour le matching (.range évite la limite 1000 lignes par défaut)
   const supabase = createAdminSupabase();
-  const { data: athletes } = await supabase
+  const { data: athletes, error: athErr } = await supabase
     .from("athletes")
-    .select("id, code_bateau, nom, prenom, categorie, rang_national, points_classement");
+    .select("id, code_bateau, nom, prenom, categorie, rang_national, points_classement")
+    .range(0, 4999);
+
+  if (athErr) {
+    return NextResponse.json({ error: `Erreur chargement athlètes: ${athErr.message}` }, { status: 500 });
+  }
 
   // Index par nom normalisé → liste d'athlètes (un nom peut exister en plusieurs catégories)
-  const nameIndex = new Map<string, typeof athletes>();
+  const nameIndex = new Map<string, NonNullable<typeof athletes>>();
   for (const a of athletes ?? []) {
     const key = normalizeName(`${a.nom} ${a.prenom}`);
     if (!nameIndex.has(key)) nameIndex.set(key, []);

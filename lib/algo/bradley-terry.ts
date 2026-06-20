@@ -73,5 +73,33 @@ export function probToCote(prob: number): number {
   const { MARGE, COTE_MIN, COTE_MAX } = ALGO_PARAMS;
   const raw  = MARGE / prob;
   const cote = Math.min(Math.max(raw, COTE_MIN), COTE_MAX);
-  return Math.round(cote / 0.05) * 0.05;
+  // Arrondi par entiers pour éviter les erreurs IEEE 754 (ex: 1.525/0.05=30.4999...)
+  return Math.round(cote * 20) / 20;
+}
+
+// Calcule toutes les forces en O(n log n) — tri fait une seule fois au lieu de N fois
+export function calculerToutesLesForces(
+  startlist: AthleteInStartlist[]
+): Map<string, number> {
+  const { K, WEIGHT_RANG, WEIGHT_PTS } = ALGO_PARAMS;
+
+  const sortedByRang = [...startlist].sort((a, b) => a.rang_national - b.rang_national);
+  const sortedByPts  = [...startlist].sort((a, b) => b.points_classement - a.points_classement);
+
+  const rangMap = new Map(sortedByRang.map((a, i) => [a.code_bateau, i + 1]));
+  const ptsMap  = new Map(sortedByPts.map((a, i)  => [a.code_bateau, i + 1]));
+
+  const forces = new Map<string, number>();
+  for (const athlete of startlist) {
+    const rangRelatif = rangMap.get(athlete.code_bateau) ?? startlist.length;
+    const ptsRelatif  = ptsMap.get(athlete.code_bateau)  ?? startlist.length;
+    const forceRang   = Math.exp(-K * (rangRelatif - 1));
+    const forcePts    = Math.exp(-K * (ptsRelatif  - 1));
+    const fiabilite   =
+      athlete.nb_courses_classement >= 3 ? 1.0
+      : athlete.nb_courses_classement === 2 ? 0.90
+      : 0.80;
+    forces.set(athlete.code_bateau, (WEIGHT_RANG * forceRang + WEIGHT_PTS * forcePts) * fiabilite);
+  }
+  return forces;
 }

@@ -22,7 +22,8 @@ export default async function CotesPage() {
   // Cotes existantes — ignoré si la table n'existe pas encore
   const { data: cotesCountRaw } = await supabase
     .from("cotes")
-    .select("course_id");
+    .select("course_id")
+    .range(0, 49999);
 
   const cotesPerCourse = new Map<string, number>();
   for (const row of cotesCountRaw ?? []) {

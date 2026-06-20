@@ -44,6 +44,7 @@ const NIVEAU_STYLE: Record<string, string> = {
   NAT: "text-[#28D7E6] bg-[rgba(40,215,230,.12)] border-[rgba(40,215,230,.3)]",
   REG: "text-[#a0f0a0] bg-[rgba(160,240,160,.10)] border-[rgba(160,240,160,.3)]",
   SEF: "text-[#FF7A45] bg-[rgba(255,122,69,.12)] border-[rgba(255,122,69,.3)]",
+  SEL: "text-[#b39ddb] bg-[rgba(179,157,219,.12)] border-[rgba(179,157,219,.3)]",
 };
 
 function fmt(v: number | null, dec = 2): string {
@@ -104,8 +105,9 @@ export default function CotesClient({
             ? `/api/cotes/${courseId}?categorie=${encodeURIComponent(cat)}`
             : `/api/cotes/${courseId}`;
         const res = await fetch(url);
+        if (!res.ok) { setCotes([]); return; }
         const data = await res.json();
-        setCotes(data);
+        setCotes(Array.isArray(data) ? data : []);
       } catch {
         setCotes([]);
       } finally {

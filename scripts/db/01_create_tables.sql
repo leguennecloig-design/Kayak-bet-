@@ -28,11 +28,11 @@ CREATE TABLE IF NOT EXISTS athletes (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS ffck_competitions (
   id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  code_ffck       INTEGER UNIQUE NOT NULL,
+  code_ffck       INTEGER UNIQUE,
   nom             TEXT NOT NULL,
   ville           TEXT,
   riviere         TEXT,
-  date_debut      DATE NOT NULL,
+  date_debut      DATE,
   date_fin        DATE,
   code_niveau     TEXT NOT NULL,
   code_type       TEXT,

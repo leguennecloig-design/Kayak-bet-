@@ -45,6 +45,8 @@ export default function StartlistClient() {
   const [showBiplace, setShowBiplace] = useState(false);
 
   async function handleFile(file: File) {
+    // Réinitialiser la valeur de l'input pour permettre de re-sélectionner le même fichier
+    if (fileRef.current) fileRef.current.value = "";
     if (!file.name.endsWith(".pdf")) {
       setError("Seuls les fichiers PDF sont acceptés.");
       return;
@@ -292,7 +294,7 @@ export default function StartlistClient() {
                         {ath.club}
                       </td>
                       <td className="px-4 py-2 text-right text-xs text-[#9fbac6] hidden md:table-cell font-mono">
-                        {ath.rang_national ? `#${ath.rang_national}` : "—"}
+                        {ath.rang_national != null ? `#${ath.rang_national}` : "—"}
                       </td>
                       <td className="px-4 py-2 text-center">
                         {ath.matched ? (

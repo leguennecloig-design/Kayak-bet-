@@ -15,7 +15,6 @@ type ImportedAthlete = {
   prenom: string;
   club: string;
   depart: string;
-  categorie?: string;
   athlete_id: string | null;
   code_bateau: string | null;
   matched: boolean;
@@ -43,21 +42,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  const body = (await req.json()) as ImportBody;
+  let body: ImportBody;
+  try {
+    body = (await req.json()) as ImportBody;
+  } catch {
+    return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
+  }
+
   const supabase = createAdminSupabase();
 
   const dateDebut = body.date_debut ? frDateToISO(body.date_debut) : null;
-  const dateFin = body.date_fin ? frDateToISO(body.date_fin) : null;
+  const dateFin   = body.date_fin   ? frDateToISO(body.date_fin)   : null;
   const annee = dateDebut ? parseInt(dateDebut.slice(0, 4)) : new Date().getFullYear();
 
-  // 1. Créer ou récupérer la compétition
+  // 1. Créer ou récupérer la compétition (idempotence correcte même si date est null)
   let compId: string;
-  const { data: existing } = await supabase
+  const baseQ = supabase
     .from("ffck_competitions")
     .select("id")
-    .eq("nom", body.nom_competition)
-    .eq("date_debut", dateDebut ?? "")
-    .maybeSingle();
+    .eq("nom", body.nom_competition);
+  const { data: existing } = await (dateDebut
+    ? baseQ.eq("date_debut", dateDebut)
+    : baseQ.is("date_debut", null)
+  ).maybeSingle();
 
   if (existing?.id) {
     compId = existing.id;
@@ -89,7 +96,7 @@ export async function POST(req: NextRequest) {
     compId = comp.id;
   }
 
-  // 2. Créer ou récupérer la course "Classique"
+  // 2. Créer ou récupérer la course
   let courseId: string;
   const { data: existingCourse } = await supabase
     .from("ffck_courses")
@@ -101,17 +108,13 @@ export async function POST(req: NextRequest) {
   if (existingCourse?.id) {
     courseId = existingCourse.id;
   } else {
-    const totalParticipants = body.categories.reduce(
-      (s, c) => s + c.athletes.length,
-      0
-    );
     const { data: course, error: courseErr } = await supabase
       .from("ffck_courses")
       .insert({
         competition_id: compId,
         code_course: 1,
         libelle: body.type_epreuve,
-        nb_participants: totalParticipants,
+        nb_participants: body.categories.reduce((s, c) => s + c.athletes.length, 0),
         synced_at: new Date().toISOString(),
       })
       .select("id")
@@ -158,10 +161,14 @@ export async function POST(req: NextRequest) {
 
   const cotesResults: Record<string, number> = {};
   for (const cat of monoCategories) {
-    const cotes = await calculateCotesFromStartlist(courseId, cat, supabase);
-    if (cotes.length > 0) {
-      await saveCotes(courseId, cotes, supabase);
-      cotesResults[cat] = cotes.length;
+    try {
+      const cotes = await calculateCotesFromStartlist(courseId, cat, supabase);
+      if (cotes.length > 0) {
+        await saveCotes(courseId, cotes, supabase);
+        cotesResults[cat] = cotes.length;
+      }
+    } catch (e) {
+      console.error(`[import-startlist] cotes ${cat}:`, e);
     }
   }
 

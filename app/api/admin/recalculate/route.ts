@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import {
   calculateCotesForCourse,
+  calculateCotesFromStartlist,
   saveCotes,
 } from "@/lib/algo/cotes-engine";
 
@@ -33,21 +34,47 @@ export async function POST(req: NextRequest) {
 
   for (const id of courseIds) {
     try {
-      const { data: cats } = await supabase
-        .from("ffck_resultats")
-        .select("categorie")
-        .eq("course_id", id)
-        .eq("dsq", false)
-        .not("rang", "is", null);
+      // Détecter le type de source : startlist_entries ou ffck_resultats
+      const { count: startlistCount } = await supabase
+        .from("startlist_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", id);
 
-      const categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
+      let categories: string[] = [];
       let total = 0;
 
-      for (const cat of categories) {
-        const cotes = await calculateCotesForCourse(id, cat, supabase);
-        if (cotes.length > 0) {
-          await saveCotes(id, cotes, supabase);
-          total += cotes.length;
+      if ((startlistCount ?? 0) > 0) {
+        // Compétition importée via startlist PDF
+        const { data: cats } = await supabase
+          .from("startlist_entries")
+          .select("categorie")
+          .eq("course_id", id)
+          .eq("is_biplace", false);
+        categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
+
+        for (const cat of categories) {
+          const cotes = await calculateCotesFromStartlist(id, cat, supabase);
+          if (cotes.length > 0) {
+            await saveCotes(id, cotes, supabase);
+            total += cotes.length;
+          }
+        }
+      } else {
+        // Compétition FFCK — résultats officiels
+        const { data: cats } = await supabase
+          .from("ffck_resultats")
+          .select("categorie")
+          .eq("course_id", id)
+          .eq("dsq", false)
+          .not("rang", "is", null);
+        categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
+
+        for (const cat of categories) {
+          const cotes = await calculateCotesForCourse(id, cat, supabase);
+          if (cotes.length > 0) {
+            await saveCotes(id, cotes, supabase);
+            total += cotes.length;
+          }
         }
       }
 

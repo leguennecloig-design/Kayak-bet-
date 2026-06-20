@@ -1,5 +1,5 @@
 import {
-  calculerForce,
+  calculerToutesLesForces,
   calculerRangEspere,
   sigmaFor,
   probTopN,
@@ -71,10 +71,7 @@ export async function calculateCotesForCourse(
 
   if (startlist.length < 2) return [];
 
-  const forces = new Map<string, number>();
-  for (const athlete of startlist) {
-    forces.set(athlete.code_bateau, calculerForce(athlete, startlist));
-  }
+  const forces = calculerToutesLesForces(startlist);
 
   const results: CoteResult[] = [];
   for (const athlete of startlist) {
@@ -162,10 +159,7 @@ export async function calculateCotesFromStartlist(
 
   if (startlist.length < 2) return [];
 
-  const forces = new Map<string, number>();
-  for (const athlete of startlist) {
-    forces.set(athlete.code_bateau, calculerForce(athlete, startlist));
-  }
+  const forces = calculerToutesLesForces(startlist);
 
   const results: CoteResult[] = [];
   for (const athlete of startlist) {

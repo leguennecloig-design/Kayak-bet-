@@ -1,4 +1,4 @@
-export interface ParsedAthlete {
+﻿export interface ParsedAthlete {
   dossard: number;
   nom: string;
   prenom: string;
@@ -50,7 +50,7 @@ export function parseNomPrenom(raw: string): { nom: string; prenom: string } {
   const parts = raw.trim().split(/\s+/);
   let split = parts.length;
   for (let i = 0; i < parts.length; i++) {
-    if (!/^[A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇŒÆ''`\-]+$/.test(parts[i])) {
+    if (!/^[A-ZÀ-ÖØ-ÞŒŠŽ''`\-]+$/.test(parts[i])) {
       split = i;
       break;
     }
@@ -81,7 +81,7 @@ function parseMonoplaceRow(line: string): ParsedAthlete | null {
   const rawName = dosM[2].trim();
   const { nom, prenom } = parseNomPrenom(rawName);
 
-  return { dossard: parseInt(dosM[1]), nom, prenom, club, depart, rawName, isBiplace: false };
+  return { dossard: parseInt(dosM[1], 10), nom, prenom, club, depart, rawName, isBiplace: false };
 }
 
 export function parseStartlistText(text: string): ParsedStartlist {
@@ -121,7 +121,9 @@ export function parseStartlistText(text: string): ParsedStartlist {
         i++; continue;
       }
       if (!result.nom_competition) { result.nom_competition = line; i++; continue; }
-      if (!result.lieu && result.nom_competition && !line.match(/\([A-Z0-9]+\)/)) {
+      // Lieu : accepte les parenthèses purement numériques (code département ex: "(38)")
+      // mais rejette les codes de catégorie qui contiennent des lettres (ex: "(K1HU18)")
+      if (!result.lieu && result.nom_competition && !line.match(/\([A-Z][A-Z0-9]*\)/)) {
         result.lieu = line;
         i++; continue;
       }
@@ -144,13 +146,13 @@ export function parseStartlistText(text: string): ParsedStartlist {
 
     // Biplace : dossard seul sur sa ligne
     if (/^\d+$/.test(line) && currentCat.isBiplace) {
-      const dossard = parseInt(line);
+      const dossard = parseInt(line, 10);
       const names: string[] = [];
       let club = '';
       let depart = '';
       let j = i + 1;
 
-      while (j < lines.length && j <= i + 6) {
+      while (j < lines.length && j <= i + 8) {
         const nl = lines[j].trim();
         if (!nl || isHeaderOrFooter(nl) || /^Dos\s+Nom/i.test(nl)) { j++; continue; }
         if (nl.match(/^(.+?)\s+\(([A-Z][A-Z0-9]+)\)\s*$/)) break;
@@ -192,11 +194,13 @@ export function parseStartlistText(text: string): ParsedStartlist {
 }
 
 // Normalisation pour matching : sans accents, sans ponctuation, lowercase
+// Utilise l'escape Unicode explicite ̀-ͯ (plage diacritiques combinants)
+// pour éviter la corruption lors d'une ré-encodage du fichier source.
 export function normalizeName(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[''`\-]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
