@@ -14,7 +14,8 @@
     "sync:resultats": "npx tsx scripts/sync/sync-resultats.ts",
     "sync:sef-embrun-2026": "npx tsx scripts/sync/import-sef-embrun-2026.ts",
     "cotes": "npx tsx scripts/sync/calculate-cotes.ts",
-    "cotes:year": "npx tsx scripts/sync/calculate-cotes.ts --year=2026"
+    "cotes:2026": "npx tsx scripts/sync/calculate-cotes.ts --year=2026",
+    "cotes:reset": "npx tsx scripts/sync/calculate-cotes.ts --year=2026 --force"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

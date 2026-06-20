@@ -12,30 +12,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isSprintCourse(libelle: string): boolean {
+  return libelle.toLowerCase().includes('sprint');
+}
+
 async function main() {
   const args = process.argv.slice(2);
-  const courseIdFlag = args.find((a) => a.startsWith("--courseId="));
-  const yearFlag    = args.find((a) => a.startsWith("--year="));
+  const courseIdFlag = args.find(a => a.startsWith("--courseId="));
+  const yearFlag     = args.find(a => a.startsWith("--year="));
+  const forceFlag    = args.includes("--force");
 
-  const courseId = courseIdFlag?.split("=")[1];
-  const year     = yearFlag    ? parseInt(yearFlag.split("=")[1]) : null;
+  const singleCourseId = courseIdFlag?.split("=")[1];
+  const year           = yearFlag ? parseInt(yearFlag.split("=")[1]) : null;
 
-  if (courseId) {
-    await processCourse(courseId);
+  if (singleCourseId) {
+    await processCourse(singleCourseId, singleCourseId);
     return;
   }
 
-  // Récupère toutes les courses (filtre par année si fournie)
   let query = supabase
     .from("ffck_courses")
-    .select(`
-      id, code_course,
-      ffck_competitions ( id, nom, annee, date_debut )
-    `);
-
-  if (year) {
-    query = query.eq("ffck_competitions.annee", year);
-  }
+    .select("id, libelle, ffck_competitions(id, nom, annee, code_type)");
 
   const { data: courses, error } = await query;
 
@@ -44,27 +41,36 @@ async function main() {
     process.exit(1);
   }
 
-  const filtered = (courses ?? []).filter((c) => {
+  const filtered = (courses ?? []).filter(c => {
     const comp = Array.isArray(c.ffck_competitions)
       ? c.ffck_competitions[0]
       : c.ffck_competitions;
     if (!comp) return false;
     if (year && (comp as { annee?: number }).annee !== year) return false;
+    if ((comp as { code_type?: string }).code_type === 'SEL' && !forceFlag) return false;
     return true;
   });
 
   console.log(`\n🎯 ${filtered.length} manche(s) à traiter${year ? ` (année ${year})` : ""}\n`);
 
+  let totalCotes = 0;
+
   for (const course of filtered) {
-    await processCourse(course.id as string, course.code_course as string);
+    const comp = Array.isArray(course.ffck_competitions)
+      ? course.ffck_competitions[0]
+      : course.ffck_competitions;
+    const compNom = (comp as { nom?: string })?.nom ?? '—';
+    const libelle = course.libelle ?? course.id;
+    const discipline = isSprintCourse(libelle) ? 'SPRINT' : 'CLASSIQUE';
+
+    const n = await processCourse(course.id as string, `${compNom} — ${libelle} [${discipline}]`);
+    totalCotes += n;
   }
 
-  console.log("\n✅ Terminé.\n");
+  console.log(`\n✅ Total : ${totalCotes} cotes calculées\n`);
 }
 
-async function processCourse(courseId: string, label = courseId) {
-  console.log(`\n📊 Course ${label} (${courseId})`);
-
+async function processCourse(courseId: string, label = courseId): Promise<number> {
   const { data: cats } = await supabase
     .from("ffck_resultats")
     .select("categorie")
@@ -75,29 +81,27 @@ async function processCourse(courseId: string, label = courseId) {
   const categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
 
   if (categories.length === 0) {
-    console.log("  Aucun résultat classé — ignorée");
-    return;
+    console.log(`  ${label} — aucun résultat classé`);
+    return 0;
   }
 
   let total = 0;
   for (const cat of categories) {
     const cotes = await calculateCotesForCourse(courseId, cat, supabase);
-    if (cotes.length === 0) {
-      console.log(`  ${cat}: pas de données classement — ignorée`);
-      continue;
-    }
+    if (cotes.length === 0) continue;
     await saveCotes(courseId, cotes, supabase);
-    const best = cotes.sort((a, b) => a.rang_espere - b.rang_espere)[0];
+    const best = [...cotes].sort((a, b) => a.rang_espere - b.rang_espere)[0];
+    const fbBadge = best.fallback_type !== 'discipline' ? ` [${best.fallback_type}]` : '';
     console.log(
-      `  ${cat}: ${cotes.length} cotes — favori ${best.nom} (cote top1: ${best.cote_top1?.toFixed(2)})`
+      `  ✓ ${label} — ${cat} : ${cotes.length} cotes (v2.0) — favori ${best.nom}${fbBadge} top1=${best.cote_top1}`
     );
     total += cotes.length;
   }
 
-  console.log(`  → ${total} cotes sauvegardées`);
+  return total;
 }
 
-main().catch((e) => {
+main().catch(e => {
   console.error(e);
   process.exit(1);
 });
