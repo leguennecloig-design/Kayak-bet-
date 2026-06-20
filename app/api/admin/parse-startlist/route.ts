@@ -17,32 +17,45 @@ export async function POST(req: NextRequest) {
   }
 
   // Parse PDF
+  // On importe pdf-parse/lib/pdf-parse directement pour contourner le code
+  // incompatible de l'index.js avec le runtime Next.js App Router.
   const buffer = Buffer.from(await file.arrayBuffer());
   let text: string;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse") as (b: Buffer) => Promise<{ text: string }>;
+    const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (b: Buffer) => Promise<{ text: string }>;
     const result = await pdfParse(buffer);
     text = result.text;
-  } catch {
-    return NextResponse.json({ error: "PDF invalide ou corrompu" }, { status: 400 });
+  } catch (e) {
+    console.error("[parse-startlist] pdfParse error:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: `Erreur lecture PDF : ${msg}` }, { status: 400 });
   }
 
   const startlist = parseStartlistText(text);
 
-  // Charger tous les athlètes pour le matching (.range évite la limite 1000 lignes par défaut)
+  // Charger tous les athlètes en paginant par tranches de 1000
   const supabase = createAdminSupabase();
-  const { data: athletes, error: athErr } = await supabase
-    .from("athletes")
-    .select("id, code_bateau, nom, prenom, categorie, rang_national, points_classement")
-    .range(0, 4999);
-
-  if (athErr) {
-    return NextResponse.json({ error: `Erreur chargement athlètes: ${athErr.message}` }, { status: 500 });
+  type AthRow = { id: string; code_bateau: string | null; nom: string; prenom: string; categorie: string; rang_national: number | null; points_classement: number | null };
+  const PAGE = 1000;
+  const athletes: AthRow[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error: athErr } = await supabase
+      .from("athletes")
+      .select("id, code_bateau, nom, prenom, categorie, rang_national, points_classement")
+      .range(offset, offset + PAGE - 1);
+    if (athErr) {
+      return NextResponse.json({ error: `Erreur chargement athlètes: ${athErr.message}` }, { status: 500 });
+    }
+    if (!data || data.length === 0) break;
+    athletes.push(...(data as AthRow[]));
+    if (data.length < PAGE) break;
+    offset += PAGE;
   }
 
   // Index par nom normalisé → liste d'athlètes (un nom peut exister en plusieurs catégories)
-  const nameIndex = new Map<string, NonNullable<typeof athletes>>();
+  const nameIndex = new Map<string, AthRow[]>();
   for (const a of athletes ?? []) {
     const key = normalizeName(`${a.nom} ${a.prenom}`);
     if (!nameIndex.has(key)) nameIndex.set(key, []);

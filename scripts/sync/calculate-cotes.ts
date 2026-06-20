@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import {
   calculateCotesForCourse,
+  calculateCotesFromStartlist,
   saveCotes,
 } from "../../lib/algo/cotes-engine";
 
@@ -71,14 +72,31 @@ async function main() {
 }
 
 async function processCourse(courseId: string, label = courseId): Promise<number> {
-  const { data: cats } = await supabase
-    .from("ffck_resultats")
-    .select("categorie")
-    .eq("course_id", courseId)
-    .eq("dsq", false)
-    .not("rang", "is", null);
+  // Détecte le type de source : startlist importée (SEL) ou résultats FFCK
+  const { count: startlistCount } = await supabase
+    .from("startlist_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId);
 
-  const categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
+  const useStartlist = (startlistCount ?? 0) > 0;
+
+  let categories: string[];
+  if (useStartlist) {
+    const { data: cats } = await supabase
+      .from("startlist_entries")
+      .select("categorie")
+      .eq("course_id", courseId)
+      .eq("is_biplace", false);
+    categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
+  } else {
+    const { data: cats } = await supabase
+      .from("ffck_resultats")
+      .select("categorie")
+      .eq("course_id", courseId)
+      .eq("dsq", false)
+      .not("rang", "is", null);
+    categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
+  }
 
   if (categories.length === 0) {
     console.log(`  ${label} — aucun résultat classé`);
@@ -87,13 +105,16 @@ async function processCourse(courseId: string, label = courseId): Promise<number
 
   let total = 0;
   for (const cat of categories) {
-    const cotes = await calculateCotesForCourse(courseId, cat, supabase);
+    const cotes = useStartlist
+      ? await calculateCotesFromStartlist(courseId, cat, supabase)
+      : await calculateCotesForCourse(courseId, cat, supabase);
     if (cotes.length === 0) continue;
     await saveCotes(courseId, cotes, supabase);
     const best = [...cotes].sort((a, b) => a.rang_espere - b.rang_espere)[0];
     const fbBadge = best.fallback_type !== 'discipline' ? ` [${best.fallback_type}]` : '';
+    const src = useStartlist ? 'startlist' : 'resultats';
     console.log(
-      `  ✓ ${label} — ${cat} : ${cotes.length} cotes (v2.0) — favori ${best.nom}${fbBadge} top1=${best.cote_top1}`
+      `  ✓ ${label} — ${cat} : ${cotes.length} cotes (v2.0/${src}) — favori ${best.nom}${fbBadge} top1=${best.cote_top1}`
     );
     total += cotes.length;
   }

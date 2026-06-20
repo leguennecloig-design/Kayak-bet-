@@ -128,7 +128,8 @@ export async function POST(req: NextRequest) {
     courseId = course.id;
   }
 
-  // 3. Insérer startlist_entries (upsert pour éviter les doublons)
+  // 3. Insérer startlist_entries — delete+insert pour éviter les conflits
+  // (upsert impossible : deux rameurs d'un C2 peuvent avoir le même nom de famille)
   const entries = body.categories.flatMap((cat) =>
     cat.athletes.map((ath) => ({
       course_id: courseId,
@@ -146,9 +147,22 @@ export async function POST(req: NextRequest) {
   );
 
   if (entries.length > 0) {
+    // Supprimer les entrées existantes pour cette course avant de réinsérer
+    await supabase.from("startlist_entries").delete().eq("course_id", courseId);
+
+    // Dédupliquer par (categorie, dossard, nom, prenom) — évite les doublons
+    // dans la batch insert même si la contrainte DB n'est pas encore mise à jour
+    const seen = new Set<string>();
+    const dedupedEntries = entries.filter(e => {
+      const key = `${e.categorie}|${e.dossard}|${e.nom}|${e.prenom}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     const { error: entryErr } = await supabase
       .from("startlist_entries")
-      .upsert(entries, { onConflict: "course_id,dossard,nom" });
+      .insert(dedupedEntries);
     if (entryErr) {
       return NextResponse.json({ error: entryErr.message }, { status: 500 });
     }

@@ -2,8 +2,8 @@ import type { AthleteInStartlist } from "./types";
 
 export const ALGO_PARAMS = {
   K_FORCE: 0.20,
-  WEIGHT_RANG_BASE: 0.40,  // poids rang quand 4+ courses dispo
-  WEIGHT_RANG_MAX: 0.80,   // poids rang quand 0 course dispo
+  WEIGHT_RANG_BASE: 0.40,
+  WEIGHT_RANG_MAX: 0.80,
   SIGMA_FACTOR: 0.55,
   SIGMA_MIN: 0.80,
   BONUS_CONFRONTATION: 0.30,
@@ -19,7 +19,7 @@ export const ALGO_PARAMS = {
   ALGO_VERSION: 'v2.0',
 } as const;
 
-// CDF normale — approximation Abramowitz & Stegun (pas de dépendance externe)
+// CDF normale — approximation Abramowitz & Stegun
 export function cumulativeNormal(z: number): number {
   const sign = z >= 0 ? 1 : -1;
   const x    = Math.abs(z);
@@ -34,68 +34,42 @@ export function cumulativeNormal(z: number): number {
   return sign === 1 ? cdf : 1 - cdf;
 }
 
-// Étape 1 — Score composite discipline-spécifique
+// Étape 1 — Score composite (rangRelatif pré-calculé par computeForces — pas de re-tri ici)
 export function calculerScoreComposite(
   athlete: AthleteInStartlist,
-  allInStartlist: AthleteInStartlist[]
+  rangRelatif: number,
 ): number {
-  const { K_FORCE, WEIGHT_RANG_BASE, WEIGHT_RANG_MAX } = ALGO_PARAMS;
+  const { WEIGHT_RANG_BASE, WEIGHT_RANG_MAX } = ALGO_PARAMS;
 
-  // Score rang national (log pour compresser les écarts)
-  const sortedByRang = [...allInStartlist].sort((a, b) => a.rang_national - b.rang_national);
-  const rangRelatif  = sortedByRang.findIndex(a => a.code_bateau === athlete.code_bateau) + 1;
-  const scoreRang    = 1 / (1 + Math.log(Math.max(rangRelatif, 1)));
+  const scoreRang = 1 / (1 + Math.log(Math.max(rangRelatif, 1)));
 
-  // Score place moyenne discipline
-  let scorePerf = scoreRang * 0.85;  // valeur par défaut si aucune perf
   const n = athlete.nb_courses_discipline;
+  let scorePerf = scoreRang * 0.85;
 
   if (n > 0) {
     const placeMoyenne = athlete.places_discipline.reduce((s, p) => s + p, 0) / n;
     scorePerf = 1 / (1 + Math.log(Math.max(placeMoyenne, 1)));
-
-    // Fiabilité croissante avec le nb de courses
     let fiabilite = Math.min(1.0, 0.55 + 0.11 * n);
     if (athlete.fallback_type === 'autre_discipline') fiabilite *= 0.75;
-
     scorePerf *= fiabilite;
   }
 
-  // Poids dynamique : plus de courses → plus confiance aux perfs réelles
   const wRang = Math.max(WEIGHT_RANG_BASE, WEIGHT_RANG_MAX - 0.10 * n);
   const wPerf = 1 - wRang;
-
-  // Utilise K_FORCE pour décroissance (harmonise avec l'ancien param K)
-  void K_FORCE; // paramètre disponible pour les ajustements futurs
 
   return wRang * scoreRang + wPerf * scorePerf;
 }
 
-// Étape 2 — Ajustement confrontations directes (±BONUS_CONFRONTATION)
+// Étape 2 — Ajustement confrontations directes
+// Désactivé : places_discipline est un tableau positionnel sans alignement temporel.
+// Comparer les indices [0],[1],... de deux athlètes revient à comparer des courses
+// différentes — le résultat est du bruit, pas une vraie confrontation directe.
 export function ajusterParConfrontations(
-  athlete: AthleteInStartlist,
-  allInStartlist: AthleteInStartlist[],
+  _athlete: AthleteInStartlist,
+  _allInStartlist: AthleteInStartlist[],
   scoreComposite: number
 ): number {
-  const { BONUS_CONFRONTATION } = ALGO_PARAMS;
-
-  let bonusTotal = 0;
-  let nComparaisons = 0;
-
-  for (const adversaire of allInStartlist) {
-    if (adversaire.code_bateau === athlete.code_bateau) continue;
-    const placesA = athlete.places_discipline;
-    const placesB = adversaire.places_discipline;
-    if (placesA.length === 0 || placesB.length === 0) continue;
-
-    const nCommun = Math.min(placesA.length, placesB.length);
-    const victoiresA = placesA.slice(0, nCommun).filter((p, i) => p < placesB[i]).length;
-    bonusTotal += (victoiresA / nCommun) - 0.5;
-    nComparaisons++;
-  }
-
-  if (nComparaisons === 0) return scoreComposite;
-  return scoreComposite * (1 + BONUS_CONFRONTATION * (bonusTotal / nComparaisons));
+  return scoreComposite;
 }
 
 // Étape 3 — Rang espéré Bradley-Terry
@@ -127,7 +101,6 @@ export function probToCote(prob: number, plafond: number): number {
   const { MARGE, COTE_MIN } = ALGO_PARAMS;
   const raw  = MARGE / prob;
   const cote = Math.min(Math.max(raw, COTE_MIN), plafond);
-  // Arrondi au 0.05 via entiers — évite les erreurs IEEE 754
   return Math.round(cote * 20) / 20;
 }
 
