@@ -168,13 +168,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 4. Calculer les cotes pour les monoplaces
-  const monoCategories = body.categories
-    .filter((c) => !c.isBiplace)
-    .map((c) => c.code);
-
+  // 4. Calculer les cotes pour toutes les catégories (mono + C2 biplace)
   const cotesResults: Record<string, number> = {};
-  for (const cat of monoCategories) {
+  for (const cat of body.categories.map((c) => c.code)) {
     try {
       const cotes = await calculateCotesFromStartlist(courseId, cat, supabase);
       if (cotes.length > 0) {

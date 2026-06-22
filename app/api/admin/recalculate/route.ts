@@ -44,12 +44,11 @@ export async function POST(req: NextRequest) {
       let total = 0;
 
       if ((startlistCount ?? 0) > 0) {
-        // Compétition importée via startlist PDF
+        // Compétition importée via startlist PDF — toutes catégories (mono + biplace C2)
         const { data: cats } = await supabase
           .from("startlist_entries")
           .select("categorie")
-          .eq("course_id", id)
-          .eq("is_biplace", false);
+          .eq("course_id", id);
         categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
 
         for (const cat of categories) {

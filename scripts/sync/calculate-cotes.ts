@@ -113,8 +113,9 @@ async function processCourse(courseId: string, label = courseId): Promise<number
     const best = [...cotes].sort((a, b) => a.rang_espere - b.rang_espere)[0];
     const fbBadge = best.fallback_type !== 'discipline' ? ` [${best.fallback_type}]` : '';
     const src = useStartlist ? 'startlist' : 'resultats';
+    const sources = (best as { sources_utilisees?: string }).sources_utilisees ?? 'NUM';
     console.log(
-      `  ✓ ${label} — ${cat} : ${cotes.length} cotes (v2.0/${src}) — favori ${best.nom}${fbBadge} top1=${best.cote_top1}`
+      `  ✓ ${label} — ${cat} : ${cotes.length} cotes (v3.0/${src}) — favori ${best.nom}${fbBadge} [${sources}] top1=${best.cote_top1}`
     );
     total += cotes.length;
   }

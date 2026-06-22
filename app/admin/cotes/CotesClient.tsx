@@ -28,8 +28,9 @@ type CoteRow = {
   categorie: string;
   nb_athletes_startlist: number;
   rang_national: number | null;
-  place_moyenne_discipline: number | null;
-  force_score: number | null;
+  sources_utilisees: string | null;
+  score_composite: number | null;
+  score_final: number | null;
   rang_espere: number | null;
   fallback_type: string | null;
   cote_top1: number | null;
@@ -70,7 +71,7 @@ function FallbackBadge({ type }: { type: string | null }) {
   );
   return (
     <span className="ml-1.5 text-[9px] font-grotesk font-bold uppercase tracking-wide bg-red-500/10 text-red-400 border border-red-500/20 rounded px-1.5 py-0.5">
-      ⚠ national only
+      ⚠ nat only
     </span>
   );
 }
@@ -215,7 +216,7 @@ export default function CotesClient({
         <div>
           <h1 className="font-anton italic uppercase text-white text-[36px] leading-[0.9]">Cotes</h1>
           <p className="font-archivo text-[14px] text-[#7c9aaa] mt-2">
-            Bradley-Terry v2.0 — discipline-spécifique · confrontations directes
+            Bradley-Terry v3.0 — SEF · NAT · IR · NUM hiérarchisés · C2 inclus
           </p>
         </div>
         <button
@@ -344,7 +345,7 @@ export default function CotesClient({
                       <table className="w-full font-archivo text-[12px]">
                         <thead>
                           <tr className="border-b border-[var(--border-2)]">
-                            {["#", "Athlète", "Cat.", "Rg nat.", "Pl. moy.", "E[Rg]", "Top 1", "Top 3", "Top 5", "Top 10", "Top 20"].map(h => (
+                            {["#", "Athlète", "Cat.", "Rg nat.", "Sources", "E[Rg]", "Top 1", "Top 3", "Top 5", "Top 10", "Top 20"].map(h => (
                               <th key={h} className="px-3 py-2.5 text-left font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase text-[#5c7c8c]">
                                 {h}
                               </th>
@@ -362,7 +363,11 @@ export default function CotesClient({
                               </td>
                               <td className="px-3 py-3 text-[#7c9aaa]">{row.categorie}</td>
                               <td className="px-3 py-3 text-[#7c9aaa]">{row.rang_national ?? "—"}</td>
-                              <td className="px-3 py-3 text-[#7c9aaa]">{fmt(row.place_moyenne_discipline, 1)}</td>
+                              <td className="px-3 py-3">
+                                <span className="font-grotesk text-[9.5px] font-bold tracking-wide text-[#28D7E6]">
+                                  {row.sources_utilisees ?? "NUM"}
+                                </span>
+                              </td>
                               <td className="px-3 py-3 text-[#5c7c8c]">{fmt(row.rang_espere, 1)}</td>
                               <CoteCell v={row.cote_top1} />
                               <CoteCell v={row.cote_top3} />
@@ -377,16 +382,16 @@ export default function CotesClient({
                       {/* Meta info */}
                       {displayedCotes[0]?.calculated_at && (
                         <p className="font-archivo text-[11px] text-[#3a5c6c] mt-3 text-right">
-                          Calculé le {fmtDate(displayedCotes[0].calculated_at)} · algo {displayedCotes[0].algo_version}
+                          Calculé le {fmtDate(displayedCotes[0].calculated_at)} · {displayedCotes[0].algo_version}
                           · {displayedCotes[0].nb_athletes_startlist} athlètes · marge {Math.round((ALGO_PARAMS.MARGE - 1) * 100)}%
                         </p>
                       )}
 
                       {/* Légende fallback */}
                       {displayedCotes.some(r => r.fallback_type && r.fallback_type !== 'discipline') && (
-                        <div className="mt-3 flex gap-4 text-[11px] font-archivo text-[#5c7c8c]">
-                          <span><span className="text-orange-400">⚠ autre disc.</span> = résultats discipline opposée utilisés</span>
-                          <span><span className="text-red-400">⚠ national only</span> = uniquement classement national</span>
+                        <div className="mt-3 flex gap-5 text-[11px] font-archivo text-[#5c7c8c] flex-wrap">
+                          <span><span className="text-orange-400">⚠ autre disc.</span> = résultats discipline opposée</span>
+                          <span><span className="text-red-400">⚠ nat only</span> = uniquement classement numérique</span>
                         </div>
                       )}
                     </div>
@@ -407,7 +412,7 @@ export default function CotesClient({
                   <svg viewBox="0 0 24 24" fill="none" className={`w-3.5 h-3.5 transition-transform ${showParams ? "rotate-90" : ""}`}>
                     <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Paramètres algo (v2.0)
+                  Paramètres algo (v3.0)
                 </button>
                 {showParams && (
                   <pre className="mt-3 text-[11px] font-mono text-[#7c9aaa] bg-[rgba(7,31,45,.6)] border border-[var(--border-2)] rounded-xl p-4 overflow-x-auto">
