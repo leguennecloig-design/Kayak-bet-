@@ -58,7 +58,13 @@ type EntryRow = {
   athlete_id: string | null;
   dossard: number;
   is_biplace: boolean;
-  athletes: { rang_national: number | null; points_classement: number | null; nb_courses_classement: number | null } | null;
+};
+
+type AthByIdRow = {
+  id: string;
+  rang_national: number | null;
+  points_classement: number | null;
+  nb_courses_classement: number | null;
 };
 
 type V3History = {
@@ -278,17 +284,41 @@ export async function calculateCotesFromStartlist(
 
   const disciplineEstSprint = isSprint(courseData?.libelle ?? '');
 
-  // Inclure tous les athlètes (mono + biplace) sans filtrer sur athlete_id
-  // Les athlètes non matchés (U18/U21/etc.) reçoivent rang_national=999 par défaut
+  // Requête sans FK join pour inclure TOUS les athlètes, même non matchés (athlete_id=null)
+  // Le join athletes(...) ferait un INNER JOIN implicite et exclurait les non matchés
   const { data: entriesRaw } = await supabase
     .from('startlist_entries')
-    .select('nom, prenom, code_bateau, athlete_id, dossard, is_biplace, athletes(rang_national, points_classement, nb_courses_classement)')
+    .select('nom, prenom, code_bateau, athlete_id, dossard, is_biplace')
     .eq('course_id', courseId)
     .eq('categorie', categorie);
 
   if (!entriesRaw || entriesRaw.length < 2) return [];
 
   const entries = entriesRaw as EntryRow[];
+
+  // Fetch séparé des données de classement pour les athlètes matchés
+  const athleteIds = [...new Set(
+    entries.map(e => e.athlete_id).filter((id): id is string => id !== null)
+  )];
+  const athByIdMap = new Map<string, { rang_national: number; points_classement: number; nb_courses_classement: number }>();
+  if (athleteIds.length > 0) {
+    const { data: athRaw } = await supabase
+      .from('athletes')
+      .select('id, rang_national, points_classement, nb_courses_classement')
+      .in('id', athleteIds);
+    for (const a of (athRaw ?? []) as AthByIdRow[]) {
+      athByIdMap.set(a.id, {
+        rang_national:         a.rang_national         ?? 999,
+        points_classement:     a.points_classement     ?? 0,
+        nb_courses_classement: a.nb_courses_classement ?? 0,
+      });
+    }
+  }
+  const getAthData = (athlete_id: string | null) =>
+    athlete_id
+      ? (athByIdMap.get(athlete_id) ?? { rang_national: 999, points_classement: 0, nb_courses_classement: 0 })
+      : { rang_national: 999, points_classement: 0, nb_courses_classement: 0 };
+
   const isBiplaceCategorie = entries.some(e => e.is_biplace);
 
   let processedAthletes: AthleteInStartlist[];
@@ -306,15 +336,14 @@ export async function calculateCotesFromStartlist(
       const e1 = grp[0];
       const e2 = grp[1] ?? null;
 
-      const rang1 = e1.athletes?.rang_national ?? 999;
-      const rang2 = e2?.athletes?.rang_national ?? 999;
-      const bestRang = Math.min(rang1, rang2);
+      const ath1 = getAthData(e1.athlete_id);
+      const ath2 = e2 ? getAthData(e2.athlete_id) : null;
+      const bestRang = Math.min(ath1.rang_national, ath2?.rang_national ?? 999);
 
       const nom1 = `${e1.nom} ${e1.prenom}`.trim();
       const nom2 = e2 ? `${e2.nom} ${e2.prenom}`.trim() : '';
       const nomBateau = e2 ? `${nom1} / ${nom2}` : nom1;
 
-      // Utiliser le code_bateau du premier rameur ou une clé synthétique
       const codeBateau = e1.code_bateau ?? `${categorie}-${e1.dossard}`;
 
       return {
@@ -323,16 +352,15 @@ export async function calculateCotesFromStartlist(
         nom:                   nomBateau,
         categorie,
         rang_national:         bestRang,
-        points_classement:     e1.athletes?.points_classement ?? 0,
-        nb_courses_classement: e1.athletes?.nb_courses_classement ?? 0,
+        points_classement:     ath1.points_classement,
+        nb_courses_classement: ath1.nb_courses_classement,
         // C2 : pas de lookup historique possible (code bateau individuel ≠ code bateau C2 FFCK)
         sef: [], nat: [], ir: [],
         fallback_type: 'national_only' as FallbackType,
       };
     });
   } else {
-    // Monoplace : un athlète = une entrée
-    // Les athlètes non matchés (athlete_id null) sont inclus avec rang_national=999
+    // Monoplace : un athlète = une entrée (non matchés inclus avec rang_national=999)
     const codeBateaux = entries
       .map(e => e.code_bateau)
       .filter((cb): cb is string => cb !== null && cb !== undefined && cb.trim() !== '');
@@ -343,8 +371,11 @@ export async function calculateCotesFromStartlist(
 
     processedAthletes = entries.map(e => {
       const cb = e.code_bateau ?? null;
-      const h  = cb ? (historyMap.get(cb) ?? { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] }) : { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] };
+      const h  = cb
+        ? (historyMap.get(cb) ?? { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] })
+        : { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] };
       const { sef, nat, ir, fallback_type } = resolveFallback(h);
+      const ath = getAthData(e.athlete_id);
 
       const key = cb ?? (`${categorie}-${e.dossard}`);
       return {
@@ -352,9 +383,9 @@ export async function calculateCotesFromStartlist(
         athlete_id:            e.athlete_id,
         nom:                   `${e.nom} ${e.prenom}`.trim(),
         categorie,
-        rang_national:         e.athletes?.rang_national ?? 999,
-        points_classement:     e.athletes?.points_classement ?? 0,
-        nb_courses_classement: e.athletes?.nb_courses_classement ?? 0,
+        rang_national:         ath.rang_national,
+        points_classement:     ath.points_classement,
+        nb_courses_classement: ath.nb_courses_classement,
         sef, nat, ir, fallback_type,
       };
     });

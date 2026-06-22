@@ -85,8 +85,7 @@ async function processCourse(courseId: string, label = courseId): Promise<number
     const { data: cats } = await supabase
       .from("startlist_entries")
       .select("categorie")
-      .eq("course_id", courseId)
-      .eq("is_biplace", false);
+      .eq("course_id", courseId);
     categories = [...new Set((cats ?? []).map((r: { categorie: string }) => r.categorie))];
   } else {
     const { data: cats } = await supabase

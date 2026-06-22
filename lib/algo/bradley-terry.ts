@@ -114,7 +114,9 @@ export function calculerRangEspere(
 
 export function probTopN(rangEspere: number, sigma: number, n: number): number {
   const z = (n + 0.5 - rangEspere) / sigma;
-  return Math.min(Math.max(cumulativeNormal(z), 0.005), 0.97);
+  // Plancher 0.5% pour éviter les cotes infinies, plafond 0.999 pour ne pas
+  // bloquer les cotes à 1.15 (1.10/0.97) quand la prob est quasi-certaine
+  return Math.min(Math.max(cumulativeNormal(z), 0.005), 0.999);
 }
 
 export function sigmaFor(rangEspere: number): number {

@@ -1,9 +1,9 @@
 export const ALGO_PARAMS = {
-  // Poids sources (somme = 1.0)
+  // Poids sources (somme = 1.0) — NUM secondaire, résultats de course prioritaires
   W_SEF: 0.40,
-  W_NAT: 0.25,
+  W_NAT: 0.35,
   W_IR:  0.10,
-  W_NUM: 0.25,
+  W_NUM: 0.15,
 
   // Fiabilité = min(1.0, BASE + INCREMENT × nb_courses)
   FIAB_SEF_BASE: 0.60, FIAB_SEF_INC: 0.13,
