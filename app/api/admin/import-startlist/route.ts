@@ -193,18 +193,50 @@ export async function POST(req: NextRequest) {
     bettingCompId = newBetting?.id ?? null;
   }
 
+  // Index nom → {prenom, club} par catégorie pour enrichir les participants
+  const catNomLookup = new Map<string, Map<string, { prenom: string; club: string }>>();
+  for (const cat of body.categories) {
+    const m = new Map<string, { prenom: string; club: string }>();
+    for (const ath of cat.athletes) m.set(ath.nom, { prenom: ath.prenom, club: ath.club });
+    catNomLookup.set(cat.code, m);
+  }
+
   // 5. Calculer les cotes pour toutes les catégories (mono + C2 biplace)
   const cotesResults: Record<string, number> = {};
+  const favorites: Array<{ nom: string; prenom: string; club: string; cote_top1: number; categorie: string }> = [];
+
   for (const cat of body.categories.map((c) => c.code)) {
     try {
       const cotes = await calculateCotesFromStartlist(courseId, cat, supabase);
       if (cotes.length > 0) {
         await saveCotes(courseId, cotes, supabase);
         cotesResults[cat] = cotes.length;
+        const fav = cotes.reduce((best, c) => c.cote_top1 < best.cote_top1 ? c : best);
+        const info = catNomLookup.get(cat)?.get(fav.nom);
+        favorites.push({
+          nom: fav.nom,
+          prenom: info?.prenom ?? "",
+          club: info?.club ?? "",
+          cote_top1: fav.cote_top1,
+          categorie: cat,
+        });
       }
     } catch (e) {
       console.error(`[import-startlist] cotes ${cat}:`, e);
     }
+  }
+
+  // 6. Auto-importer le favori de chaque catégorie comme participant
+  if (bettingCompId && favorites.length > 0) {
+    await supabase.from("participants").delete().eq("competition_id", bettingCompId);
+    await supabase.from("participants").insert(
+      favorites.map((f) => ({
+        competition_id: bettingCompId,
+        nom: [f.prenom, f.nom].filter(Boolean).join(" ").trim(),
+        pays: f.categorie,
+        cote: f.cote_top1,
+      }))
+    );
   }
 
   return NextResponse.json({
@@ -214,5 +246,6 @@ export async function POST(req: NextRequest) {
     course_id: courseId,
     entries: entries.length,
     cotes: cotesResults,
+    participants_added: favorites.length,
   });
 }
