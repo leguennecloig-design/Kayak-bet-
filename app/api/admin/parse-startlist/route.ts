@@ -16,20 +16,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
   }
 
-  // Parse PDF
-  // On importe pdf-parse/lib/pdf-parse directement pour contourner le code
-  // incompatible de l'index.js avec le runtime Next.js App Router.
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const name = file.name.toLowerCase();
   let text: string;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (b: Buffer) => Promise<{ text: string }>;
-    const result = await pdfParse(buffer);
-    text = result.text;
-  } catch (e) {
-    console.error("[parse-startlist] pdfParse error:", e);
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: `Erreur lecture PDF : ${msg}` }, { status: 400 });
+
+  if (name.endsWith(".txt") || name.endsWith(".md")) {
+    // Fichier texte — lecture directe, pas de pdf-parse requis
+    text = await file.text();
+  } else if (name.endsWith(".pdf")) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (b: Buffer) => Promise<{ text: string }>;
+      const result = await pdfParse(buffer);
+      text = result.text;
+    } catch (e) {
+      console.error("[parse-startlist] pdfParse error:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: `Erreur lecture PDF : ${msg}` }, { status: 400 });
+    }
+  } else {
+    return NextResponse.json(
+      { error: "Format non supporté — utilisez .pdf ou .txt" },
+      { status: 400 }
+    );
   }
 
   const startlist = parseStartlistText(text);

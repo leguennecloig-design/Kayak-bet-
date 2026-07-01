@@ -42,10 +42,15 @@ export default function NouvelleCompetition() {
   const [result, setResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  function isAccepted(file: File): boolean {
+    const n = file.name.toLowerCase();
+    return n.endsWith(".pdf") || n.endsWith(".txt") || n.endsWith(".md");
+  }
+
   async function handleFile(file: File) {
     if (fileRef.current) fileRef.current.value = "";
-    if (!file.name.endsWith(".pdf")) {
-      setError("Seuls les fichiers PDF sont acceptés.");
+    if (!isAccepted(file)) {
+      setError("Format non supporté — utilisez .pdf ou .txt");
       return;
     }
     setParsing(true);
@@ -136,7 +141,7 @@ export default function NouvelleCompetition() {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf"
+            accept=".pdf,.txt,.md"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -161,7 +166,7 @@ export default function NouvelleCompetition() {
             Glisser-déposer le PDF de liste de départ
           </p>
           <p className="text-[12px] text-[#7c9aaa]">
-            ou cliquer pour sélectionner · Format competFFCK
+            ou cliquer pour sélectionner · .pdf ou .txt competFFCK
           </p>
         </div>
       )}
