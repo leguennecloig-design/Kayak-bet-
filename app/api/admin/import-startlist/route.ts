@@ -203,7 +203,8 @@ export async function POST(req: NextRequest) {
 
   // 5. Calculer les cotes pour toutes les catégories (mono + C2 biplace)
   const cotesResults: Record<string, number> = {};
-  const favorites: Array<{ nom: string; prenom: string; club: string; cote_top1: number; categorie: string }> = [];
+  type ParticipantRow = { competition_id: string; nom: string; pays: string; cote: number };
+  const allParticipants: ParticipantRow[] = [];
 
   for (const cat of body.categories.map((c) => c.code)) {
     try {
@@ -211,32 +212,30 @@ export async function POST(req: NextRequest) {
       if (cotes.length > 0) {
         await saveCotes(courseId, cotes, supabase);
         cotesResults[cat] = cotes.length;
-        const fav = cotes.reduce((best, c) => c.cote_top1 < best.cote_top1 ? c : best);
-        const info = catNomLookup.get(cat)?.get(fav.nom);
-        favorites.push({
-          nom: fav.nom,
-          prenom: info?.prenom ?? "",
-          club: info?.club ?? "",
-          cote_top1: fav.cote_top1,
-          categorie: cat,
-        });
+        if (bettingCompId) {
+          for (const c of cotes) {
+            const info = catNomLookup.get(cat)?.get(c.nom);
+            allParticipants.push({
+              competition_id: bettingCompId,
+              nom: [info?.prenom ?? "", c.nom].filter(Boolean).join(" ").trim() || c.nom,
+              pays: cat,
+              cote: c.cote_top1,
+            });
+          }
+        }
       }
     } catch (e) {
       console.error(`[import-startlist] cotes ${cat}:`, e);
     }
   }
 
-  // 6. Auto-importer le favori de chaque catégorie comme participant
-  if (bettingCompId && favorites.length > 0) {
+  // 6. Insérer tous les participants (1 par athlète, triés par catégorie puis cote)
+  if (bettingCompId && allParticipants.length > 0) {
     await supabase.from("participants").delete().eq("competition_id", bettingCompId);
-    await supabase.from("participants").insert(
-      favorites.map((f) => ({
-        competition_id: bettingCompId,
-        nom: [f.prenom, f.nom].filter(Boolean).join(" ").trim(),
-        pays: f.categorie,
-        cote: f.cote_top1,
-      }))
+    allParticipants.sort((a, b) =>
+      a.pays.localeCompare(b.pays) || a.cote - b.cote
     );
+    await supabase.from("participants").insert(allParticipants);
   }
 
   return NextResponse.json({
@@ -246,6 +245,6 @@ export async function POST(req: NextRequest) {
     course_id: courseId,
     entries: entries.length,
     cotes: cotesResults,
-    participants_added: favorites.length,
+    participants_added: allParticipants.length,
   });
 }

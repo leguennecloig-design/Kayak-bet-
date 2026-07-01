@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 
 type Competition = {
@@ -311,9 +311,17 @@ export default function EditClient({
 
         {/* Liste */}
         {participants.length > 0 ? (
-          <div className="flex flex-col gap-2 mb-6">
-            {participants.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 bg-[rgba(255,255,255,.04)] border border-[var(--border)] rounded-[12px] px-4 py-3">
+          <div className="flex flex-col gap-1 mb-6">
+            {participants.map((p, i) => {
+              const showHeader = p.pays && (i === 0 || participants[i - 1].pays !== p.pays);
+              return (
+              <Fragment key={p.id}>
+                {showHeader && (
+                  <div className="font-grotesk font-bold text-[9.5px] uppercase tracking-[.16em] text-[#7c9aaa] px-1 pt-4 pb-1 first:pt-0">
+                    {p.pays}
+                  </div>
+                )}
+              <div className="flex items-center gap-3 bg-[rgba(255,255,255,.04)] border border-[var(--border)] rounded-[12px] px-4 py-3">
                 {/* Cote — cliquable pour éditer */}
                 {editId === p.id ? (
                   <div className="flex items-center gap-2 flex-none">
@@ -357,7 +365,9 @@ export default function EditClient({
                   </svg>
                 </button>
               </div>
-            ))}
+              </Fragment>
+              );
+            })}
           </div>
         ) : (
           <p className="font-archivo text-[13.5px] text-[#5c7c8c] mb-5">

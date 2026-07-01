@@ -29,6 +29,7 @@ export default async function EditCompetition({
     .from("participants")
     .select("id, nom, pays, cote")
     .eq("competition_id", params.id)
+    .order("pays", { ascending: true })
     .order("cote", { ascending: true });
 
   return (
