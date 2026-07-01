@@ -168,7 +168,32 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 4. Calculer les cotes pour toutes les catégories (mono + C2 biplace)
+  // 4. Créer (ou retrouver) une entrée dans la table "competitions" (paris)
+  // pour que la compétition apparaisse dans le panneau admin.
+  let bettingCompId: string | null = null;
+  const { data: existingBetting } = await supabase
+    .from("competitions")
+    .select("id")
+    .eq("nom", body.nom_competition)
+    .maybeSingle();
+
+  if (existingBetting?.id) {
+    bettingCompId = existingBetting.id;
+  } else {
+    const { data: newBetting } = await supabase
+      .from("competitions")
+      .insert({
+        nom: body.nom_competition,
+        date: dateDebut,
+        lieu: body.lieu,
+        discipline: null,
+      })
+      .select("id")
+      .single();
+    bettingCompId = newBetting?.id ?? null;
+  }
+
+  // 5. Calculer les cotes pour toutes les catégories (mono + C2 biplace)
   const cotesResults: Record<string, number> = {};
   for (const cat of body.categories.map((c) => c.code)) {
     try {
@@ -185,6 +210,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     competition_id: compId,
+    betting_competition_id: bettingCompId,
     course_id: courseId,
     entries: entries.length,
     cotes: cotesResults,

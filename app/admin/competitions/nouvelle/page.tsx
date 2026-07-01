@@ -86,7 +86,11 @@ export default function NouvelleCompetition() {
         const j = await res.json();
         throw new Error(j.error ?? "Erreur import");
       }
-      router.push("/admin");
+      const json = await res.json();
+      const dest = json.betting_competition_id
+        ? `/admin/competitions/${json.betting_competition_id}`
+        : "/admin";
+      router.push(dest);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
       setImporting(false);
