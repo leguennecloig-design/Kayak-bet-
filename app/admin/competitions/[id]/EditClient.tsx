@@ -222,8 +222,10 @@ export default function EditClient({
     setCotesMsg("");
     try {
       const res  = await fetch(`/api/admin/competitions/${compId}/calculate-cotes`, { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
+      const text = await res.text();
+      let json: Record<string, unknown> = {};
+      try { json = JSON.parse(text); } catch { throw new Error(`Réponse invalide du serveur (${res.status})`); }
+      if (!res.ok) throw new Error((json.error as string) ?? "Erreur serveur");
       const cats = Object.entries(json.categories as Record<string, number>)
         .map(([k, v]) => `${k}: ${v}`)
         .join(", ");

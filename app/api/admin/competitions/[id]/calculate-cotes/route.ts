@@ -58,16 +58,20 @@ export async function POST(
   const summary: Record<string, number> = {};
 
   for (const epreuve of epreuves) {
-    const cotes = await calculateCotesFromInscriptions(
-      competitionId,
-      epreuve,
-      disciplineEstSprint,
-      supabase
-    );
-    if (cotes.length > 0) {
-      await saveCotesForCompetition(competitionId, cotes, supabase);
-      allCotes.push(...cotes);
-      summary[epreuve] = cotes.length;
+    try {
+      const cotes = await calculateCotesFromInscriptions(
+        competitionId,
+        epreuve,
+        disciplineEstSprint,
+        supabase
+      );
+      if (cotes.length > 0) {
+        await saveCotesForCompetition(competitionId, cotes, supabase);
+        allCotes.push(...cotes);
+        summary[epreuve] = cotes.length;
+      }
+    } catch (err) {
+      console.error(`Erreur catégorie ${epreuve}:`, err);
     }
   }
 
