@@ -426,9 +426,13 @@ export async function saveCotesForCompetition(
   supabase: SupabaseAny
 ): Promise<void> {
   const rows = cotes.map(c => ({
-    competition_id: competitionId,
+    competition_id:        competitionId,
     ...c,
-    calculated_at: new Date().toISOString(),
+    // Colonnes INTEGER : arrondi pour éviter les erreurs Postgres
+    rang_national:         Math.round(c.rang_national),
+    nb_athletes_startlist: Math.round(c.nb_athletes_startlist),
+    // rang_espere est NUMERIC (float) en base — on le garde tel quel
+    calculated_at:         new Date().toISOString(),
   }));
 
   const { error } = await supabase
