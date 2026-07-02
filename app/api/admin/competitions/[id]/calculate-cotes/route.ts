@@ -76,8 +76,13 @@ export async function POST(
   }
 
   if (allCotes.length === 0) {
+    const categoriesVues = epreuves.join(", ");
     return NextResponse.json(
-      { error: "Aucune cote calculée. Les catégories ont moins de 2 athlètes ou les données sont insuffisantes." },
+      {
+        error: `Aucun athlète connu trouvé dans les catégories [${categoriesVues}]. ` +
+          "L'algo n'inclut que les athlètes avec un classement numérique ou des résultats en base. " +
+          "Vérifie que la table athletes est synchronisée avec les données FFCK.",
+      },
       { status: 422 }
     );
   }

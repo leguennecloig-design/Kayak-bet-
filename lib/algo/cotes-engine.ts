@@ -507,9 +507,14 @@ export async function calculateCotesFromInscriptions(
     return processedAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, processedAthletes.length));
   }
 
-  // Monoplace : lookup historique par code_bateau
+  // Monoplace : lookup historique par code_bateau (robuste si ffck_resultats indisponible)
   const codeBateaux = entries.map(e => e.code_bateau);
-  const historyMap  = await fetchAllV3History(codeBateaux, categorie, disciplineEstSprint, supabase);
+  let historyMap: Awaited<ReturnType<typeof fetchAllV3History>>;
+  try {
+    historyMap = await fetchAllV3History(codeBateaux, categorie, disciplineEstSprint, supabase);
+  } catch {
+    historyMap = new Map();
+  }
 
   const processedAthletes: AthleteInStartlist[] = entries.map(e => {
     const h   = historyMap.get(e.code_bateau) ?? { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] };
@@ -527,8 +532,15 @@ export async function calculateCotesFromInscriptions(
     };
   });
 
-  if (processedAthletes.length < 2) return [];
-  const forces = computeForces(processedAthletes);
-  const scores = new Map(processedAthletes.map(a => [a.code_bateau, calculerScoreComposite(a)]));
-  return processedAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, processedAthletes.length));
+  // Seuls les athlètes "connus" participent au calcul :
+  // rang_national < 999 OU au moins un résultat en course (SEF/NAT/IR)
+  // Les inconnus sont exclus → pas de cote, pas dans les participants
+  const knownAthletes = processedAthletes.filter(
+    a => a.rang_national < 999 || a.sef.length > 0 || a.nat.length > 0 || a.ir.length > 0
+  );
+
+  if (knownAthletes.length < 2) return [];
+  const forces = computeForces(knownAthletes);
+  const scores = new Map(knownAthletes.map(a => [a.code_bateau, calculerScoreComposite(a)]));
+  return knownAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, knownAthletes.length));
 }
