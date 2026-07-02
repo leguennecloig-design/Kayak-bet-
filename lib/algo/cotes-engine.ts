@@ -446,21 +446,18 @@ type InscriptionRow2 = {
   athlete_id: string | null;
 };
 
+// Les entrées sont passées directement depuis la route (pas de re-query par epreuve)
+export type InscriptionEntry = { code_bateau: string; nom: string; athlete_id: string | null };
+
 export async function calculateCotesFromInscriptions(
-  competitionId: string,
+  entries: InscriptionEntry[],
   categorie: string,
   disciplineEstSprint: boolean,
   supabase: SupabaseAny
 ): Promise<CoteResult[]> {
-  const { data: entriesRaw } = await supabase
-    .from('inscriptions')
-    .select('code_bateau, nom, athlete_id')
-    .eq('competition_id', competitionId)
-    .eq('epreuve', categorie);
+  if (!entries || entries.length < 2) return [];
 
-  if (!entriesRaw || entriesRaw.length < 2) return [];
-
-  const entries = entriesRaw as InscriptionRow2[];
+  // entries est déjà fourni par l'appelant
 
   // Fetch données de classement : d'abord par athlete_id, puis fallback par code_bateau direct
   const athleteIds = [...new Set(

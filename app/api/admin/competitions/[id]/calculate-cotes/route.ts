@@ -6,11 +6,17 @@ import {
   saveCotesForCompetition,
 } from "@/lib/algo/cotes-engine";
 
+type InscriptionRow = {
+  code_bateau: string;
+  nom: string;
+  athlete_id: string | null;
+  epreuve: string | null;
+  club: string | null;
+};
+
 // POST /api/admin/competitions/[id]/calculate-cotes
-// 1. Regroupe les inscriptions par epreuve (catégorie)
-// 2. Lance l'algo Bradley-Terry par catégorie
-// 3. Sauvegarde les cotes dans la table `cotes`
-// 4. Synchronise la table `participants` (nom + cote_top1)
+// Groupe les inscriptions par epreuve en mémoire (pas de re-query),
+// lance Bradley-Terry v3 par catégorie, sauvegarde cotes + participants.
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -22,7 +28,7 @@ export async function POST(
   const competitionId = params.id;
   const supabase = createAdminSupabase();
 
-  // Récupère la discipline pour détecter sprint vs descente
+  // Discipline (sprint vs descente pour l'historique)
   const { data: comp } = await supabase
     .from("competitions")
     .select("discipline")
@@ -32,66 +38,91 @@ export async function POST(
   const disciplineEstSprint =
     comp?.discipline?.toLowerCase().includes("sprint") ?? false;
 
-  // Récupère les épreuves distinctes présentes dans les inscriptions
-  const { data: epreuvesRaw } = await supabase
+  // Récupère TOUTES les inscriptions en une seule requête
+  const { data: rawInscs, error: inscErr } = await supabase
     .from("inscriptions")
-    .select("epreuve, code_bateau, nom, club")
-    .eq("competition_id", competitionId)
-    .not("epreuve", "is", null);
+    .select("code_bateau, nom, athlete_id, epreuve, club")
+    .eq("competition_id", competitionId);
 
-  if (!epreuvesRaw || epreuvesRaw.length === 0) {
+  if (inscErr) {
+    return NextResponse.json({ error: inscErr.message }, { status: 500 });
+  }
+
+  if (!rawInscs || rawInscs.length === 0) {
     return NextResponse.json(
-      { error: "Aucune inscription avec épreuve trouvée. Réimporte les partants depuis la page Inscriptions." },
+      { error: "Aucune inscription trouvée pour cette compétition. Importe d'abord les partants." },
       { status: 422 }
     );
   }
 
-  // Map code_bateau → club pour la synchro participants
-  const clubMap = new Map<string, string | null>();
-  for (const r of epreuvesRaw) {
-    clubMap.set(r.code_bateau as string, r.club as string | null);
+  const inscriptions = rawInscs as InscriptionRow[];
+
+  // Groupe par epreuve en mémoire — élimine les problèmes de matching DB
+  const byEpreuve = new Map<string, InscriptionRow[]>();
+  const clubMap   = new Map<string, string | null>();
+
+  for (const row of inscriptions) {
+    const key = (row.epreuve ?? "INCONNU").trim();
+    const grp = byEpreuve.get(key) ?? [];
+    grp.push(row);
+    byEpreuve.set(key, grp);
+    clubMap.set(row.code_bateau, row.club);
   }
 
-  const epreuves = [...new Set(epreuvesRaw.map(r => r.epreuve as string))];
+  // Vérifie qu'on a au moins un epreuve renseigné
+  const hasEpreuve = [...byEpreuve.keys()].some(k => k !== "INCONNU");
+  if (!hasEpreuve) {
+    return NextResponse.json(
+      { error: "Les partants n'ont pas d'épreuve renseignée. Réimporte les partants depuis la page Inscriptions (bouton 'Réimporter')." },
+      { status: 422 }
+    );
+  }
 
   const allCotes: Awaited<ReturnType<typeof calculateCotesFromInscriptions>> = [];
-  const summary: Record<string, number> = {};
+  const summary:  Record<string, number> = {};
+  const errors:   string[] = [];
 
-  for (const epreuve of epreuves) {
+  for (const [epreuve, entries] of byEpreuve) {
+    if (epreuve === "INCONNU") continue;
+    if (entries.length < 2) continue; // pas assez d'athlètes pour une cote relative
+
     try {
       const cotes = await calculateCotesFromInscriptions(
-        competitionId,
+        entries.map(e => ({ code_bateau: e.code_bateau, nom: e.nom, athlete_id: e.athlete_id })),
         epreuve,
         disciplineEstSprint,
         supabase
       );
+
       if (cotes.length > 0) {
         await saveCotesForCompetition(competitionId, cotes, supabase);
         allCotes.push(...cotes);
         summary[epreuve] = cotes.length;
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${epreuve}: ${msg}`);
       console.error(`Erreur catégorie ${epreuve}:`, err);
     }
   }
 
   if (allCotes.length === 0) {
-    const categoriesVues = epreuves.join(", ");
+    const epreuvesList = [...byEpreuve.entries()]
+      .filter(([k]) => k !== "INCONNU")
+      .map(([k, v]) => `${k}(${v.length})`)
+      .join(", ");
+
     return NextResponse.json(
       {
-        error: `Aucun athlète connu trouvé dans les catégories [${categoriesVues}]. ` +
-          "L'algo n'inclut que les athlètes avec un classement numérique ou des résultats en base. " +
-          "Vérifie que la table athletes est synchronisée avec les données FFCK.",
+        error: `Aucune cote générée. Catégories trouvées : [${epreuvesList}]. ` +
+          (errors.length > 0 ? `Erreurs : ${errors.join(" | ")}` : "Toutes les catégories ont moins de 2 athlètes."),
       },
       { status: 422 }
     );
   }
 
   // Synchronise les participants : supprime les anciens, insère depuis les cotes
-  await supabase
-    .from("participants")
-    .delete()
-    .eq("competition_id", competitionId);
+  await supabase.from("participants").delete().eq("competition_id", competitionId);
 
   const participantRows = allCotes.map(c => ({
     competition_id: competitionId,
@@ -113,5 +144,6 @@ export async function POST(
     total_cotes:          allCotes.length,
     participants_created: participantRows.length,
     categories:           summary,
+    ...(errors.length > 0 ? { warnings: errors } : {}),
   });
 }
