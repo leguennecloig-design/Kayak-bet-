@@ -32,11 +32,11 @@ export async function POST() {
   // On ne filtre PAS sur status ni discipline côté DB :
   // - les imports PDF créent les compétitions sans status ni discipline
   // - la liste FFCK est déjà filtrée sur DES, donc seules les Descente auront un match
+  // Aucun filtre sur status — les imports PDF ne renseignent pas ce champ
   const { data: comps, error: compsError } = await supabase
     .from("competitions")
     .select("id, nom, date, lieu, discipline")
-    .is("ffck_inscription_code", null)
-    .or("status.is.null,status.neq.closed");
+    .is("ffck_inscription_code", null);
 
   if (compsError) {
     return NextResponse.json({ error: compsError.message }, { status: 500 });

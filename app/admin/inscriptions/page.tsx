@@ -7,12 +7,11 @@ export default async function InscriptionsPage() {
 
   const supabase = createAdminSupabase();
 
-  // Toutes les compétitions (import PDF crée sans status ni discipline).
-  // NULL != 'closed' étant NULL en PostgreSQL, on filtre via OR explicite.
+  // Toutes les compétitions sans aucun filtre sur status/discipline
+  // (les imports PDF créent les entrées sans ces champs)
   const { data: comps } = await supabase
     .from("competitions")
     .select("id, nom, date, lieu, discipline, status, ffck_inscription_code, ffck_match_status")
-    .or("status.is.null,status.neq.closed")
     .order("date", { ascending: false });
 
   // Compte des partants par compétition
