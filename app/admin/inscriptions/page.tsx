@@ -7,12 +7,11 @@ export default async function InscriptionsPage() {
 
   const supabase = createAdminSupabase();
 
-  // Compétitions Descente (draft ou published)
+  // Toutes les compétitions non terminées (import PDF crée sans status ni discipline)
   const { data: comps } = await supabase
     .from("competitions")
     .select("id, nom, date, lieu, discipline, status, ffck_inscription_code, ffck_match_status")
-    .in("status", ["draft", "published"])
-    .or("discipline.ilike.%Descente%,discipline.is.null")
+    .not("status", "eq", "closed")
     .order("date", { ascending: false });
 
   // Compte des partants par compétition

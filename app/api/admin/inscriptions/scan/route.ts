@@ -28,21 +28,26 @@ export async function POST() {
 
   const supabase = createAdminSupabase();
 
-  // Compétitions Descente sans code FFCK déjà assigné
+  // Toutes les compétitions sans code FFCK déjà assigné.
+  // On ne filtre PAS sur status ni discipline côté DB :
+  // - les imports PDF créent les compétitions sans status ni discipline
+  // - la liste FFCK est déjà filtrée sur DES, donc seules les Descente auront un match
   const { data: comps, error: compsError } = await supabase
     .from("competitions")
     .select("id, nom, date, lieu, discipline")
-    .in("status", ["draft", "published"])
     .is("ffck_inscription_code", null)
-    .or("discipline.ilike.%Descente%,discipline.is.null");
+    .not("status", "eq", "closed");
 
   if (compsError) {
     return NextResponse.json({ error: compsError.message }, { status: 500 });
   }
 
-  if (!comps || comps.length === 0) {
+  // Inclure aussi les compétitions sans status (créées par import PDF)
+  const allComps = comps ?? [];
+
+  if (allComps.length === 0) {
     return NextResponse.json({
-      message: "Aucune compétition Descente à matcher.",
+      message: "Aucune compétition à scanner (toutes ont déjà un code FFCK ou sont terminées).",
       results: [],
       summary: { auto: 0, ambigu: 0, introuvable: 0 },
     });
@@ -63,7 +68,7 @@ export async function POST() {
   const results: ScanResult[] = [];
   let autoCount = 0, ambiguCount = 0, introuvableCount = 0;
 
-  for (const comp of comps) {
+  for (const comp of allComps) {
     await sleep(FFCK_SCRAPER_CONFIG.REQUEST_DELAY_MS);
 
     const match = matchCompetitionToFFCK(
