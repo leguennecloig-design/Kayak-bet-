@@ -36,7 +36,7 @@ export async function POST() {
     .from("competitions")
     .select("id, nom, date, lieu, discipline")
     .is("ffck_inscription_code", null)
-    .not("status", "eq", "closed");
+    .or("status.is.null,status.neq.closed");
 
   if (compsError) {
     return NextResponse.json({ error: compsError.message }, { status: 500 });

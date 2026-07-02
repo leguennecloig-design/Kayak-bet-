@@ -223,7 +223,7 @@ export default function InscriptionsClient({ competitions: initial }: { competit
       {/* Tableau */}
       {competitions.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-[var(--border-2)] rounded-2xl">
-          <p className="font-archivo text-[15px] text-[#5c7c8c]">Aucune compétition Descente en draft ou publiée.</p>
+          <p className="font-archivo text-[15px] text-[#5c7c8c]">Aucune compétition active trouvée.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
