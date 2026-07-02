@@ -462,11 +462,16 @@ export async function calculateCotesFromInscriptions(
 
   const entries = entriesRaw as InscriptionRow2[];
 
-  // Fetch données de classement pour les athlètes matchés
+  // Fetch données de classement : d'abord par athlete_id, puis fallback par code_bateau direct
   const athleteIds = [...new Set(
     entries.map(e => e.athlete_id).filter((id): id is string => id !== null)
   )];
+  const codeBateauxAll = entries.map(e => e.code_bateau);
+
   const athByIdMap = new Map<string, { rang_national: number; points_classement: number; nb_courses_classement: number }>();
+  const athByCodeMap = new Map<string, { rang_national: number; points_classement: number; nb_courses_classement: number }>();
+
+  // Lookup par ID
   if (athleteIds.length > 0) {
     const { data: athRaw } = await supabase
       .from('athletes')
@@ -480,15 +485,32 @@ export async function calculateCotesFromInscriptions(
       });
     }
   }
-  const getAthData = (athlete_id: string | null) =>
-    athlete_id
-      ? (athByIdMap.get(athlete_id) ?? { rang_national: 999, points_classement: 0, nb_courses_classement: 0 })
-      : { rang_national: 999, points_classement: 0, nb_courses_classement: 0 };
+
+  // Lookup par code_bateau direct (couvre les athlètes non liés via athlete_id)
+  if (codeBateauxAll.length > 0) {
+    const { data: athCodeRaw } = await supabase
+      .from('athletes')
+      .select('code_bateau, rang_national, points_classement, nb_courses_classement')
+      .in('code_bateau', codeBateauxAll);
+    for (const a of (athCodeRaw ?? []) as AthRow[]) {
+      athByCodeMap.set(a.code_bateau, {
+        rang_national:         a.rang_national         ?? 999,
+        points_classement:     a.points_classement     ?? 0,
+        nb_courses_classement: a.nb_courses_classement ?? 0,
+      });
+    }
+  }
+
+  const getAthData = (athlete_id: string | null, code_bateau: string) => {
+    if (athlete_id && athByIdMap.has(athlete_id)) return athByIdMap.get(athlete_id)!;
+    if (athByCodeMap.has(code_bateau)) return athByCodeMap.get(code_bateau)!;
+    return { rang_national: 999, points_classement: 0, nb_courses_classement: 0 };
+  };
 
   // C2 biplaces : pas de lookup historique possible
   if (categorie.startsWith('C2')) {
     const processedAthletes: AthleteInStartlist[] = entries.map(e => {
-      const ath = getAthData(e.athlete_id);
+      const ath = getAthData(e.athlete_id, e.code_bateau);
       return {
         code_bateau:           e.code_bateau,
         athlete_id:            e.athlete_id,
@@ -501,17 +523,17 @@ export async function calculateCotesFromInscriptions(
         fallback_type: 'national_only' as FallbackType,
       };
     });
-    if (processedAthletes.length < 2) return [];
-    const forces = computeForces(processedAthletes);
-    const scores = new Map(processedAthletes.map(a => [a.code_bateau, calculerScoreComposite(a)]));
-    return processedAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, processedAthletes.length));
+    const toProcess = selectAthletes(processedAthletes);
+    if (toProcess.length < 2) return [];
+    const forces = computeForces(toProcess);
+    const scores = new Map(toProcess.map(a => [a.code_bateau, calculerScoreComposite(a)]));
+    return toProcess.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, toProcess.length));
   }
 
   // Monoplace : lookup historique par code_bateau (robuste si ffck_resultats indisponible)
-  const codeBateaux = entries.map(e => e.code_bateau);
   let historyMap: Awaited<ReturnType<typeof fetchAllV3History>>;
   try {
-    historyMap = await fetchAllV3History(codeBateaux, categorie, disciplineEstSprint, supabase);
+    historyMap = await fetchAllV3History(codeBateauxAll, categorie, disciplineEstSprint, supabase);
   } catch {
     historyMap = new Map();
   }
@@ -519,7 +541,7 @@ export async function calculateCotesFromInscriptions(
   const processedAthletes: AthleteInStartlist[] = entries.map(e => {
     const h   = historyMap.get(e.code_bateau) ?? { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] };
     const { sef, nat, ir, fallback_type } = resolveFallback(h);
-    const ath = getAthData(e.athlete_id);
+    const ath = getAthData(e.athlete_id, e.code_bateau);
     return {
       code_bateau:           e.code_bateau,
       athlete_id:            e.athlete_id,
@@ -532,15 +554,19 @@ export async function calculateCotesFromInscriptions(
     };
   });
 
-  // Seuls les athlètes "connus" participent au calcul :
-  // rang_national < 999 OU au moins un résultat en course (SEF/NAT/IR)
-  // Les inconnus sont exclus → pas de cote, pas dans les participants
-  const knownAthletes = processedAthletes.filter(
+  const toProcess = selectAthletes(processedAthletes);
+  if (toProcess.length < 2) return [];
+  const forces = computeForces(toProcess);
+  const scores = new Map(toProcess.map(a => [a.code_bateau, calculerScoreComposite(a)]));
+  return toProcess.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, toProcess.length));
+}
+
+// Sélectionne les athlètes à inclure dans le calcul :
+// - Si ≥ 2 athlètes "connus" (rang < 999 ou résultats en base) → seulement les connus
+// - Sinon → tous les athlètes (pas assez de données pour discriminer)
+function selectAthletes(athletes: AthleteInStartlist[]): AthleteInStartlist[] {
+  const known = athletes.filter(
     a => a.rang_national < 999 || a.sef.length > 0 || a.nat.length > 0 || a.ir.length > 0
   );
-
-  if (knownAthletes.length < 2) return [];
-  const forces = computeForces(knownAthletes);
-  const scores = new Map(knownAthletes.map(a => [a.code_bateau, calculerScoreComposite(a)]));
-  return knownAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, knownAthletes.length));
+  return known.length >= 2 ? known : athletes;
 }
