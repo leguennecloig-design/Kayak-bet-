@@ -231,7 +231,8 @@ export default function EditClient({
         .join(", ");
       setCotesMsg(`${json.total_cotes} cotes générées · ${json.participants_created} participants · ${cats}`);
       setCotesState("ok");
-      router.refresh();
+      // Rechargement complet pour afficher les participants dans la liste
+      setTimeout(() => window.location.reload(), 1800);
     } catch (e) {
       setCotesMsg(e instanceof Error ? e.message : "Erreur inconnue");
       setCotesState("error");
