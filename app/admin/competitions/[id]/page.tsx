@@ -27,10 +27,10 @@ export default async function EditCompetition({
 
   const { data: participants } = await supabase
     .from("participants")
-    .select("id, nom, pays, cote")
+    .select("id, nom, pays, cote, categorie")
     .eq("competition_id", params.id)
-    .order("pays", { ascending: true })
-    .order("cote", { ascending: true });
+    .order("categorie", { ascending: true })
+    .order("cote",      { ascending: true });
 
   // Partants FFCK scrapés (uniquement si discipline = Descente et inscriptions présentes)
   const isDescente = (comp.discipline as string | null)?.toLowerCase().includes("descente") ?? false;

@@ -29,6 +29,7 @@ type Participant = {
   nom: string;
   pays: string | null;
   cote: number | null;
+  categorie: string | null;
 };
 
 type AthleteResult = {
@@ -356,12 +357,14 @@ export default function EditClient({
         {participants.length > 0 ? (
           <div className="flex flex-col gap-1 mb-6">
             {participants.map((p, i) => {
-              const showHeader = p.pays && (i === 0 || participants[i - 1].pays !== p.pays);
+              const groupKey = p.categorie ?? p.pays ?? "";
+              const prevGroupKey = i > 0 ? (participants[i - 1].categorie ?? participants[i - 1].pays ?? "") : null;
+              const showHeader = groupKey && groupKey !== prevGroupKey;
               return (
               <Fragment key={p.id}>
                 {showHeader && (
                   <div className="font-grotesk font-bold text-[9.5px] uppercase tracking-[.16em] text-[#7c9aaa] px-1 pt-4 pb-1 first:pt-0">
-                    {p.pays}
+                    {groupKey}
                   </div>
                 )}
               <div className="flex items-center gap-3 bg-[rgba(255,255,255,.04)] border border-[var(--border)] rounded-[12px] px-4 py-3">

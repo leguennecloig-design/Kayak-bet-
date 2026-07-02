@@ -126,9 +126,10 @@ export async function POST(
 
   const participantRows = allCotes.map(c => ({
     competition_id: competitionId,
-    nom:  c.nom,
-    pays: clubMap.get(c.code_bateau) ?? null,
-    cote: c.cote_top1,
+    nom:       c.nom,
+    pays:      clubMap.get(c.code_bateau) ?? null,
+    cote:      c.cote_top1,
+    categorie: c.categorie,
   }));
 
   const { error: insertErr } = await supabase
