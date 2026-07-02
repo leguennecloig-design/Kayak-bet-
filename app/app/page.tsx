@@ -142,6 +142,10 @@ type BetRecord = {
 const TARGET = new Date("2026-07-16T10:00:00");
 const pad = (n: number) => String(n).padStart(2, "0");
 
+function cleanPays(s: string) {
+  return s.replace(/^\d{4}(?:\/\d{4})*\s*-\s*/, "").trim();
+}
+
 function fmtDate(iso: string) {
   const [y, m, d] = iso.split("-");
   const months = ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
@@ -284,10 +288,23 @@ export default function DashboardPage() {
   const [userEmail,     setUserEmail]     = useState("");
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
+  const [catFilter,     setCatFilter]     = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
   });
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  /* computed stats */
+  const myRank       = dbLeaderboard.find(p => p.isMe)?.rank ?? null;
+  const pendingCount = betHistory.filter(b => b.result === "pending").length;
+  const streak       = (() => {
+    let s = 0;
+    for (const b of betHistory) {
+      if (b.result === "pending") continue;
+      if (b.result === "win") s++; else break;
+    }
+    return s;
+  })();
 
   /* profil + solde */
   useEffect(() => {
@@ -361,8 +378,8 @@ export default function DashboardPage() {
           odds: parts.map((p: any) => ({
             id:            p.id,
             nm:            p.nom,
-            ctry:          p.pays ?? "",
-            note:          p.pays ?? p.nom,
+            ctry:          "FR",
+            note:          cleanPays(p.pays ?? ""),
             val:           p.cote != null ? parseFloat(p.cote) : 1.00,
             fav:           minCote != null && p.cote === minCote,
             competitionId: c.id,
@@ -536,15 +553,15 @@ export default function DashboardPage() {
           <div className="quick">
             <div className="chip-stat">
               <span className="ic"><ColRank /></span>
-              <span className="tx"><span className="l">Classement</span><span className="v">247<em>e</em></span></span>
+              <span className="tx"><span className="l">Classement</span><span className="v">{myRank !== null ? <>{myRank}<em>e</em></> : "—"}</span></span>
             </div>
             <div className="chip-stat">
               <span className="ic"><ColTicket /></span>
-              <span className="tx"><span className="l">Paris en cours</span><span className="v">2</span></span>
+              <span className="tx"><span className="l">Paris en cours</span><span className="v">{pendingCount}</span></span>
             </div>
             <div className="chip-stat">
               <span className="ic"><ColFlame /></span>
-              <span className="tx"><span className="l">Série</span><span className="v">3 victoires</span></span>
+              <span className="tx"><span className="l">Série</span><span className="v">{streak > 0 ? `${streak} victoire${streak > 1 ? "s" : ""}` : "—"}</span></span>
             </div>
           </div>
         </div>
@@ -579,10 +596,26 @@ export default function DashboardPage() {
               <span className="lab"><span className="bar" /> Vainqueur — Classement général</span>
               <button className="all" onClick={() => navigate("competitions")}>Toutes les compétitions <Arrow /></button>
             </div>
-            {feat.odds.length > 0
-              ? <OddsGrid odds={feat.odds} eventName={feat.name} />
-              : <p className="no-odds">Les cotes seront disponibles bientôt.</p>
-            }
+            {feat.odds.length > 0 ? (() => {
+              const cats = [...new Set(feat.odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
+              const sel  = catFilter[feat.id] ?? "";
+              const filtOdds = sel ? feat.odds.filter(o => o.categorie === sel) : feat.odds;
+              return (
+                <>
+                  {cats.length > 1 && (
+                    <div className="cat-tabs">
+                      <button className={`cat-tab${!sel ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [feat.id]: "" }))}>Toutes</button>
+                      {cats.map(cat => (
+                        <button key={cat} className={`cat-tab${sel === cat ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [feat.id]: cat }))}>
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <OddsGrid odds={filtOdds} eventName={feat.name} />
+                </>
+              );
+            })() : <p className="no-odds">Les cotes seront disponibles bientôt.</p>}
           </section>
         )}
       </>
@@ -613,19 +646,36 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="comp-right">
-                  <div className="comp-bettors">
-                    <span className="bv">{c.bettors.toLocaleString("fr-FR")}</span>
-                    <span className="bl">parieurs</span>
-                  </div>
+                  {c.bettors > 0 && (
+                    <div className="comp-bettors">
+                      <span className="bv">{c.bettors.toLocaleString("fr-FR")}</span>
+                      <span className="bl">parieurs</span>
+                    </div>
+                  )}
                   <div className={`comp-chevron${isOpen ? " open" : ""}`}><ChevRight /></div>
                 </div>
               </div>
-              {isOpen && (
-                <div className="comp-odds-wrap">
-                  <div className="comp-odds-label"><span className="bar" /> Vainqueur — {c.category}</div>
-                  <OddsGrid odds={c.odds} eventName={c.name} />
-                </div>
-              )}
+              {isOpen && (() => {
+                const cats = [...new Set(c.odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
+                const sel  = catFilter[c.id] ?? "";
+                const filtOdds = sel ? c.odds.filter(o => o.categorie === sel) : c.odds;
+                return (
+                  <div className="comp-odds-wrap">
+                    {cats.length > 1 && (
+                      <div className="cat-tabs">
+                        <button className={`cat-tab${!sel ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [c.id]: "" }))}>Toutes</button>
+                        {cats.map(cat => (
+                          <button key={cat} className={`cat-tab${sel === cat ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [c.id]: cat }))}>
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="comp-odds-label"><span className="bar" /> Vainqueur — {sel || c.category}</div>
+                    <OddsGrid odds={filtOdds} eventName={c.name} />
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
@@ -716,8 +766,27 @@ export default function DashboardPage() {
           <p className="profil-email">{userEmail}</p>
           <span className="profil-rank">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-            Rang 247 · Coupe du Monde
+            Rang {myRank ?? "—"} · Saison 2026
           </span>
+        </div>
+      </div>
+
+      <div className="profil-stats">
+        <div className="profil-stat">
+          <span className="ps-val">{totalBets}</span>
+          <span className="ps-label">Paris</span>
+        </div>
+        <div className="profil-stat">
+          <span className="ps-val">{totalWins}</span>
+          <span className="ps-label">Victoires</span>
+        </div>
+        <div className="profil-stat">
+          <span className="ps-val">{winRate}%</span>
+          <span className="ps-label">Win rate</span>
+        </div>
+        <div className="profil-stat">
+          <span className="ps-val">{balance.toLocaleString("fr-FR")}</span>
+          <span className="ps-label">Crédits</span>
         </div>
       </div>
 
@@ -809,7 +878,7 @@ export default function DashboardPage() {
               <span className="pic">{initials}</span>
               <span className="who">
                 <span className="nm">{name}</span>
-                <span className="rk">Rang 247</span>
+                <span className="rk">Rang {myRank ?? "—"}</span>
               </span>
             </button>
           </div>

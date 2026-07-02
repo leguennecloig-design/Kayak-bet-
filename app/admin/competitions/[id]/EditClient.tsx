@@ -278,6 +278,24 @@ export default function EditClient({
         ← Toutes les compétitions
       </a>
 
+      {/* Workflow steps */}
+      <div className="flex items-center gap-1.5 mt-5 font-grotesk font-bold text-[9px] tracking-[.12em] uppercase">
+        {(["Informations", "Participants", "Résultats", "Clôture"] as const).map((s, i) => (
+          <Fragment key={s}>
+            {i > 0 && <span className="text-[#2a4a5a] text-[8px]">›</span>}
+            <span className={`px-2.5 py-1 rounded-md border ${
+              status === "closed" && i === 3
+                ? "text-[#a0f0a0] bg-[rgba(160,240,160,.07)] border-[rgba(160,240,160,.25)]"
+                : i <= (participants.length > 0 ? 1 : 0)
+                  ? "text-[#28D7E6] bg-[rgba(40,215,230,.06)] border-[rgba(40,215,230,.2)]"
+                  : "text-[#5c7c8c] border-[#2a4a5a]"
+            }`}>
+              {i + 1}. {s}
+            </span>
+          </Fragment>
+        ))}
+      </div>
+
       {/* En-tête : nom + badge statut + bouton publier */}
       <div className="flex items-start justify-between gap-6 mt-5 mb-8">
         <div>

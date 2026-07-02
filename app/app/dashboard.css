@@ -1127,6 +1127,36 @@
   flex: none;
 }
 
+/* ---- CATEGORY FILTER TABS ---- */
+.kb-app .cat-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.kb-app .cat-tab {
+  font: 700 9.5px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--idle);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 20px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.kb-app .cat-tab:hover {
+  color: var(--cyan);
+  border-color: rgba(40, 215, 230, 0.25);
+}
+.kb-app .cat-tab.active {
+  color: var(--cyan);
+  border-color: rgba(40, 215, 230, 0.4);
+  background: rgba(40, 215, 230, 0.08);
+}
+
 /* ============================================================
    CLASSEMENT
    ============================================================ */

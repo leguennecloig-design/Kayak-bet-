@@ -25,7 +25,7 @@ export default async function AdminDashboard() {
   const supabase = createAdminSupabase();
   const { data: competitions, error } = await supabase
     .from("competitions")
-    .select("id, nom, date, discipline, lieu, status, created_at")
+    .select("id, nom, date, discipline, lieu, status, created_at, participants(id)")
     .order("created_at", { ascending: false });
 
   return (
@@ -97,6 +97,11 @@ export default async function AdminDashboard() {
                       {new Date(c.date).toLocaleDateString("fr-FR", {
                         day: "numeric", month: "long", year: "numeric",
                       })}
+                    </span>
+                  )}
+                  {(c as any).participants?.length > 0 && (
+                    <span className="font-grotesk font-bold text-[9.5px] tracking-[.08em] uppercase text-[#5c7c8c]">
+                      {(c as any).participants.length} partant{(c as any).participants.length > 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
