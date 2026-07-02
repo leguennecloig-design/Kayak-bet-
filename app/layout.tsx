@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import TawkWidget from "./TawkWidget";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,7 +42,6 @@ export default function RootLayout({
       <body>
         {children}
         <Analytics />
-        <TawkWidget />
       </body>
     </html>
   );
