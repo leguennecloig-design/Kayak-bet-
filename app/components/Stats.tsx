@@ -1,26 +1,21 @@
-const STATS = [
-  { value: "100%", label: "Gratuit" },
-  { value: "0€", label: "Dépôt requis" },
-  { value: "∞", label: "Crédits fictifs" },
-];
-
 export default function Stats() {
   return (
-    <section className="border-b border-[var(--border)] bg-deep">
-      <div className="wrap py-10 flex flex-col min-[561px]:flex-row items-center justify-center gap-0 divide-y min-[561px]:divide-y-0 min-[561px]:divide-x divide-[var(--border)]">
-        {STATS.map((s, i) => (
-          <div
-            key={i}
-            className="reveal flex items-center gap-4 px-10 py-4 min-[561px]:py-2"
-          >
-            <span className="font-anton italic text-[38px] leading-none text-cyan">
-              {s.value}
-            </span>
-            <span className="font-archivo font-semibold text-[14px] text-soft uppercase tracking-[.06em]">
-              {s.label}
-            </span>
+    <section className="border-b border-[var(--border)] bg-deep relative overflow-hidden">
+      <div className="wrap py-11 flex items-center justify-center">
+        <div className="trust-panel reveal" id="trustPanel">
+          <div className="trust">
+            <span className="tn">100%</span>
+            <span className="tl">Gratuit</span>
           </div>
-        ))}
+          <div className="trust">
+            <span className="tn">0€</span>
+            <span className="tl">Dépôt requis</span>
+          </div>
+          <div className="trust">
+            <span className="tn">∞</span>
+            <span className="tl">Crédits fictifs</span>
+          </div>
+        </div>
       </div>
     </section>
   );
