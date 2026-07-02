@@ -9,7 +9,7 @@ const withPWA = require("next-pwa")({
 const nextConfig = {
   reactStrictMode: true,
   // pdf-parse doit rester en module Node.js natif — ne pas bundler
-  serverExternalPackages: ["pdf-parse"],
+  serverExternalPackages: ["pdf-parse", "ws"],
 };
 
 module.exports = withPWA(nextConfig);

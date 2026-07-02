@@ -5,6 +5,7 @@
 import { adminGuard } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import Link from "next/link";
+import SyncLiveButton from "./SyncLiveButton";
 
 // Couleurs des badges selon le statut
 const STATUS_STYLE: Record<string, string> = {
@@ -39,15 +40,18 @@ export default async function AdminDashboard() {
             {competitions?.length ?? 0} au total — brouillons et publiées
           </p>
         </div>
-        <Link
-          href="/admin/competitions/nouvelle"
-          className="inline-flex items-center gap-2 bg-gradient-to-r from-[#28D7E6] to-[#11C2C2] text-[#0A2A3D] font-archivo font-bold text-[13px] px-5 py-3 rounded-[11px] hover:-translate-y-[1px] transition-transform"
-        >
-          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-          </svg>
-          Nouvelle compétition
-        </Link>
+        <div className="flex items-center gap-3">
+          <SyncLiveButton />
+          <Link
+            href="/admin/competitions/nouvelle"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#28D7E6] to-[#11C2C2] text-[#0A2A3D] font-archivo font-bold text-[13px] px-5 py-3 rounded-[11px] hover:-translate-y-[1px] transition-transform"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+            Nouvelle compétition
+          </Link>
+        </div>
       </div>
 
       {error && (

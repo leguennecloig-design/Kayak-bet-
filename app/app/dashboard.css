@@ -250,6 +250,105 @@
   font-style: normal;
 }
 
+/* ---- LIVE SECTION ---- */
+.kb-app .live-section {
+  background: rgba(255, 122, 69, 0.04);
+  border: 1px solid rgba(255, 122, 69, 0.25);
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.kb-app .live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 122, 69, 0.15);
+}
+.kb-app .live-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kb-app .live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FF7A45;
+  animation: live-pulse 1.4s ease-in-out infinite;
+  flex: none;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+.kb-app .live-title {
+  font: 400 italic 14px/1 var(--font-anton), sans-serif;
+  text-transform: uppercase;
+  color: #FF7A45;
+  letter-spacing: 0.05em;
+}
+.kb-app .live-comp-name {
+  font: 700 11px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.kb-app .live-sync {
+  font: 700 9px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--idle);
+}
+.kb-app .live-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.kb-app .live-table tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+.kb-app .live-table tbody tr:last-child {
+  border-bottom: none;
+}
+.kb-app .live-table td {
+  padding: 10px 20px;
+  font: 400 13px/1 var(--font-archivo);
+  color: var(--body);
+}
+.kb-app .live-table td.lv-rank {
+  font: 400 italic 20px/1 var(--font-anton), sans-serif;
+  color: var(--cyan);
+  width: 36px;
+  text-align: center;
+  padding-right: 0;
+}
+.kb-app .live-table td.lv-rank.top1 { color: #FFD700; }
+.kb-app .live-table td.lv-rank.top2 { color: #C0C0C0; }
+.kb-app .live-table td.lv-rank.top3 { color: #CD7F32; }
+.kb-app .live-table td.lv-name {
+  font-weight: 700;
+  color: #fff;
+}
+.kb-app .live-table td.lv-club {
+  font: 700 9px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--idle);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.kb-app .live-table td.lv-time {
+  font: 400 italic 15px/1 var(--font-anton), sans-serif;
+  color: var(--cyan);
+  text-align: right;
+}
+.kb-app .live-empty {
+  padding: 20px;
+  font: 400 13px/1 var(--font-archivo);
+  color: var(--sub);
+  text-align: center;
+}
+
 /* ---- FEATURED COMPETITION ---- */
 .kb-app .feature {
   position: relative;

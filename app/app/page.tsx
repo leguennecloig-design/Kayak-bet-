@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase";
+import dynamic from "next/dynamic";
 import "./dashboard.css";
+
+const LiveSection = dynamic(() => import("./LiveSection"), { ssr: false });
 
 /* ----------------------------------------------------------------
    Icons
@@ -618,6 +621,8 @@ export default function DashboardPage() {
             })() : <p className="no-odds">Les cotes seront disponibles bientôt.</p>}
           </section>
         )}
+
+        <LiveSection />
       </>
     );
   };
