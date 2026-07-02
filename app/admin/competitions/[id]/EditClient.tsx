@@ -213,6 +213,29 @@ export default function EditClient({
 
   const [showPartants, setShowPartants] = useState(inscriptions.length > 0 && inscriptions.length <= 30);
 
+  // Calcul des cotes
+  const [cotesState, setCotesState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [cotesMsg,   setCotesMsg]   = useState<string>("");
+
+  async function calculateCotes() {
+    setCotesState("loading");
+    setCotesMsg("");
+    try {
+      const res  = await fetch(`/api/admin/competitions/${compId}/calculate-cotes`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
+      const cats = Object.entries(json.categories as Record<string, number>)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+      setCotesMsg(`${json.total_cotes} cotes générées · ${json.participants_created} participants · ${cats}`);
+      setCotesState("ok");
+      router.refresh();
+    } catch (e) {
+      setCotesMsg(e instanceof Error ? e.message : "Erreur inconnue");
+      setCotesState("error");
+    }
+  }
+
   const inputCls = "bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-[11px] px-4 py-3 text-white font-archivo text-[13.5px] placeholder:text-[#4a6a7a] outline-none focus:border-[rgba(40,215,230,.5)] focus:bg-[rgba(40,215,230,.04)] transition-colors";
   const labelCls = "font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#7c9aaa] mb-1.5";
   const isDescente = competition.discipline?.toLowerCase().includes("descente") ?? false;
@@ -588,6 +611,39 @@ export default function EditClient({
               </button>
             )}
           </div>
+
+          {/* Bouton Calculer les cotes */}
+          {inscriptions.length > 0 && (
+            <div className="mb-5 flex items-center gap-3 flex-wrap">
+              <button
+                onClick={calculateCotes}
+                disabled={cotesState === "loading"}
+                className={`inline-flex items-center gap-2 font-archivo font-bold text-[13px] px-5 py-2.5 rounded-[10px] border transition-colors disabled:opacity-50 ${
+                  cotesState === "ok"
+                    ? "text-[#a0f0a0] border-[rgba(160,240,160,.3)] bg-[rgba(160,240,160,.08)]"
+                    : cotesState === "error"
+                      ? "text-red-400 border-red-500/30 bg-red-500/10"
+                      : "text-[#28D7E6] border-[rgba(40,215,230,.3)] hover:bg-[rgba(40,215,230,.08)]"
+                }`}
+              >
+                {cotesState === "loading" ? (
+                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                    <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+                {cotesState === "loading" ? "Calcul en cours…" : cotesState === "ok" ? "Cotes recalculées ✓" : "Calculer les cotes (algo)"}
+              </button>
+              {cotesMsg && (
+                <span className={`font-archivo text-[12px] ${cotesState === "error" ? "text-red-400" : "text-[#a0f0a0]"}`}>
+                  {cotesMsg}
+                </span>
+              )}
+            </div>
+          )}
 
           {inscriptions.length === 0 ? (
             <p className="font-archivo text-[13px] text-[#5c7c8c]">

@@ -102,6 +102,7 @@ export async function POST(
     competition_id:  competitionId,
     code_bateau:     p.codeBateau,
     nom:             p.nom,
+    epreuve:         p.epreuve,
     sexe:            p.sexe,
     club:            p.club,
     numero_club:     p.numeroClub,

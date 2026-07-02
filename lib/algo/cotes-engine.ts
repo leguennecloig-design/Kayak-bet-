@@ -398,7 +398,7 @@ export async function calculateCotesFromStartlist(
   return processedAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, processedAthletes.length));
 }
 
-// ── saveCotes ─────────────────────────────────────────────────────────────────
+// ── saveCotes (ancien système course_id) ─────────────────────────────────────
 
 export async function saveCotes(
   courseId: string,
@@ -416,4 +416,119 @@ export async function saveCotes(
     .upsert(rows, { onConflict: 'course_id,code_bateau' });
 
   if (error) throw new Error(error.message);
+}
+
+// ── saveCotesForCompetition (nouveau système competition_id) ──────────────────
+
+export async function saveCotesForCompetition(
+  competitionId: string,
+  cotes: CoteResult[],
+  supabase: SupabaseAny
+): Promise<void> {
+  const rows = cotes.map(c => ({
+    competition_id: competitionId,
+    ...c,
+    calculated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from('cotes')
+    .upsert(rows, { onConflict: 'competition_id,code_bateau' });
+
+  if (error) throw new Error(error.message);
+}
+
+// ── calculateCotesFromInscriptions (FFCK inscriptions → algo) ────────────────
+
+type InscriptionRow2 = {
+  code_bateau: string;
+  nom: string;
+  athlete_id: string | null;
+};
+
+export async function calculateCotesFromInscriptions(
+  competitionId: string,
+  categorie: string,
+  disciplineEstSprint: boolean,
+  supabase: SupabaseAny
+): Promise<CoteResult[]> {
+  const { data: entriesRaw } = await supabase
+    .from('inscriptions')
+    .select('code_bateau, nom, athlete_id')
+    .eq('competition_id', competitionId)
+    .eq('epreuve', categorie);
+
+  if (!entriesRaw || entriesRaw.length < 2) return [];
+
+  const entries = entriesRaw as InscriptionRow2[];
+
+  // Fetch données de classement pour les athlètes matchés
+  const athleteIds = [...new Set(
+    entries.map(e => e.athlete_id).filter((id): id is string => id !== null)
+  )];
+  const athByIdMap = new Map<string, { rang_national: number; points_classement: number; nb_courses_classement: number }>();
+  if (athleteIds.length > 0) {
+    const { data: athRaw } = await supabase
+      .from('athletes')
+      .select('id, rang_national, points_classement, nb_courses_classement')
+      .in('id', athleteIds);
+    for (const a of (athRaw ?? []) as AthByIdRow[]) {
+      athByIdMap.set(a.id, {
+        rang_national:         a.rang_national         ?? 999,
+        points_classement:     a.points_classement     ?? 0,
+        nb_courses_classement: a.nb_courses_classement ?? 0,
+      });
+    }
+  }
+  const getAthData = (athlete_id: string | null) =>
+    athlete_id
+      ? (athByIdMap.get(athlete_id) ?? { rang_national: 999, points_classement: 0, nb_courses_classement: 0 })
+      : { rang_national: 999, points_classement: 0, nb_courses_classement: 0 };
+
+  // C2 biplaces : pas de lookup historique possible
+  if (categorie.startsWith('C2')) {
+    const processedAthletes: AthleteInStartlist[] = entries.map(e => {
+      const ath = getAthData(e.athlete_id);
+      return {
+        code_bateau:           e.code_bateau,
+        athlete_id:            e.athlete_id,
+        nom:                   e.nom,
+        categorie,
+        rang_national:         ath.rang_national,
+        points_classement:     ath.points_classement,
+        nb_courses_classement: ath.nb_courses_classement,
+        sef: [], nat: [], ir: [],
+        fallback_type: 'national_only' as FallbackType,
+      };
+    });
+    if (processedAthletes.length < 2) return [];
+    const forces = computeForces(processedAthletes);
+    const scores = new Map(processedAthletes.map(a => [a.code_bateau, calculerScoreComposite(a)]));
+    return processedAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, processedAthletes.length));
+  }
+
+  // Monoplace : lookup historique par code_bateau
+  const codeBateaux = entries.map(e => e.code_bateau);
+  const historyMap  = await fetchAllV3History(codeBateaux, categorie, disciplineEstSprint, supabase);
+
+  const processedAthletes: AthleteInStartlist[] = entries.map(e => {
+    const h   = historyMap.get(e.code_bateau) ?? { sef_disc: [], nat_disc: [], ir_disc: [], sef_autre: [], nat_autre: [], ir_autre: [] };
+    const { sef, nat, ir, fallback_type } = resolveFallback(h);
+    const ath = getAthData(e.athlete_id);
+    return {
+      code_bateau:           e.code_bateau,
+      athlete_id:            e.athlete_id,
+      nom:                   e.nom,
+      categorie,
+      rang_national:         ath.rang_national,
+      points_classement:     ath.points_classement,
+      nb_courses_classement: ath.nb_courses_classement,
+      sef, nat, ir, fallback_type,
+    };
+  });
+
+  if (processedAthletes.length < 2) return [];
+  const forces = computeForces(processedAthletes);
+  const scores = new Map(processedAthletes.map(a => [a.code_bateau, calculerScoreComposite(a)]));
+  return processedAthletes.map(a => buildCoteResult(a, forces, scores.get(a.code_bateau)!, processedAthletes.length));
 }

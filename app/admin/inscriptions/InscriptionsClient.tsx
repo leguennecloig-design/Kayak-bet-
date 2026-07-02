@@ -88,14 +88,12 @@ export default function InscriptionsClient() {
       if (!res.ok) throw new Error(json.error ?? "Erreur");
       setImportState(prev => ({ ...prev, [comp.ffckCode]: "ok" }));
       setImportMsg(prev => ({ ...prev, [comp.ffckCode]: json.message ?? `${json.imported} importés` }));
-      // Met à jour le nb_partants dans la liste
       setCompetitions(prev =>
         prev.map(c => c.ffckCode === comp.ffckCode
           ? { ...c, nb_partants: json.imported, competition_id: json.competition_id }
           : c
         )
       );
-      setTimeout(() => setImportState(prev => ({ ...prev, [comp.ffckCode]: "idle" })), 4000);
     } catch (e) {
       setImportState(prev => ({ ...prev, [comp.ffckCode]: "error" }));
       setImportMsg(prev => ({ ...prev, [comp.ffckCode]: e instanceof Error ? e.message : "Erreur" }));
@@ -237,11 +235,23 @@ export default function InscriptionsClient() {
                   </div>
                 </div>
 
-                {/* Message import */}
-                {iMsg && (
-                  <p className={`font-archivo text-[12px] mt-2 ${iState === "error" ? "text-red-400" : "text-[#a0f0a0]"}`}>
-                    {iMsg}
-                  </p>
+                {/* Message import + lien admin */}
+                {(iMsg || (iState === "ok" && comp.competition_id)) && (
+                  <div className="flex items-center gap-4 mt-2 flex-wrap">
+                    {iMsg && (
+                      <p className={`font-archivo text-[12px] ${iState === "error" ? "text-red-400" : "text-[#a0f0a0]"}`}>
+                        {iMsg}
+                      </p>
+                    )}
+                    {iState === "ok" && comp.competition_id && (
+                      <a
+                        href={`/admin/competitions/${comp.competition_id}`}
+                        className="inline-flex items-center gap-1.5 font-archivo font-bold text-[12px] text-[#28D7E6] hover:underline"
+                      >
+                        Ouvrir dans l&apos;admin →
+                      </a>
+                    )}
+                  </div>
                 )}
 
                 {/* Tableau des partants */}
