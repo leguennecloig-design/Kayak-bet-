@@ -10,6 +10,18 @@ type Competition = {
   discipline: string | null;
   lieu: string | null;
   status: string;
+  ffck_inscription_code: number | null;
+  ffck_match_status: string;
+};
+
+type InscriptionRow = {
+  id: string;
+  code_bateau: string;
+  nom: string;
+  sexe: string | null;
+  club: string | null;
+  licence_valide: boolean | null;
+  athlete_id: string | null;
 };
 
 type Participant = {
@@ -51,9 +63,11 @@ const STATUS_LABEL: Record<string, string> = {
 export default function EditClient({
   competition,
   initialParticipants,
+  inscriptions,
 }: {
   competition: Competition;
   initialParticipants: Participant[];
+  inscriptions: InscriptionRow[];
 }) {
   const router = useRouter();
 
@@ -197,8 +211,11 @@ export default function EditClient({
     }
   }
 
+  const [showPartants, setShowPartants] = useState(inscriptions.length > 0 && inscriptions.length <= 30);
+
   const inputCls = "bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-[11px] px-4 py-3 text-white font-archivo text-[13.5px] placeholder:text-[#4a6a7a] outline-none focus:border-[rgba(40,215,230,.5)] focus:bg-[rgba(40,215,230,.04)] transition-colors";
   const labelCls = "font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#7c9aaa] mb-1.5";
+  const isDescente = competition.discipline?.toLowerCase().includes("descente") ?? false;
 
   return (
     <div className="max-w-3xl">
@@ -533,6 +550,98 @@ export default function EditClient({
           )}
         </div>
       </div>
+
+      {/* ---- Section Partants FFCK (Descente uniquement) ---- */}
+      {isDescente && (
+        <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-[18px] p-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-grotesk font-bold text-[10px] tracking-[.18em] uppercase text-[#7c9aaa]">
+                Partants FFCK
+              </h2>
+              {competition.ffck_inscription_code ? (
+                <p className="font-archivo text-[12px] text-[#5c7c8c] mt-0.5">
+                  Code FFCK #{competition.ffck_inscription_code}
+                  {" · "}
+                  <a
+                    href={`/admin/inscriptions`}
+                    className="text-[#28D7E6] hover:underline"
+                  >
+                    Gérer les inscriptions →
+                  </a>
+                </p>
+              ) : (
+                <p className="font-archivo text-[12px] text-[#5c7c8c] mt-0.5">
+                  Pas encore matché FFCK —{" "}
+                  <a href="/admin/inscriptions" className="text-[#28D7E6] hover:underline">
+                    Lancer le scan →
+                  </a>
+                </p>
+              )}
+            </div>
+            {inscriptions.length > 0 && (
+              <button
+                onClick={() => setShowPartants(v => !v)}
+                className="font-archivo font-semibold text-[12px] text-[#7c9aaa] border border-[var(--border-2)] px-3 py-1.5 rounded-[9px] hover:text-white hover:border-[rgba(40,215,230,.3)] transition-colors"
+              >
+                {showPartants ? "Masquer" : `Voir ${inscriptions.length} partants`}
+              </button>
+            )}
+          </div>
+
+          {inscriptions.length === 0 ? (
+            <p className="font-archivo text-[13px] text-[#5c7c8c]">
+              Aucun partant importé.
+              {competition.ffck_inscription_code
+                ? " Utilise le bouton \"Récupérer les partants\" dans la page Inscriptions."
+                : " Commence par matcher cette compétition via la page Inscriptions."}
+            </p>
+          ) : showPartants ? (
+            <div className="overflow-x-auto">
+              <table className="w-full font-archivo text-[12px]">
+                <thead>
+                  <tr className="border-b border-[var(--border-2)]">
+                    {["Code bateau", "Nom", "Club", "Lic.", "Lié"].map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase text-[#5c7c8c]">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {inscriptions.slice(0, 50).map(row => (
+                    <tr key={row.id} className="border-b border-[var(--border-2)] hover:bg-white/[.015]">
+                      <td className="px-3 py-2 font-mono text-[11px] text-[#7c9aaa]">{row.code_bateau}</td>
+                      <td className="px-3 py-2 font-semibold text-white">{row.nom}</td>
+                      <td className="px-3 py-2 text-[#7c9aaa] truncate max-w-[200px]">{row.club ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        {row.licence_valide === true
+                          ? <span className="text-[#a0f0a0] font-bold">✓</span>
+                          : row.licence_valide === false
+                            ? <span className="text-red-400">✗</span>
+                            : <span className="text-[#5c7c8c]">—</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          title={row.athlete_id ? "Athlète dans la base" : "Non lié"}
+                          className={`inline-block w-2 h-2 rounded-full ${row.athlete_id ? "bg-[#28D7E6]" : "bg-[#3a5c6c]"}`}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {inscriptions.length > 50 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-2 text-center text-[#5c7c8c] font-archivo text-[11px]">
+                        … et {inscriptions.length - 50} autres partants
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

@@ -19,7 +19,7 @@ export default async function EditCompetition({
 
   const { data: comp, error } = await supabase
     .from("competitions")
-    .select("id, nom, date, discipline, lieu, status, created_at")
+    .select("id, nom, date, discipline, lieu, status, created_at, ffck_inscription_code, ffck_match_status")
     .eq("id", params.id)
     .single();
 
@@ -32,10 +32,41 @@ export default async function EditCompetition({
     .order("pays", { ascending: true })
     .order("cote", { ascending: true });
 
+  // Partants FFCK scrapés (uniquement si discipline = Descente et inscriptions présentes)
+  const isDescente = (comp.discipline as string | null)?.toLowerCase().includes("descente") ?? false;
+  let inscriptions: {
+    id: string;
+    code_bateau: string;
+    nom: string;
+    sexe: string | null;
+    club: string | null;
+    licence_valide: boolean | null;
+    athlete_id: string | null;
+  }[] = [];
+
+  if (isDescente) {
+    const { data: ins } = await supabase
+      .from("inscriptions")
+      .select("id, code_bateau, nom, sexe, club, licence_valide, athlete_id")
+      .eq("competition_id", params.id)
+      .order("nom", { ascending: true });
+    inscriptions = ins ?? [];
+  }
+
   return (
     <EditClient
-      competition={comp}
+      competition={{
+        id:                    comp.id as string,
+        nom:                   comp.nom as string,
+        date:                  comp.date as string | null,
+        discipline:            comp.discipline as string | null,
+        lieu:                  comp.lieu as string | null,
+        status:                comp.status as string,
+        ffck_inscription_code: comp.ffck_inscription_code as number | null,
+        ffck_match_status:     (comp.ffck_match_status as string | null) ?? "non_matche",
+      }}
       initialParticipants={participants ?? []}
+      inscriptions={inscriptions}
     />
   );
 }
