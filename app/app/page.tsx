@@ -98,6 +98,8 @@ type Odd = {
   note: string;
   val: number;
   fav?: boolean;
+  competitionId?: string;
+  categorie?:     string;
 };
 
 type Competition = {
@@ -130,6 +132,8 @@ type BetRecord = {
   stake: number;
   result: "win" | "loss" | "pending";
   date: string;
+  gainPotentiel?: number;
+  gainReel?: number | null;
 };
 
 /* ----------------------------------------------------------------
@@ -265,44 +269,79 @@ const BOTNAV = [
 export default function DashboardPage() {
   const supabase = createClient();
 
-  const [view,        setView]        = useState<View>("home");
-  const [expandedComp, setExpandedComp] = useState<string | null>(null);
-  const [balance,     setBalance]     = useState(1000);
-  const [coupon,      setCoupon]      = useState<Record<string, Odd>>({});
-  const [stake,       setStake]       = useState(50);
-  const [drawerOpen,  setDrawerOpen]  = useState(false);
-  const [cd,          setCd]          = useState({ d: "00", h: "00", m: "00", s: "00" });
-  const [dbComps,     setDbComps]     = useState<Competition[] | null>(null);
-  const [cdTarget,    setCdTarget]    = useState<Date>(new Date("2026-07-16T10:00:00"));
-  const [name,        setName]        = useState("Alex");
-  const [initials,    setInitials]    = useState("AX");
-  const [userEmail,   setUserEmail]   = useState("");
+  const [view,          setView]          = useState<View>("home");
+  const [expandedComp,  setExpandedComp]  = useState<string | null>(null);
+  const [balance,       setBalance]       = useState(0);
+  const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
+  const [stake,         setStake]         = useState(50);
+  const [drawerOpen,    setDrawerOpen]    = useState(false);
+  const [betLoading,    setBetLoading]    = useState(false);
+  const [cd,            setCd]            = useState({ d: "00", h: "00", m: "00", s: "00" });
+  const [dbComps,       setDbComps]       = useState<Competition[] | null>(null);
+  const [cdTarget,      setCdTarget]      = useState<Date>(new Date("2026-07-16T10:00:00"));
+  const [name,          setName]          = useState("Joueur");
+  const [initials,      setInitials]      = useState("??");
+  const [userEmail,     setUserEmail]     = useState("");
+  const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
+  const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
   });
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  /* profil */
+  /* profil + solde */
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    async function loadProfile() {
+      const { data } = await supabase.auth.getUser();
       const email = data.user?.email ?? "";
       setUserEmail(email);
       if (email) {
-        const base  = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+        const base   = email.split("@")[0].replace(/[._-]+/g, " ").trim();
         const pretty = base.charAt(0).toUpperCase() + base.slice(1);
         setName(pretty);
         const parts = base.split(" ");
         setInitials(parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : base.slice(0, 2).toUpperCase());
       }
-    });
+      // Solde réel + stats
+      try {
+        const res = await fetch("/api/user/profile");
+        if (res.ok) {
+          const prof = await res.json();
+          setBalance(Number(prof.balance ?? 0));
+          if (prof.username) { setName(prof.username); setInitials(prof.username.slice(0, 2).toUpperCase()); }
+        }
+      } catch { /* ignore */ }
+    }
+    loadProfile();
   }, [supabase]);
+
+  /* historique paris */
+  async function fetchBetHistory() {
+    try {
+      const res = await fetch("/api/user/bets");
+      if (res.ok) setBetHistory(await res.json());
+    } catch { /* ignore */ }
+  }
+
+  /* classement */
+  async function fetchLeaderboard() {
+    try {
+      const res = await fetch("/api/user/leaderboard");
+      if (res.ok) setDbLeaderboard(await res.json());
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => {
+    fetchBetHistory();
+    fetchLeaderboard();
+  }, []);
 
   /* fetch competitions from Supabase */
   useEffect(() => {
     async function fetchComps() {
       const { data } = await supabase
         .from("competitions")
-        .select("id, nom, date, discipline, lieu, participants(id, nom, pays, cote)")
+        .select("id, nom, date, discipline, lieu, participants(id, nom, pays, cote, categorie)")
         .eq("status", "published")
         .order("date", { ascending: true });
       if (!data || data.length === 0) return;
@@ -320,12 +359,14 @@ export default function DashboardPage() {
           bettors: 0,
           featured: i === 0,
           odds: parts.map((p: any) => ({
-            id: p.id,
-            nm: p.nom,
-            ctry: p.pays ?? "",
-            note: p.pays ?? p.nom,
-            val: p.cote != null ? parseFloat(p.cote) : 1.00,
-            fav: minCote != null && p.cote === minCote,
+            id:            p.id,
+            nm:            p.nom,
+            ctry:          p.pays ?? "",
+            note:          p.pays ?? p.nom,
+            val:           p.cote != null ? parseFloat(p.cote) : 1.00,
+            fav:           minCote != null && p.cote === minCote,
+            competitionId: c.id,
+            categorie:     p.categorie ?? "",
           })),
         };
       });
@@ -378,20 +419,68 @@ export default function DashboardPage() {
     setCoupon((prev) => { const next = { ...prev }; delete next[id]; return next; });
   }
 
-  function addCredits() {
-    setBalance(1000);
-    showToast(<Check c="#28D7E6" />, <>Crédits fictifs · <span>rechargés à 1 000</span></>);
+  async function addCredits() {
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deposit: 1000 }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setBalance(Number(json.balance));
+        showToast(<Check c="#28D7E6" />, <>Solde rechargé · <span>{Number(json.balance).toLocaleString("fr-FR")} cr.</span></>);
+      } else {
+        showToast(<XIcon c="#FF7A45" />, json.error ?? "Erreur", true);
+      }
+    } catch {
+      showToast(<XIcon c="#FF7A45" />, "Erreur réseau", true);
+    }
   }
 
-  function validate() {
+  async function validate() {
     const s = Math.max(0, stake || 0);
     if (s <= 0 || count === 0) return;
     if (s > balance) { showToast(<XIcon c="#FF7A45" />, "Solde insuffisant", true); return; }
-    const g = Math.round(s * totalOdds);
-    setBalance((b) => b - s);
-    setCoupon({});
-    setDrawerOpen(false);
-    showToast(<Check c="#28D7E6" />, <>Pari validé · gain potentiel <span>{g.toLocaleString("fr-FR")} cr.</span></>);
+    if (betLoading) return;
+
+    setBetLoading(true);
+    try {
+      const compIds = [...new Set(selected.map(o => o.competitionId))];
+      const firstComp = competitions.find(c => c.id === compIds[0]);
+
+      const selectionsPayload = selected.map(o => ({
+        participantId:  o.id,
+        nom:            o.nm,
+        cote:           o.val,
+        competitionId:  o.competitionId ?? "",
+        competitionNom: competitions.find(c => c.id === o.competitionId)?.name ?? "",
+        categorie:      o.categorie ?? "",
+      }));
+
+      const res  = await fetch("/api/user/bets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selections: selectionsPayload, stake: s }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        showToast(<XIcon c="#FF7A45" />, json.error ?? "Erreur", true);
+        return;
+      }
+
+      setBalance(Number(json.newBalance));
+      setCoupon({});
+      setDrawerOpen(false);
+      showToast(<Check c="#28D7E6" />, <>Pari validé · gain potentiel <span>{Math.round(json.gainPotentiel).toLocaleString("fr-FR")} cr.</span></>);
+      void firstComp;
+      fetchBetHistory();
+    } catch {
+      showToast(<XIcon c="#FF7A45" />, "Erreur réseau", true);
+    } finally {
+      setBetLoading(false);
+    }
   }
 
   async function signOut() {
@@ -548,15 +637,16 @@ export default function DashboardPage() {
   const rankColors: Record<number, string> = { 1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32" };
 
   const ClassementView = () => {
-    const top3  = LEADERBOARD.filter((p) => p.rank <= 3);
-    const rest  = LEADERBOARD.filter((p) => p.rank > 3 && !p.isMe);
-    const me    = LEADERBOARD.find((p) => p.isMe);
+    const leaderboard = dbLeaderboard.length > 0 ? dbLeaderboard : LEADERBOARD;
+    const top3  = leaderboard.filter((p) => p.rank <= 3);
+    const rest  = leaderboard.filter((p) => p.rank > 3 && !p.isMe);
+    const me    = leaderboard.find((p) => p.isMe);
 
     return (
       <>
         <div className="view-header">
           <h1>Classement</h1>
-          <p>Semaine du 16 juin 2026 · {LEADERBOARD.length > 8 ? "2 480" : LEADERBOARD.length} joueurs</p>
+          <p>Saison 2026 · {leaderboard.length} joueurs</p>
         </div>
 
         {/* Podium top 3 */}
@@ -606,9 +696,10 @@ export default function DashboardPage() {
   };
 
   /* ---- PROFIL ---- */
-  const totalWins   = BET_HISTORY.filter((b) => b.result === "win").length;
-  const totalBets   = BET_HISTORY.length;
-  const winRate     = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
+  const displayHistory = betHistory.length > 0 ? betHistory : BET_HISTORY;
+  const totalWins      = displayHistory.filter((b) => b.result === "win").length;
+  const totalBets      = displayHistory.length;
+  const winRate        = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
 
   const ProfilView = () => (
     <>
@@ -633,11 +724,19 @@ export default function DashboardPage() {
       <div className="profil-section">
         <div className="profil-section-head">
           <span>Historique des paris</span>
-          <span className="ps-count">{BET_HISTORY.length} paris</span>
+          <span className="ps-count">{displayHistory.length} paris</span>
         </div>
         <div className="history-list">
-          {BET_HISTORY.map((b) => {
-            const gain = Math.round(b.stake * b.odds);
+          {displayHistory.length === 0 ? (
+            <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
+              Aucun pari pour l&apos;instant. Sélectionne des cotes et mise !
+            </p>
+          ) : displayHistory.map((b) => {
+            const showGain = b.result === "win"
+              ? `+${(b.gainReel ?? b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")}`
+              : b.result === "loss"
+                ? `-${b.stake}`
+                : `${(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} en jeu`;
             return (
               <div key={b.id} className={`history-item hi-${b.result}`}>
                 <div className={`hi-dot hi-dot-${b.result}`} />
@@ -646,9 +745,7 @@ export default function DashboardPage() {
                   <div className="hi-athlete">{b.athlete} · {b.odds.toFixed(2)}</div>
                 </div>
                 <div className="hi-right">
-                  <div className={`hi-result hi-result-${b.result}`}>
-                    {b.result === "win" ? `+${gain.toLocaleString("fr-FR")}` : b.result === "loss" ? `-${b.stake}` : "En cours"}
-                  </div>
+                  <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
                   <div className="hi-date">{fmtDate(b.date)}</div>
                 </div>
               </div>
@@ -779,7 +876,9 @@ export default function DashboardPage() {
               <span className="lab">Gain potentiel</span>
               <span className="gain">{gain.toLocaleString("fr-FR")}</span>
             </div>
-            <button className="validate" onClick={validate}>Valider le pari</button>
+            <button className="validate" onClick={validate} disabled={betLoading} style={{ opacity: betLoading ? 0.6 : 1 }}>
+              {betLoading ? "Validation…" : "Valider le pari"}
+            </button>
           </div>
         )}
       </aside>

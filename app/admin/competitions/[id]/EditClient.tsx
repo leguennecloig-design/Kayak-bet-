@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
+import ResultatsSection from "./ResultatsSection";
 
 type Competition = {
   id: string;
@@ -217,6 +218,31 @@ export default function EditClient({
   // Calcul des cotes
   const [cotesState, setCotesState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [cotesMsg,   setCotesMsg]   = useState<string>("");
+
+  // Clôture
+  const [closeState, setCloseState] = useState<"idle" | "loading" | "ok" | "error">(
+    status === "closed" ? "ok" : "idle"
+  );
+  const [closeMsg,   setCloseMsg]   = useState<string>("");
+
+  async function closeCompetition() {
+    if (!confirm("Clôturer la compétition et régler tous les paris en attente ? Cette action est irréversible.")) return;
+    setCloseState("loading");
+    setCloseMsg("");
+    try {
+      const res  = await fetch(`/api/admin/competitions/${compId}/close`, { method: "POST" });
+      const text = await res.text();
+      let json: Record<string, unknown> = {};
+      try { json = JSON.parse(text); } catch { throw new Error(`Réponse invalide (${res.status})`); }
+      if (!res.ok) throw new Error((json.error as string) ?? "Erreur serveur");
+      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés`);
+      setCloseState("ok");
+      setStatus("closed");
+    } catch (e) {
+      setCloseMsg(e instanceof Error ? e.message : "Erreur inconnue");
+      setCloseState("error");
+    }
+  }
 
   async function calculateCotes() {
     setCotesState("loading");
@@ -576,6 +602,56 @@ export default function EditClient({
                 </div>
               )}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* ---- Section Résultats ---- */}
+      <ResultatsSection competitionId={compId} />
+
+      {/* ---- Clôture & règlement des paris ---- */}
+      <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-[18px] p-6 mt-6">
+        <h2 className="font-grotesk font-bold text-[10px] tracking-[.18em] uppercase text-[#7c9aaa] mb-3">
+          Clôture de la compétition
+        </h2>
+        <p className="font-archivo text-[12.5px] text-[#5c7c8c] mb-4">
+          Importe les résultats (section ci-dessus), puis clôture la compétition.<br />
+          Tous les paris en attente seront réglés automatiquement : les gagnants recevront leurs gains.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {status !== "closed" ? (
+            <button
+              onClick={closeCompetition}
+              disabled={closeState === "loading"}
+              className={`inline-flex items-center gap-2 font-archivo font-bold text-[13px] px-5 py-2.5 rounded-[10px] border transition-colors disabled:opacity-50 ${
+                closeState === "error"
+                  ? "text-red-400 border-red-500/30 bg-red-500/10"
+                  : "text-[#FF7A45] border-[rgba(255,122,69,.4)] hover:bg-[rgba(255,122,69,.1)]"
+              }`}
+            >
+              {closeState === "loading" ? (
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              {closeState === "loading" ? "Règlement en cours…" : "Clôturer et régler les paris"}
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-2 font-archivo font-bold text-[13px] px-5 py-2.5 rounded-[10px] border text-[#a0f0a0] border-[rgba(160,240,160,.3)] bg-[rgba(160,240,160,.07)]">
+              <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                <path d="M5 12.5 10 17.5 19 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Compétition clôturée
+            </span>
+          )}
+          {closeMsg && (
+            <span className={`font-archivo text-[12px] ${closeState === "error" ? "text-red-400" : "text-[#a0f0a0]"}`}>
+              {closeMsg}
+            </span>
           )}
         </div>
       </div>
