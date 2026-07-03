@@ -18,6 +18,8 @@ type Resultat = {
 type FormEntry = {
   categorie: string;
   nom:       string;
+  club:      string;
+  dossard:   string;
   rang:      string;
   temps:     string;
   points:    string;
@@ -25,8 +27,15 @@ type FormEntry = {
   dnf:       boolean;
 };
 
+type Partant = {
+  id:          string;
+  code_bateau: string;
+  nom:         string;
+  club:        string | null;
+};
+
 const EMPTY_FORM: FormEntry = {
-  categorie: "", nom: "", rang: "", temps: "", points: "", dns: false, dnf: false,
+  categorie: "", nom: "", club: "", dossard: "", rang: "", temps: "", points: "", dns: false, dnf: false,
 };
 
 const ATHLETE_CATEGORIES = [
@@ -48,6 +57,7 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
   const [saveMsg,       setSaveMsg]       = useState("");
   const [editId,        setEditId]        = useState<string|null>(null);
   const [editFields,    setEditFields]    = useState<Partial<Resultat>>({});
+  const [partants,      setPartants]      = useState<Partant[]>([]);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +69,13 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
     setLoading(false);
   }
 
-  useEffect(() => { fetchResultats(); }, [competitionId]);
+  useEffect(() => {
+    fetchResultats();
+    fetch(`/api/admin/inscriptions/list/${competitionId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Partant[]) => setPartants(data))
+      .catch(() => {});
+  }, [competitionId]);
 
   // ── Import PDF ──────────────────────────────────────────────────────────
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -118,8 +134,8 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
       categorie: form.categorie.trim().toUpperCase(),
       nom:       form.nom.trim(),
       rang:      form.dns || form.dnf || !form.rang ? null : parseInt(form.rang, 10),
-      dossard:   null,
-      club:      null,
+      dossard:   form.dossard ? parseInt(form.dossard, 10) : null,
+      club:      form.club.trim() || null,
       temps:     form.temps.trim() || null,
       points:    form.points ? parseInt(form.points, 10) : null,
       dns:       form.dns,
@@ -267,7 +283,7 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
           </p>
           <div className="grid grid-cols-12 gap-3">
             {/* Catégorie */}
-            <div className="col-span-3 flex flex-col gap-1.5">
+            <div className="col-span-2 flex flex-col gap-1.5">
               <label className={labelCls}>Catégorie *</label>
               <select
                 required
@@ -292,15 +308,48 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
               </select>
             </div>
             {/* Nom */}
-            <div className="col-span-4 flex flex-col gap-1.5">
-              <label className={labelCls}>Nom Prénom *</label>
+            <div className="col-span-3 flex flex-col gap-1.5">
+              <label className={labelCls}>
+                Nom Prénom *
+                {partants.length > 0 && (
+                  <span className="ml-2 normal-case tracking-normal font-normal text-[#5c7c8c]">
+                    ({partants.length} partants)
+                  </span>
+                )}
+              </label>
               <input
                 required
                 type="text"
+                list="partants-datalist"
                 placeholder="FONTAINE Lucas"
                 value={form.nom}
-                onChange={e => setForm(f => ({ ...f, nom: e.target.value }))}
+                onChange={e => {
+                  const val = e.target.value;
+                  const match = partants.find(p => p.nom.toLowerCase() === val.toLowerCase());
+                  setForm(f => ({
+                    ...f,
+                    nom:     val,
+                    club:    match ? (match.club ?? f.club) : f.club,
+                    dossard: match ? match.code_bateau : f.dossard,
+                  }));
+                }}
                 className={inputCls}
+              />
+              <datalist id="partants-datalist">
+                {partants.map(p => (
+                  <option key={p.id} value={p.nom} />
+                ))}
+              </datalist>
+            </div>
+            {/* Club */}
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <label className={labelCls}>Club</label>
+              <input
+                type="text"
+                placeholder="auto"
+                value={form.club}
+                onChange={e => setForm(f => ({ ...f, club: e.target.value }))}
+                className={`${inputCls} ${form.club && partants.find(p => p.club === form.club) ? "border-[rgba(40,215,230,.35)]" : ""}`}
               />
             </div>
             {/* Rang */}

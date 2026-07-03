@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase";
 import dynamic from "next/dynamic";
 import "./dashboard.css";
@@ -296,6 +296,8 @@ export default function DashboardPage() {
     icon: null, msg: null, err: false, show: false,
   });
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const navRef     = useRef<HTMLElement>(null);
+  const pillRef    = useRef<HTMLDivElement>(null);
 
   /* computed stats */
   const myRank       = dbLeaderboard.find(p => p.isMe)?.rank ?? null;
@@ -516,6 +518,34 @@ export default function DashboardPage() {
 
   const topActive = { home: 0, competitions: 1, classement: 2, profil: -1 }[view] ?? -1;
   const botActive = { home: 0, competitions: 1, classement: 3, profil: 4 }[view] ?? -1;
+
+  /* pill glissant — positionne sur le lien actif */
+  useLayoutEffect(() => {
+    const nav  = navRef.current;
+    const pill = pillRef.current;
+    if (!nav || !pill) return;
+    const links = nav.querySelectorAll<HTMLElement>("a");
+    const a = topActive >= 0 ? links[topActive] : undefined;
+    if (!a) { pill.style.opacity = "0"; return; }
+    pill.style.width     = a.offsetWidth  + "px";
+    pill.style.transform = `translateX(${a.offsetLeft}px)`;
+    pill.style.opacity   = "1";
+  }, [topActive]);
+
+  useEffect(() => {
+    const nav  = navRef.current;
+    const pill = pillRef.current;
+    if (!nav || !pill) return;
+    const obs = new ResizeObserver(() => {
+      const links = nav.querySelectorAll<HTMLElement>("a");
+      const a = topActive >= 0 ? links[topActive] : undefined;
+      if (!a) return;
+      pill.style.width     = a.offsetWidth  + "px";
+      pill.style.transform = `translateX(${a.offsetLeft}px)`;
+    });
+    obs.observe(nav);
+    return () => obs.disconnect();
+  }, [topActive]);
 
   /* ---- ODDS GRID (partagé home + compétitions) ---- */
   const OddsGrid = ({ odds, eventName }: { odds: Odd[]; eventName: string }) => (
@@ -862,7 +892,8 @@ export default function DashboardPage() {
             <span className="wm">Kayak<span className="b">bet</span></span>
           </a>
 
-          <nav className="links">
+          <nav className="links" ref={navRef}>
+            <div className="nav-pill" ref={pillRef} />
             {TOPNAV.map((n, i) => (
               <a key={n.t} className={i === topActive ? "active" : ""} onClick={() => navigate(n.v)}>
                 <NavIcon name={n.ic} /><span>{n.t}</span>
