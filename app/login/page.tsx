@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import "./login.css";
 
-type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent";
+type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding";
+type OnbStep = "profile" | "athlete" | "source";
 
+/* ---- Icons ---- */
 const EyeOpen = () => (
   <svg viewBox="0 0 24 24" fill="none">
     <path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
@@ -31,6 +33,198 @@ const DropLogo = () => (
   </svg>
 );
 
+/* ---- Athletes list (onboarding step 2) ---- */
+const ATHLETES = [
+  { id: "castryck",   nm: "T. Castryck",    ctry: "FR", init: "TC" },
+  { id: "prskavec",   nm: "J. Prskavec",    ctry: "CZ", init: "JP" },
+  { id: "slafkovsky", nm: "A. Slafkovský",  ctry: "SK", init: "AS" },
+  { id: "aigner",     nm: "H. Aigner",      ctry: "DE", init: "HA" },
+  { id: "zerouga",    nm: "N. Zerouga",     ctry: "FR", init: "NZ" },
+  { id: "muller",     nm: "K. Müller",      ctry: "DE", init: "KM" },
+];
+
+/* ================================================================
+   Welcome overlay — shown after successful login
+================================================================ */
+function WelcomeOverlay({ onDone }: { onDone: () => void }) {
+  const cbRef = useRef(onDone);
+  cbRef.current = onDone;
+
+  useEffect(() => {
+    const t = setTimeout(() => cbRef.current(), 2400);
+    return () => clearTimeout(t);
+  }, []);
+
+  const chars = [...'Bon retour parmi nous'];
+
+  return (
+    <div className="lp-welcome" role="status" aria-live="polite">
+      <div className="lp-w-coin" aria-hidden="true">
+        <div className="lp-w-face"><span>KB</span></div>
+      </div>
+      <h2 className="lp-w-heading" aria-label="Bon retour parmi nous">
+        {chars.map((ch, i) => (
+          <span
+            key={i}
+            className="lp-char"
+            aria-hidden="true"
+            style={{ animationDelay: `${0.35 + i * 0.045}s` }}
+          >
+            {ch === ' ' ? ' ' : ch}
+          </span>
+        ))}
+      </h2>
+      <p className="lp-w-sub">On t'emmène vers la ligne de départ…</p>
+    </div>
+  );
+}
+
+/* ================================================================
+   Onboarding flow — 3 steps, shown only on first login
+================================================================ */
+function OnboardingFlow({ onDone }: { onDone: () => void }) {
+  const [steps, setSteps] = useState<OnbStep[]>(["profile", "source"]);
+  const [stepIdx, setStepIdx] = useState(0);
+  const [profile, setProfile] = useState<"athlete" | "bettor" | null>(null);
+  const [athleteId, setAthleteId] = useState<string | null>(null);
+  const [source, setSource] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const currentStep = steps[stepIdx];
+
+  function selectProfile(p: "athlete" | "bettor") {
+    setProfile(p);
+    if (p === "athlete" && !steps.includes("athlete")) {
+      setSteps(["profile", "athlete", "source"]);
+    } else if (p === "bettor" && steps.includes("athlete")) {
+      setSteps(["profile", "source"]);
+    }
+  }
+
+  function goNext() {
+    if (stepIdx + 1 >= steps.length) { onDone(); return; }
+    setStepIdx(i => i + 1);
+  }
+
+  const filtered = ATHLETES.filter(a =>
+    a.nm.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="lp-onb">
+      {/* Ambient bg reuse */}
+      <div className="lp-bg" />
+      <div className="lp-glow g1" /><div className="lp-glow g2" />
+
+      <div className="lp-onb-card">
+        <div className="lp-onb-inner">
+
+          {/* Progress dots */}
+          <div className="lp-onb-dots">
+            {steps.map((_, i) => (
+              <span key={i} className={i < stepIdx ? "done" : i === stepIdx ? "on" : ""} />
+            ))}
+          </div>
+
+          {/* Step 1 — profile type */}
+          {currentStep === "profile" && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Ton profil</h2>
+              <p className="lp-onb-sub">Comment veux-tu vivre Kayakbet ?</p>
+              <div className="lp-opt-grid">
+                <div className={`lp-opt-card${profile === "athlete" ? " sel" : ""}`} role="button" tabIndex={0} onClick={() => selectProfile("athlete")} onKeyDown={e => e.key === "Enter" && selectProfile("athlete")}>
+                  <div className="lp-opt-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M8 3h8v4a4 4 0 0 1-8 0V3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round"/>
+                      <path d="M8 4H4v2a4 4 0 0 0 4 4M16 4h4v2a4 4 0 0 1-4 4M12 11v5m-4 4h8m-4-4v4" stroke="#28D7E6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="lp-opt-text"><b>Athlète &amp; parieur</b><span>Je participe aux courses et je parie</span></div>
+                  <div className="lp-opt-check" />
+                </div>
+                <div className={`lp-opt-card${profile === "bettor" ? " sel" : ""}`} role="button" tabIndex={0} onClick={() => selectProfile("bettor")} onKeyDown={e => e.key === "Enter" && selectProfile("bettor")}>
+                  <div className="lp-opt-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M3 10a2 2 0 0 1 0-4h18a2 2 0 0 1 0 4 2 2 0 0 0 0 4 2 2 0 0 1 0 4H3a2 2 0 0 1 0-4 2 2 0 0 0 0-4Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round"/>
+                      <path d="M14 6l-4 12" stroke="#28D7E6" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                  <div className="lp-opt-text"><b>Parieur</b><span>Je pronostique sur le circuit</span></div>
+                  <div className="lp-opt-check" />
+                </div>
+              </div>
+              <button className="lp-btn-primary" disabled={!profile} onClick={goNext}>Continuer</button>
+            </div>
+          )}
+
+          {/* Step 2 — athlete search (conditional) */}
+          {currentStep === "athlete" && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Ton nom d'athlète</h2>
+              <p className="lp-onb-sub">Retrouve-toi dans le classement officiel du circuit.</p>
+              <div className="lp-onb-search">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8"/>
+                  <path d="M21 21l-4.3-4.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Chercher ton nom…"
+                  autoComplete="off"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="lp-athlete-list">
+                {filtered.length === 0 ? (
+                  <div className="lp-athlete-empty">Aucun athlète trouvé</div>
+                ) : filtered.map(a => (
+                  <div
+                    key={a.id}
+                    className={`lp-athlete-row${athleteId === a.id ? " sel" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setAthleteId(a.id)}
+                    onKeyDown={e => e.key === "Enter" && setAthleteId(a.id)}
+                  >
+                    <div className="lp-av">{a.init}</div>
+                    <div className="lp-meta"><b>{a.nm}</b><span>Circuit mondial · Slalom</span></div>
+                    <div className="lp-flag">{a.ctry}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="lp-onb-row">
+                <button className="lp-btn-skip" onClick={goNext}>Passer</button>
+                <button className="lp-btn-primary" disabled={!athleteId} onClick={goNext}>Continuer</button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 — how did you find us */}
+          {currentStep === "source" && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Comment nous as-tu connu ?</h2>
+              <p className="lp-onb-sub">Ça nous aide à faire connaître le circuit.</p>
+              <div className="lp-chip-grid">
+                {["Réseaux sociaux", "Un ami / bouche-à-oreille", "Recherche en ligne", "Presse / média", "Créateur de contenu", "Autre"].map(s => (
+                  <button key={s} className={`lp-chip${source === s ? " sel" : ""}`} onClick={() => setSource(s)}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <button className="lp-btn-primary" disabled={!source} onClick={goNext}>Terminer</button>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
+   Main login page
+================================================================ */
 export default function LoginPage() {
   const [mode,     setMode]     = useState<Mode>("login");
   const [email,    setEmail]    = useState("");
@@ -79,8 +273,8 @@ export default function LoginPage() {
       else setMode("sent");
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-      else location.href = "/app";
+      if (error) { setError(error.message); }
+      else { setMode("welcome"); }
     }
 
     setLoading(false);
@@ -100,14 +294,37 @@ export default function LoginPage() {
     setPassword("");
   }
 
+  /* ---- Welcome overlay ---- */
+  if (mode === "welcome") {
+    return (
+      <>
+        <div className="lp-bg" />
+        <div className="lp-glow g1" /><div className="lp-glow g2" />
+        <WelcomeOverlay onDone={() => {
+          const isNew = typeof window !== "undefined" && !localStorage.getItem("kb_onboarded");
+          if (isNew) { setMode("onboarding"); } else { location.href = "/app"; }
+        }} />
+      </>
+    );
+  }
+
+  /* ---- Onboarding (first login only) ---- */
+  if (mode === "onboarding") {
+    return (
+      <OnboardingFlow onDone={() => {
+        if (typeof window !== "undefined") localStorage.setItem("kb_onboarded", "1");
+        location.href = "/app";
+      }} />
+    );
+  }
+
   /* ---- Email sent screens ---- */
   if (mode === "sent" || mode === "reset-sent") {
     const isSent = mode === "sent";
     return (
       <div className="lp-bg-bg min-h-screen flex flex-col items-center justify-center px-5">
         <div className="lp-bg" />
-        <div className="lp-glow g1" />
-        <div className="lp-glow g2" />
+        <div className="lp-glow g1" /><div className="lp-glow g2" />
         <div className="relative z-10 text-center max-w-[340px]">
           <div
             className="w-16 h-16 rounded-[18px] flex items-center justify-center mx-auto mb-6"
@@ -137,9 +354,8 @@ export default function LoginPage() {
     );
   }
 
-  const isForgot  = mode === "forgot";
-  const isSignup  = mode === "signup";
-  const isLogin   = mode === "login";
+  const isForgot = mode === "forgot";
+  const isSignup = mode === "signup";
 
   return (
     <div
@@ -148,21 +364,15 @@ export default function LoginPage() {
     >
       {/* Ambient background */}
       <div className="lp-bg" />
-      <div className="lp-glow g1" />
-      <div className="lp-glow g2" />
-      <span className="lp-ring r1" />
-      <span className="lp-ring r2" />
+      <div className="lp-glow g1" /><div className="lp-glow g2" />
+      <span className="lp-ring r1" /><span className="lp-ring r2" />
       <svg className="lp-waves" viewBox="0 0 1180 220" preserveAspectRatio="none" fill="none" aria-hidden="true">
         <path d="M-20 150c160 0 160-46 320-46s160 46 320 46 160-46 340-46 160 46 300 46" stroke="rgba(40,215,230,.12)" strokeWidth="2" fill="none"/>
         <path d="M-20 182c160 0 160-40 320-40s160 40 320 40 160-40 340-40 160 40 300 40" stroke="rgba(40,215,230,.07)" strokeWidth="2" fill="none"/>
       </svg>
 
       {/* Logo */}
-      <a
-        href="/"
-        className="lp-logo relative z-10 flex items-center gap-3 mt-14 mb-9"
-        aria-label="Kayakbet"
-      >
+      <a href="/" className="lp-logo relative z-10 flex items-center gap-3 mt-14 mb-9" aria-label="Kayakbet">
         <DropLogo />
         <span className="lp-wm-box">
           <span className="lp-wmtxt">Kayak<span className="b">bet</span></span>
@@ -189,7 +399,7 @@ export default function LoginPage() {
                 : "Bienvenue de retour sur Kayakbet."}
             </p>
 
-            {/* Google — seulement login/signup */}
+            {/* Google */}
             {!isForgot && (
               <button type="button" className="lp-btn-google" onClick={handleGoogle}>
                 <span className="lp-g-icon">
@@ -210,58 +420,29 @@ export default function LoginPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit}>
-              {/* Email */}
               <div className="lp-field">
                 <label htmlFor="lp-email">Adresse e-mail</label>
                 <div>
-                  <input
-                    id="lp-email"
-                    type="email"
-                    placeholder="prenom.nom@email.com"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                  />
+                  <input id="lp-email" type="email" placeholder="prenom.nom@email.com" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} />
                 </div>
               </div>
 
-              {/* Password — pas sur forgot */}
               {!isForgot && (
                 <div className="lp-field">
                   <label htmlFor="lp-pw">Mot de passe</label>
                   <div className="lp-field-pw">
-                    <input
-                      id="lp-pw"
-                      type={showPw ? "text" : "password"}
-                      placeholder="••••••••"
-                      autoComplete={isSignup ? "new-password" : "current-password"}
-                      required
-                      minLength={6}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="lp-pw-toggle"
-                      aria-label={showPw ? "Masquer" : "Afficher le mot de passe"}
-                      onClick={() => setShowPw(v => !v)}
-                    >
+                    <input id="lp-pw" type={showPw ? "text" : "password"} placeholder="••••••••" autoComplete={isSignup ? "new-password" : "current-password"} required minLength={6} value={password} onChange={e => setPassword(e.target.value)} />
+                    <button type="button" className="lp-pw-toggle" aria-label={showPw ? "Masquer" : "Afficher le mot de passe"} onClick={() => setShowPw(v => !v)}>
                       {showPw ? <EyeOff /> : <EyeOpen />}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Remember me + Forgot — login seulement */}
-              {isLogin && (
+              {mode === "login" && (
                 <div className="flex items-center justify-between mt-[2px] mb-[26px]">
                   <label className="lp-remember">
-                    <input
-                      type="checkbox"
-                      checked={remember}
-                      onChange={e => setRemember(e.target.checked)}
-                    />
+                    <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
                     Se souvenir de moi
                   </label>
                   <button
@@ -277,29 +458,14 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Error */}
               {error && (
-                <p className="font-archivo text-[13px] rounded-[10px] px-4 py-3 mb-4" style={{
-                  color: "#FF7A45",
-                  background: "rgba(255,122,69,.1)",
-                  border: "1px solid rgba(255,122,69,.25)",
-                }}>
+                <p className="font-archivo text-[13px] rounded-[10px] px-4 py-3 mb-4" style={{ color: "#FF7A45", background: "rgba(255,122,69,.1)", border: "1px solid rgba(255,122,69,.25)" }}>
                   {error}
                 </p>
               )}
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="lp-btn-primary"
-                style={{ marginTop: isLogin ? 0 : "26px" }}
-              >
-                {loading
-                  ? "Chargement…"
-                  : isForgot  ? "Envoyer le lien"
-                  : isSignup  ? "Créer mon compte"
-                  : "Se connecter"}
+              <button type="submit" disabled={loading} className="lp-btn-primary" style={{ marginTop: mode === "login" ? 0 : "26px" }}>
+                {loading ? "Chargement…" : isForgot ? "Envoyer le lien" : isSignup ? "Créer mon compte" : "Se connecter"}
               </button>
             </form>
           </div>
@@ -308,38 +474,11 @@ export default function LoginPage() {
         {/* Footer toggle */}
         <p className="text-center mt-7 text-[14px] font-archivo" style={{ color: "var(--soft)" }}>
           {isForgot ? (
-            <>
-              Retour à{" "}
-              <button
-                className="font-bold transition-colors"
-                style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }}
-                onClick={() => switchMode("login")}
-              >
-                la connexion
-              </button>
-            </>
+            <>Retour à{" "}<button className="font-bold" style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }} onClick={() => switchMode("login")}>la connexion</button></>
           ) : isSignup ? (
-            <>
-              Déjà membre ?{" "}
-              <button
-                className="font-bold transition-colors"
-                style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }}
-                onClick={() => switchMode("login")}
-              >
-                Connexion
-              </button>
-            </>
+            <>Déjà membre ?{" "}<button className="font-bold" style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }} onClick={() => switchMode("login")}>Connexion</button></>
           ) : (
-            <>
-              Pas encore de compte ?{" "}
-              <button
-                className="font-bold transition-colors"
-                style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }}
-                onClick={() => switchMode("signup")}
-              >
-                Créer un compte
-              </button>
-            </>
+            <>Pas encore de compte ?{" "}<button className="font-bold" style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }} onClick={() => switchMode("signup")}>Créer un compte</button></>
           )}
         </p>
       </div>
