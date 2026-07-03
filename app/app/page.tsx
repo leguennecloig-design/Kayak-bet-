@@ -142,7 +142,6 @@ type BetRecord = {
 /* ----------------------------------------------------------------
    Données statiques (beta)
 ---------------------------------------------------------------- */
-const TARGET = new Date("2026-07-16T10:00:00");
 const pad = (n: number) => String(n).padStart(2, "0");
 
 function cleanPays(s: string) {
@@ -154,85 +153,6 @@ function fmtDate(iso: string) {
   const months = ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
 }
-
-const COMPETITIONS: Competition[] = [
-  {
-    id: "chfr26",
-    name: "Championnats de France · Descente",
-    location: "La Plagne",
-    flag: "FR",
-    date: "2026-07-16",
-    category: "Toutes catégories",
-    bettors: 2480,
-    featured: true,
-    odds: [
-      { id: "tostain",  nm: "D. Tostain",  ctry: "FR", note: "France", val: 1.65 },
-      { id: "zerouga",  nm: "N. Zerouga",  ctry: "FR", note: "France", val: 2.87 },
-      { id: "fontaine", nm: "L. Fontaine", ctry: "FR", note: "France · Favorite", val: 1.32, fav: true },
-      { id: "lacoste",  nm: "E. Lacoste",  ctry: "FR", note: "France", val: 1.96 },
-    ],
-  },
-  {
-    id: "icf-sprint",
-    name: "Coupe du Monde ICF · Sprint",
-    location: "Poznań",
-    flag: "PL",
-    date: "2026-07-28",
-    category: "K1 Hommes",
-    bettors: 1240,
-    odds: [
-      { id: "kowalski", nm: "P. Kowalski", ctry: "PL", note: "Pologne · Favori", val: 1.45, fav: true },
-      { id: "martin",   nm: "T. Martin",   ctry: "FR", note: "France", val: 2.20 },
-      { id: "schmidt",  nm: "L. Schmidt",  ctry: "DE", note: "Allemagne", val: 2.75 },
-      { id: "smith",    nm: "J. Smith",    ctry: "GB", note: "Grande-Bretagne", val: 3.10 },
-    ],
-  },
-  {
-    id: "euro-slalom",
-    name: "Championnat d'Europe · Slalom",
-    location: "Cracovie",
-    flag: "PL",
-    date: "2026-08-10",
-    category: "C1 / K1",
-    bettors: 890,
-    odds: [
-      { id: "muller", nm: "K. Müller", ctry: "DE", note: "Allemagne · Favori", val: 1.58, fav: true },
-      { id: "dupont", nm: "A. Dupont", ctry: "FR", note: "France", val: 2.45 },
-      { id: "novak",  nm: "J. Novák",  ctry: "CZ", note: "Tchéquie", val: 2.90 },
-      { id: "ross",   nm: "E. Ross",   ctry: "AU", note: "Australie", val: 3.60 },
-    ],
-  },
-  {
-    id: "open-bretagne",
-    name: "Open de Bretagne · Descente",
-    location: "Brest",
-    flag: "FR",
-    date: "2026-08-22",
-    category: "Descente K1",
-    bettors: 340,
-    odds: [
-      { id: "leblanc", nm: "S. Leblanc", ctry: "FR", note: "France · Favori", val: 1.72, fav: true },
-      { id: "mora",    nm: "C. Mora",    ctry: "ES", note: "Espagne", val: 2.30 },
-      { id: "klein",   nm: "M. Klein",   ctry: "DE", note: "Allemagne", val: 2.85 },
-      { id: "picard",  nm: "L. Picard",  ctry: "FR", note: "France", val: 3.20 },
-    ],
-  },
-  {
-    id: "masters-pau",
-    name: "Masters ICF · Eau Vive",
-    location: "Pau",
-    flag: "FR",
-    date: "2026-09-05",
-    category: "Descente / Slalom",
-    bettors: 560,
-    odds: [
-      { id: "richard", nm: "B. Richard",  ctry: "FR", note: "France · Favori", val: 1.80, fav: true },
-      { id: "sanchez", nm: "O. Sánchez",  ctry: "ES", note: "Espagne", val: 2.10 },
-      { id: "weber",   nm: "F. Weber",    ctry: "DE", note: "Allemagne", val: 2.55 },
-      { id: "leroy",   nm: "C. Leroy",    ctry: "FR", note: "France", val: 3.40 },
-    ],
-  },
-];
 
 const LEADERBOARD: Player[] = [
   { rank: 1,   name: "KayakKing42",   ini: "KK", wins: 34, balance: 4820, streak: 7 },
@@ -805,7 +725,7 @@ export default function DashboardPage() {
   const pillRef    = useRef<HTMLDivElement>(null);
 
   /* derived */
-  const competitions  = dbComps ?? COMPETITIONS;
+  const competitions  = dbComps ?? [];
   const effectiveBets = betHistory.length > 0 ? betHistory : BET_HISTORY;
   const effectiveLb   = dbLeaderboard.length > 0 ? dbLeaderboard : LEADERBOARD;
   const myRank        = effectiveLb.find(p => p.isMe)?.rank ?? null;
