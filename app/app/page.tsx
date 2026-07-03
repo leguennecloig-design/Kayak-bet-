@@ -653,6 +653,126 @@ export default function DashboardPage() {
         )}
 
         <LiveSection />
+
+        {/* ── Section inférieure : mini events + side cards ── */}
+        {competitions.length > 1 && (
+          <>
+            <div className="sectionhead">
+              <div className="l">
+                <span className="bar" />
+                <h3>Prochaines compétitions</h3>
+              </div>
+              <button className="more" onClick={() => navigate("competitions")}>
+                Tout voir →
+              </button>
+            </div>
+
+            <div className="lower">
+              {/* Mini events list */}
+              <div className="mini-list">
+                {competitions.slice(1).map(c => {
+                  const dt = c.date ? new Date(c.date) : null;
+                  const day = dt ? dt.getDate() : "—";
+                  const mon = dt ? dt.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "") : "";
+                  return (
+                    <div key={c.id} className="mini" onClick={() => { navigate("competitions"); setExpandedComp(c.id); }}>
+                      <div className="when">
+                        <div className="day">{day}</div>
+                        <div className="mon">{mon}</div>
+                      </div>
+                      <div className="info">
+                        <div className="cat">{c.category}</div>
+                        <div className="t">{c.name}</div>
+                        {c.location && <div className="loc">{c.location}</div>}
+                      </div>
+                      <div className="go">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Side column */}
+              <div className="side-col">
+                {/* Paris en cours */}
+                {(() => {
+                  const pending = (betHistory.length > 0 ? betHistory : BET_HISTORY).filter(b => b.result === "pending");
+                  return (
+                    <div className="side-card">
+                      <div className="hd">
+                        <div className="t">
+                          <ColTicket />
+                          Paris en cours
+                        </div>
+                        {pending.length > 0 && <span className="badge">{pending.length} actif{pending.length > 1 ? "s" : ""}</span>}
+                      </div>
+                      {pending.length === 0 ? (
+                        <p style={{ font: "600 13px/1.4 var(--font-archivo)", color: "var(--sub)", margin: 0 }}>
+                          Aucun pari en cours. Sélectionne des cotes !
+                        </p>
+                      ) : pending.slice(0, 2).map(b => (
+                        <div key={b.id} className="openbet">
+                          <div className="ev">{b.event}</div>
+                          <div className="row">
+                            <div className="nm">{b.athlete}</div>
+                            <div className="od">{b.odds.toFixed(2)}</div>
+                          </div>
+                          <div className="ft">
+                            <span>Mise · {b.stake} cr.</span>
+                            <span className="gain">+{(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} pot.</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Classement rapide */}
+                {(() => {
+                  const lb = dbLeaderboard.length > 0 ? dbLeaderboard : LEADERBOARD;
+                  const top3 = lb.filter(p => p.rank <= 3);
+                  const me   = lb.find(p => p.isMe);
+                  return (
+                    <div className="side-card">
+                      <div className="hd">
+                        <div className="t">
+                          <ColRank />
+                          Classement
+                        </div>
+                        <button className="badge" style={{ background: "none", cursor: "pointer", border: "1px solid rgba(40,215,230,.32)" }} onClick={() => navigate("classement")}>
+                          Voir tout
+                        </button>
+                      </div>
+                      {top3.map(p => (
+                        <div key={p.rank} className="home-lb-row">
+                          <span className="pos">{p.rank}</span>
+                          <div className="av">{p.ini}</div>
+                          <div className="nm">
+                            {p.name}
+                            <small>{p.balance.toLocaleString("fr-FR")} cr.</small>
+                          </div>
+                          <span className="pts">{p.wins} vic.</span>
+                        </div>
+                      ))}
+                      {me && me.rank > 3 && (
+                        <div className="home-lb-row you">
+                          <span className="pos">{me.rank}</span>
+                          <div className="av">{me.ini}</div>
+                          <div className="nm">
+                            {me.name} <span style={{ font: "700 8px/1 var(--font-grotesk)", letterSpacing: ".1em", textTransform: "uppercase", background: "var(--cyan)", color: "var(--navy)", borderRadius: 4, padding: "2px 5px", marginLeft: 6 }}>Moi</span>
+                            <small>{balance.toLocaleString("fr-FR")} cr.</small>
+                          </div>
+                          <span className="pts">{me.wins} vic.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </>
+        )}
       </>
     );
   };
@@ -903,9 +1023,12 @@ export default function DashboardPage() {
 
           <div className="head-right">
             <div className="balance">
-              <span className="k">Solde</span>
               <span className="v">{balance.toLocaleString("fr-FR")}</span>
-              <span className="u">cr.</span>
+              <span className="kb-coin">
+                <span className="kb-face">
+                  <span className="kb-letters">KB</span>
+                </span>
+              </span>
               <button className="plus" onClick={addCredits} aria-label="Recharger">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#28D7E6" strokeWidth="2.2" strokeLinecap="round" /></svg>
               </button>
