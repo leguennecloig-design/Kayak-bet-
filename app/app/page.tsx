@@ -154,27 +154,6 @@ function fmtDate(iso: string) {
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
 }
 
-const LEADERBOARD: Player[] = [
-  { rank: 1,   name: "KayakKing42",   ini: "KK", wins: 34, balance: 4820, streak: 7 },
-  { rank: 2,   name: "PaddleQueen",   ini: "PQ", wins: 29, balance: 3940, streak: 3 },
-  { rank: 3,   name: "EauVive59",     ini: "EV", wins: 26, balance: 3210, streak: 5 },
-  { rank: 4,   name: "Descente_Pro",  ini: "DP", wins: 22, balance: 2870, streak: 2 },
-  { rank: 5,   name: "Slalom_Boss",   ini: "SB", wins: 20, balance: 2540, streak: 1 },
-  { rank: 6,   name: "RapidRider",    ini: "RR", wins: 18, balance: 2210, streak: 4 },
-  { rank: 7,   name: "WhiteWaterF",   ini: "WF", wins: 15, balance: 1980, streak: 0 },
-  { rank: 8,   name: "CayakFrance",   ini: "CF", wins: 13, balance: 1740, streak: 2 },
-  { rank: 247, name: "Alex",          ini: "AX", wins: 8,  balance: 1000, streak: 3, isMe: true },
-];
-
-const BET_HISTORY: BetRecord[] = [
-  { id: "h1", event: "Masters ICF · Descente",     athlete: "T. Büchner",  odds: 2.10, stake: 100, result: "win",  date: "2026-06-10" },
-  { id: "h2", event: "Open Espagne · K1",           athlete: "R. García",   odds: 1.85, stake: 50,  result: "loss", date: "2026-06-05" },
-  { id: "h3", event: "Coupe de France · Sprint",    athlete: "N. Zerouga",  odds: 2.45, stake: 75,  result: "win",  date: "2026-05-28" },
-  { id: "h4", event: "Euro Slalom · C1",            athlete: "K. Müller",   odds: 1.60, stake: 120, result: "win",  date: "2026-05-20" },
-  { id: "h5", event: "Masters Bretagne · Descente", athlete: "D. Tostain",  odds: 1.65, stake: 80,  result: "loss", date: "2026-05-12" },
-  { id: "h6", event: "Champs Europe · Slalom",      athlete: "A. Dupont",   odds: 2.30, stake: 60,  result: "win",  date: "2026-05-02" },
-];
-
 const TOPNAV = [
   { ic: "home",   t: "Accueil",      v: "home"         as View | "drawer" },
   { ic: "trophy", t: "Compétitions", v: "competitions" as View | "drawer" },
@@ -726,8 +705,8 @@ export default function DashboardPage() {
 
   /* derived */
   const competitions  = dbComps ?? [];
-  const effectiveBets = betHistory.length > 0 ? betHistory : BET_HISTORY;
-  const effectiveLb   = dbLeaderboard.length > 0 ? dbLeaderboard : LEADERBOARD;
+  const effectiveBets = betHistory;
+  const effectiveLb   = dbLeaderboard;
   const myRank        = effectiveLb.find(p => p.isMe)?.rank ?? null;
   const pendingCount  = effectiveBets.filter(b => b.result === "pending").length;
   const streak        = (() => {
