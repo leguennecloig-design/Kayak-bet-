@@ -318,15 +318,15 @@ function HomeView({
           <p>Une grosse manche se prépare. Compose ton coupon avant le départ.</p>
         </div>
         <div className="quick">
-          <div className="chip-stat">
+          <div className="chip-stat chip-rank">
             <span className="ic"><ColRank /></span>
             <span className="tx"><span className="l">Classement</span><span className="v">{myRank !== null ? <>{myRank}<em>e</em></> : "—"}</span></span>
           </div>
-          <div className="chip-stat">
+          <div className="chip-stat chip-bets">
             <span className="ic"><ColTicket /></span>
             <span className="tx"><span className="l">Paris en cours</span><span className="v">{pendingCount}</span></span>
           </div>
-          <div className="chip-stat">
+          <div className="chip-stat chip-streak">
             <span className="ic"><ColFlame /></span>
             <span className="tx"><span className="l">Série</span><span className="v">{streak > 0 ? `${streak} victoire${streak > 1 ? "s" : ""}` : "—"}</span></span>
           </div>

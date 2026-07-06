@@ -37,28 +37,42 @@ export default function FeaturedEvent() {
     if (!ferroRef.current) return;
     let handle: { destroy: () => void } | null = null;
     let cancelled = false;
-    import("./ferrofluid").then(({ mountFerrofluid }) => {
-      if (cancelled || !ferroRef.current) return;
-      try {
-        handle = mountFerrofluid(ferroRef.current, {
-          colors: ["#0A2A3D", "#1F73FF", "#28D7E6", "#11C2C2"],
-          flowDirection: "left",
-          speed: 0.3,
-          scale: 1.1,
-          opacity: 0.7,
-          turbulence: 0.7,
-          fluidity: 0.16,
-          rimWidth: 0.22,
-          sharpness: 3,
-          shimmer: 0.8,
-          glow: 1.6,
-          mouseInteraction: false,
+
+    // Monte le WebGL seulement quand la section approche du viewport : au
+    // chargement, Hero/FeaturedEvent/CtaBand créeraient sinon 3 contextes
+    // WebGL simultanés dès le premier paint, ce qui peut dépasser le budget
+    // GPU de Safari mobile et faire perdre le contexte (blob qui reste noir).
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || cancelled) return;
+        io.disconnect();
+        import("./ferrofluid").then(({ mountFerrofluid }) => {
+          if (cancelled || !ferroRef.current) return;
+          try {
+            handle = mountFerrofluid(ferroRef.current, {
+              colors: ["#0A2A3D", "#1F73FF", "#28D7E6", "#11C2C2"],
+              flowDirection: "left",
+              speed: 0.3,
+              scale: 1.1,
+              opacity: 0.7,
+              turbulence: 0.7,
+              fluidity: 0.16,
+              rimWidth: 0.22,
+              sharpness: 3,
+              shimmer: 0.8,
+              glow: 1.6,
+              mouseInteraction: false,
+            });
+          } catch (e) {
+            console.error("Ferrofluid failed to mount", e);
+          }
         });
-      } catch (e) {
-        console.error("Ferrofluid failed to mount", e);
-      }
-    });
-    return () => { cancelled = true; handle?.destroy(); };
+      },
+      { rootMargin: "300px" }
+    );
+    io.observe(ferroRef.current);
+
+    return () => { cancelled = true; io.disconnect(); handle?.destroy(); };
   }, []);
 
   return (

@@ -230,8 +230,18 @@ export function mountFerrofluid(container: HTMLElement, opts: FerrofluidOptions 
   let mouseTarget: [number, number] = [0, 0];
   let lastTime = 0;
 
+  // Cap le DPR : ce blob est un effet d'ambiance flouté, pas besoin du plein
+  // 3x des écrans retina — avec 3 instances simultanées sur la page (Hero,
+  // FeaturedEvent, CtaBand), un DPR non plafonné pousse trop de contextes
+  // WebGL lourds en même temps et peut déclencher une perte de contexte
+  // sur mobile Safari (budget GPU serré), laissant le canvas vide/noir.
+  const effectiveDpr = Math.min(
+    dpr ?? (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1),
+    2
+  );
+
   const renderer = new Renderer({
-    dpr: dpr ?? (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1),
+    dpr: effectiveDpr,
     alpha: true,
     antialias: true,
   });
@@ -282,6 +292,34 @@ export function mountFerrofluid(container: HTMLElement, opts: FerrofluidOptions 
   const ro = new ResizeObserver(resize);
   ro.observe(container);
 
+  // Coupe le rendu quand le blob est hors-écran : réduit la charge GPU
+  // cumulée des instances simultanées (moins de risque de perte de contexte)
+  // et économise la batterie pendant le scroll.
+  let offscreenPaused = false;
+  const io = new IntersectionObserver(
+    ([entry]) => { offscreenPaused = !entry.isIntersecting; },
+    { rootMargin: "200px" }
+  );
+  io.observe(container);
+
+  // Un contexte WebGL peut être perdu sous pression mémoire/GPU (fréquent
+  // sur mobile avec plusieurs canvases animés en simultané). Sans ce
+  // handler, le canvas reste vide/noir en permanence après la perte.
+  let contextLost = false;
+  const onContextLost = (e: Event) => {
+    e.preventDefault();
+    contextLost = true;
+    if (rafRef) cancelAnimationFrame(rafRef);
+  };
+  const onContextRestored = () => {
+    contextLost = false;
+    resize();
+    lastTime = 0;
+    rafRef = requestAnimationFrame(loop);
+  };
+  canvas.addEventListener("webglcontextlost", onContextLost, false);
+  canvas.addEventListener("webglcontextrestored", onContextRestored, false);
+
   const onPointerMove = (e: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
     const sc = renderer.dpr || 1;
@@ -309,7 +347,7 @@ export function mountFerrofluid(container: HTMLElement, opts: FerrofluidOptions 
     } else {
       lastTime = t;
     }
-    if (!isPaused) {
+    if (!isPaused && !offscreenPaused && !contextLost) {
       try { renderer.render({ scene: mesh }); } catch (e) { console.error(e); }
     }
   };
@@ -319,6 +357,9 @@ export function mountFerrofluid(container: HTMLElement, opts: FerrofluidOptions 
     setPaused(v: boolean) { isPaused = v; },
     destroy() {
       if (rafRef) cancelAnimationFrame(rafRef);
+      io.disconnect();
+      canvas.removeEventListener("webglcontextlost", onContextLost);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
       if (mouseInteraction) canvas.removeEventListener("pointermove", onPointerMove);
       ro.disconnect();
       if (canvas.parentElement === container) container.removeChild(canvas);
