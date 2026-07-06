@@ -4,6 +4,8 @@ const COLS = [
   {
     h: "Produit",
     links: [
+      { t: "Pourquoi Kayakbet", href: "#features" },
+      { t: "Comment ça marche", href: "#how" },
       { t: "Compétitions", href: "#event" },
       { t: "Classement", href: "#cta" },
     ],

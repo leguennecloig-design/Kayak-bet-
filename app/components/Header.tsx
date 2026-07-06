@@ -5,6 +5,8 @@ import Logo from "./Logo";
 import { useToast } from "./Toast";
 
 const NAV = [
+  { href: "#features", label: "Pourquoi" },
+  { href: "#how", label: "Comment ça marche" },
   { href: "#event", label: "Compétitions" },
 ];
 
