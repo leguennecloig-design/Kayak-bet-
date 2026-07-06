@@ -3,7 +3,21 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { createClient } from "@/lib/supabase";
 import dynamic from "next/dynamic";
+import type { BetType } from "@/lib/algo/types";
+import CategoryBetModal from "@/app/components/CategoryBetModal";
+import EditProfileModal from "@/app/components/EditProfileModal";
+import LinkAthleteModal from "@/app/components/LinkAthleteModal";
 import "./dashboard.css";
+
+const BET_LABELS: Record<BetType, string> = {
+  TOP_1: "Vainqueur",
+  TOP_3: "Top 3",
+  TOP_5: "Top 5",
+  TOP_10: "Top 10",
+  TOP_20: "Top 20",
+  EXACT_PLACE: "Place exacte",
+  EXACT_TIME: "Temps exact",
+};
 
 const LiveSection = dynamic(() => import("./LiveSection"), { ssr: false });
 
@@ -95,7 +109,10 @@ const StarIcon  = ({ filled }: { filled?: boolean }) => (
 type View = "home" | "competitions" | "classement" | "profil";
 
 type Odd = {
-  id: string;
+  id: string;            // clé composite `${participantId}:${betType}`
+  participantId: string;
+  betType: BetType;
+  betLabel: string;
   nm: string;
   ctry: string;
   note: string;
@@ -103,6 +120,7 @@ type Odd = {
   fav?: boolean;
   competitionId?: string;
   categorie?:     string;
+  codeBateau?:    string | null;
 };
 
 type Competition = {
@@ -196,6 +214,7 @@ type HomeViewProps = {
   streak: number;
   effectiveBets: BetRecord[];
   effectiveLb: Player[];
+  openBetModal: (compId: string, compNom: string, categorie: string) => void;
 };
 
 type CompetitionsViewProps = {
@@ -206,6 +225,7 @@ type CompetitionsViewProps = {
   setCatFilter: Dispatch<SetStateAction<Record<string, string>>>;
   coupon: Record<string, Odd>;
   toggle: (o: Odd) => void;
+  openBetModal: (compId: string, compNom: string, categorie: string) => void;
 };
 
 type ClassementViewProps = {
@@ -220,7 +240,14 @@ type ProfilViewProps = {
   balance: number;
   effectiveBets: BetRecord[];
   signOut: () => Promise<void>;
+  avatarUrl: string | null;
+  bio: string;
+  onEditProfile: () => void;
+  linkedAthlete: LinkedAthlete | null;
+  onLinkAthlete: () => void;
 };
+
+type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null };
 
 /* ----------------------------------------------------------------
    Sub-views — defined OUTSIDE DashboardPage so React never
@@ -254,7 +281,7 @@ function OddsGrid({ odds, eventName, coupon, toggle }: OddsGridProps) {
 function HomeView({
   competitions, name, cd, catFilter, setCatFilter, navigate,
   setExpandedComp, coupon, toggle, myRank, pendingCount, streak,
-  effectiveBets, effectiveLb,
+  effectiveBets, effectiveLb, openBetModal,
 }: HomeViewProps) {
   const feat    = competitions[0];
   const pending = effectiveBets.filter(b => b.result === "pending");
@@ -330,7 +357,13 @@ function HomeView({
                     ))}
                   </div>
                 )}
-                <OddsGrid odds={filtOdds} eventName={feat.name} coupon={coupon} toggle={toggle} />
+                {sel ? (
+                  <button className="cat-open-modal" onClick={() => openBetModal(feat.id, feat.name, sel)}>
+                    Voir les paris {sel} <Arrow />
+                  </button>
+                ) : (
+                  <OddsGrid odds={filtOdds} eventName={feat.name} coupon={coupon} toggle={toggle} />
+                )}
               </>
             );
           })() : <p className="no-odds">Les cotes seront disponibles bientôt.</p>}
@@ -457,7 +490,7 @@ function HomeView({
 }
 
 function CompetitionsView({
-  competitions, expandedComp, setExpandedComp, catFilter, setCatFilter, coupon, toggle,
+  competitions, expandedComp, setExpandedComp, catFilter, setCatFilter, coupon, toggle, openBetModal,
 }: CompetitionsViewProps) {
   return (
     <>
@@ -507,8 +540,16 @@ function CompetitionsView({
                         ))}
                       </div>
                     )}
-                    <div className="comp-odds-label"><span className="bar" /> Vainqueur — {sel || c.category}</div>
-                    <OddsGrid odds={filtOdds} eventName={c.name} coupon={coupon} toggle={toggle} />
+                    {sel ? (
+                      <button className="cat-open-modal" onClick={() => openBetModal(c.id, c.name, sel)}>
+                        Voir les paris {sel} <Arrow />
+                      </button>
+                    ) : (
+                      <>
+                        <div className="comp-odds-label"><span className="bar" /> Vainqueur — {c.category}</div>
+                        <OddsGrid odds={filtOdds} eventName={c.name} coupon={coupon} toggle={toggle} />
+                      </>
+                    )}
                   </div>
                 );
               })()}
@@ -576,7 +617,7 @@ function ClassementView({ effectiveLb }: ClassementViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut }: ProfilViewProps) {
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, onEditProfile, linkedAthlete, onLinkAthlete }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
@@ -590,14 +631,25 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
           <path d="M0 92c142 0 142-24 284-24s142 24 284 24 142-24 284-24 142 24 284 24v48H0Z" fill="#11C2C2" opacity=".1" />
         </svg>
         <div className="profil-hero-inner">
-          <div className="profil-avatar"><span>{initials}</span></div>
+          <div className="profil-avatar">
+            {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{initials}</span>}
+          </div>
           <span className="profil-eyebrow">Mon profil · Saison 2026</span>
           <h1 className="profil-name">{name}</h1>
           <p className="profil-email">{userEmail}</p>
+          {bio && <p className="profil-bio">{bio}</p>}
           <span className="profil-rank">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
             Rang {myRank ?? "—"} · Saison 2026
           </span>
+          <div className="profil-actions">
+            <button className="profil-edit-btn" onClick={onEditProfile}>Modifier le profil</button>
+            {linkedAthlete ? (
+              <span className="profil-linked">Athlète lié · {linkedAthlete.prenom} {linkedAthlete.nom}</span>
+            ) : (
+              <button className="profil-edit-btn" onClick={onLinkAthlete}>Lier mon profil athlète</button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -693,9 +745,17 @@ export default function DashboardPage() {
   const [name,          setName]          = useState("Joueur");
   const [initials,      setInitials]      = useState("??");
   const [userEmail,     setUserEmail]     = useState("");
+  const [userId,        setUserId]        = useState("");
+  const [username,      setUsername]     = useState("");
+  const [avatarUrl,     setAvatarUrl]     = useState<string | null>(null);
+  const [bio,           setBio]           = useState("");
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [linkedAthlete, setLinkedAthlete] = useState<LinkedAthlete | null>(null);
+  const [linkAthleteOpen, setLinkAthleteOpen] = useState(false);
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [catFilter,     setCatFilter]     = useState<Record<string, string>>({});
+  const [betModal, setBetModal] = useState<{ compId: string; compNom: string; categorie: string } | null>(null);
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
   });
@@ -730,6 +790,7 @@ export default function DashboardPage() {
       const { data } = await supabase.auth.getUser();
       const email = data.user?.email ?? "";
       setUserEmail(email);
+      setUserId(data.user?.id ?? "");
       if (email) {
         const base   = email.split("@")[0].replace(/[._-]+/g, " ").trim();
         const pretty = base.charAt(0).toUpperCase() + base.slice(1);
@@ -742,7 +803,10 @@ export default function DashboardPage() {
         if (res.ok) {
           const prof = await res.json();
           setBalance(Number(prof.balance ?? 0));
-          if (prof.username) { setName(prof.username); setInitials(prof.username.slice(0, 2).toUpperCase()); }
+          if (prof.username) { setName(prof.username); setInitials(prof.username.slice(0, 2).toUpperCase()); setUsername(prof.username); }
+          setAvatarUrl(prof.avatarUrl ?? null);
+          setBio(prof.bio ?? "");
+          setLinkedAthlete(prof.linkedAthlete ?? null);
         }
       } catch { /* ignore */ }
     }
@@ -772,7 +836,7 @@ export default function DashboardPage() {
     async function fetchComps() {
       const { data } = await supabase
         .from("competitions")
-        .select("id, nom, date, discipline, lieu, participants(id, nom, pays, cote, categorie)")
+        .select("id, nom, date, discipline, lieu, participants(id, nom, pays, cote, categorie, code_bateau)")
         .eq("status", "published")
         .order("date", { ascending: true });
       if (!data || data.length === 0) return;
@@ -790,7 +854,10 @@ export default function DashboardPage() {
           bettors: 0,
           featured: i === 0,
           odds: parts.map((p: any) => ({
-            id:            p.id,
+            id:            `${p.id}:TOP_1`,
+            participantId: p.id,
+            betType:       "TOP_1" as const,
+            betLabel:      BET_LABELS.TOP_1,
             nm:            p.nom,
             ctry:          "FR",
             note:          cleanPays(p.pays ?? ""),
@@ -798,6 +865,7 @@ export default function DashboardPage() {
             fav:           minCote != null && p.cote === minCote,
             competitionId: c.id,
             categorie:     p.categorie ?? "",
+            codeBateau:    p.code_bateau ?? null,
           })),
         };
       });
@@ -839,6 +907,10 @@ export default function DashboardPage() {
     setCoupon((prev) => { const next = { ...prev }; delete next[id]; return next; });
   }
 
+  function openBetModal(compId: string, compNom: string, categorie: string) {
+    setBetModal({ compId, compNom, categorie });
+  }
+
   async function addCredits() {
     try {
       const res = await fetch("/api/user/profile", {
@@ -870,7 +942,8 @@ export default function DashboardPage() {
       const firstComp = competitions.find(c => c.id === compIds[0]);
 
       const selectionsPayload = selected.map(o => ({
-        participantId:  o.id,
+        participantId:  o.participantId,
+        betType:        o.betType,
         nom:            o.nm,
         cote:           o.val,
         competitionId:  o.competitionId ?? "",
@@ -1009,6 +1082,7 @@ export default function DashboardPage() {
               streak={streak}
               effectiveBets={effectiveBets}
               effectiveLb={effectiveLb}
+              openBetModal={openBetModal}
             />
           )}
           {view === "competitions" && (
@@ -1020,6 +1094,7 @@ export default function DashboardPage() {
               setCatFilter={setCatFilter}
               coupon={coupon}
               toggle={toggle}
+              openBetModal={openBetModal}
             />
           )}
           {view === "classement" && <ClassementView effectiveLb={effectiveLb} />}
@@ -1032,6 +1107,11 @@ export default function DashboardPage() {
               balance={balance}
               effectiveBets={effectiveBets}
               signOut={signOut}
+              avatarUrl={avatarUrl}
+              bio={bio}
+              onEditProfile={() => setEditProfileOpen(true)}
+              linkedAthlete={linkedAthlete}
+              onLinkAthlete={() => setLinkAthleteOpen(true)}
             />
           )}
         </div>
@@ -1059,7 +1139,7 @@ export default function DashboardPage() {
           ) : (
             selected.map((o) => (
               <div className="bet" key={o.id}>
-                <div className="ev">{o.note}</div>
+                <div className="ev">{o.note}{o.betType !== "TOP_1" && <> · {o.betLabel}</>}</div>
                 <div className="row">
                   <div className="nm">{o.nm}</div>
                   <div className="od">{o.val.toFixed(2)}</div>
@@ -1093,6 +1173,44 @@ export default function DashboardPage() {
           </div>
         )}
       </aside>
+
+      {/* ============ MODAL PARIS PAR CATÉGORIE ============ */}
+      {betModal && (
+        <CategoryBetModal
+          open
+          onClose={() => setBetModal(null)}
+          competitionId={betModal.compId}
+          competitionNom={betModal.compNom}
+          categorie={betModal.categorie}
+          participants={
+            (competitions.find(c => c.id === betModal.compId)?.odds ?? [])
+              .filter(o => o.categorie === betModal.categorie)
+          }
+          coupon={coupon}
+          toggle={toggle}
+        />
+      )}
+
+      <EditProfileModal
+        open={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        userId={userId}
+        initials={initials}
+        username={username}
+        avatarUrl={avatarUrl}
+        bio={bio}
+        onSaved={(updates) => {
+          if (updates.username) { setName(updates.username); setInitials(updates.username.slice(0, 2).toUpperCase()); setUsername(updates.username); }
+          if (updates.bio != null) setBio(updates.bio);
+          if (updates.avatarUrl) setAvatarUrl(updates.avatarUrl);
+        }}
+      />
+
+      <LinkAthleteModal
+        open={linkAthleteOpen}
+        onClose={() => setLinkAthleteOpen(false)}
+        onLinked={(athlete) => setLinkedAthlete(athlete)}
+      />
 
       {/* ============ TOAST ============ */}
       <div className={`toast${toast.show ? " show" : ""}`} style={{ borderColor: toast.err ? "#FF7A45" : "#28D7E6" }}>

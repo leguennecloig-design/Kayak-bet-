@@ -1524,6 +1524,44 @@
 .kb-app .profil-avatar span {
   font: 800 32px/1 var(--font-archivo); color: #fff; letter-spacing: 0.01em;
 }
+.kb-app .profil-avatar img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 24px;
+}
+.kb-app .profil-bio {
+  font: 500 13.5px/1.5 var(--font-archivo); color: var(--soft, var(--idle));
+  max-width: 380px; margin: 0 0 14px;
+}
+.kb-app .profil-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.kb-app .profil-edit-btn {
+  font: 700 13px/1 var(--font-archivo);
+  color: var(--cyan);
+  background: rgba(40, 215, 230, 0.08);
+  border: 1px solid rgba(40, 215, 230, 0.3);
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kb-app .profil-edit-btn:hover {
+  background: rgba(40, 215, 230, 0.14);
+  border-color: rgba(40, 215, 230, 0.5);
+}
+.kb-app .profil-linked {
+  display: inline-flex;
+  align-items: center;
+  font: 700 13px/1 var(--font-archivo);
+  color: var(--idle);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
 .kb-app .profil-eyebrow {
   font: 700 10.5px/1 var(--font-grotesk), monospace;
   letter-spacing: 0.18em; text-transform: uppercase;
@@ -1947,4 +1985,364 @@
   .kb-app .lb-bal {
     display: none;
   }
+}
+
+/* ---- CAT-TABS "OUVRIR MODAL" BUTTON ---- */
+.kb-app .cat-open-modal {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: 700 13px/1 var(--font-archivo);
+  color: var(--cyan);
+  background: rgba(40, 215, 230, 0.08);
+  border: 1px solid rgba(40, 215, 230, 0.3);
+  border-radius: 12px;
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+.kb-app .cat-open-modal:hover {
+  background: rgba(40, 215, 230, 0.14);
+  border-color: rgba(40, 215, 230, 0.5);
+  transform: translateY(-1px);
+}
+.kb-app .cat-open-modal svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ============ CATEGORY BET MODAL ============ */
+.kb-app .catmodal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 16, 24, 0.62);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.kb-app .catmodal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--navy-2), var(--navy) 40%, var(--deep));
+  border: 1px solid var(--border-2);
+  border-radius: 20px;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.65);
+  outline: none;
+}
+.kb-app .catmodal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.kb-app .catmodal-cat {
+  font: 700 10.5px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+.kb-app .catmodal-head h3 {
+  font: 400 italic 21px/1.05 var(--font-anton), sans-serif;
+  text-transform: uppercase;
+  color: #fff;
+  margin: 0;
+}
+.kb-app .catmodal-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--border-2);
+  background: transparent;
+  color: var(--idle);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kb-app .catmodal-close svg {
+  width: 14px;
+  height: 14px;
+}
+.kb-app .catmodal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.kb-app .catmodal-status {
+  text-align: center;
+  color: var(--sub);
+  font: 600 13.5px/1.5 var(--font-archivo);
+  padding: 24px 0;
+}
+.kb-app .catmodal-status.err {
+  color: var(--coral);
+}
+.kb-app .catmodal-athlete {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+.kb-app .catmodal-athlete:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.kb-app .catmodal-athlete-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.kb-app .catmodal-athlete-head .ctry {
+  font: 700 8px/1 var(--font-grotesk), monospace;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 3px 5px;
+  color: var(--idle);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kb-app .catmodal-athlete-head .nm {
+  font: 800 14px/1.1 var(--font-archivo);
+  color: #fff;
+}
+.kb-app .catmodal-bets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.kb-app .catmodal-bet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 12px/1 var(--font-archivo);
+  color: var(--idle);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kb-app .catmodal-bet:hover {
+  border-color: rgba(40, 215, 230, 0.4);
+  color: #fff;
+}
+.kb-app .catmodal-bet .vl {
+  font: 400 italic 15px/1 var(--font-anton), sans-serif;
+  color: var(--cyan);
+}
+.kb-app .catmodal-bet.sel {
+  border-color: var(--cyan);
+  background: rgba(40, 215, 230, 0.12);
+  color: #fff;
+}
+.kb-app .catmodal-bet.sel .vl {
+  color: #fff;
+}
+.kb-app .catmodal-note {
+  font: 600 11.5px/1.3 var(--font-archivo);
+  color: var(--sub);
+  align-self: center;
+}
+
+@media (max-width: 480px) {
+  .kb-app .catmodal {
+    max-height: 92vh;
+  }
+  .kb-app .catmodal-bets {
+    gap: 6px;
+  }
+  .kb-app .catmodal-bet {
+    padding: 7px 10px;
+  }
+}
+
+/* ============ EDIT PROFILE MODAL ============ */
+.kb-app .sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.kb-app .editprofile-avatar-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.kb-app .avatar-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.kb-app .avatar-upload-btn {
+  position: relative;
+  width: 84px; height: 84px;
+  border-radius: 22px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: linear-gradient(140deg, var(--cyan), var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.kb-app .avatar-upload-btn img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.kb-app .avatar-upload-btn .fallback {
+  font: 800 28px/1 var(--font-archivo); color: #fff;
+}
+.kb-app .avatar-upload-overlay {
+  position: absolute; inset: auto 0 0 0;
+  background: rgba(4, 16, 24, 0.72);
+  color: #fff;
+  font: 700 9.5px/1 var(--font-grotesk), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 5px 0;
+  text-align: center;
+}
+.kb-app .avatar-upload-error {
+  font: 600 11.5px/1.3 var(--font-archivo);
+  color: var(--coral);
+  text-align: center;
+  max-width: 220px;
+}
+.kb-app .editprofile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  position: relative;
+}
+.kb-app .editprofile-field span:first-child {
+  font: 700 11px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--idle);
+}
+.kb-app .editprofile-field input,
+.kb-app .editprofile-field textarea {
+  font: 600 14.5px/1.4 var(--font-archivo);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--border-2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kb-app .editprofile-field input:focus,
+.kb-app .editprofile-field textarea:focus {
+  border-color: var(--cyan);
+  background: rgba(40, 215, 230, 0.05);
+}
+.kb-app .editprofile-hint {
+  font: 600 11px/1.3 var(--font-archivo);
+  color: var(--coral);
+}
+.kb-app .editprofile-counter {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  font: 700 10px/1 var(--font-grotesk), monospace;
+  color: var(--sub);
+}
+.kb-app .editprofile-save {
+  margin-top: 4px;
+  font: 800 14px/1 var(--font-archivo);
+  color: var(--navy);
+  background: linear-gradient(95deg, var(--cyan), var(--turq));
+  border: none;
+  border-radius: 12px;
+  padding: 13px 18px;
+  cursor: pointer;
+}
+.kb-app .editprofile-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============ LINK ATHLETE MODAL ============ */
+.kb-app .linkathlete-search {
+  width: 100%;
+  font: 600 14.5px/1.4 var(--font-archivo);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--border-2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  margin-bottom: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kb-app .linkathlete-search:focus {
+  border-color: var(--cyan);
+  background: rgba(40, 215, 230, 0.05);
+}
+.kb-app .linkathlete-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.kb-app .linkathlete-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid var(--border-2);
+  border-radius: 12px;
+  padding: 11px 14px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kb-app .linkathlete-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.kb-app .linkathlete-row b {
+  font: 700 14px/1.2 var(--font-archivo);
+  color: #fff;
+}
+.kb-app .linkathlete-row span {
+  font: 500 12px/1.3 var(--font-archivo);
+  color: var(--idle);
+}
+.kb-app .linkathlete-row.selected {
+  border-color: var(--cyan);
+  background: rgba(40, 215, 230, 0.08);
+  cursor: default;
+  margin-bottom: 18px;
+}
+.kb-app .linkathlete-actions {
+  display: flex;
+  gap: 12px;
+}
+.kb-app .linkathlete-actions .editprofile-save {
+  flex: 1;
+}
+.kb-app .linkathlete-skip {
+  font: 700 13px/1 var(--font-archivo);
+  color: var(--idle);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 13px 16px;
+}
+.kb-app .linkathlete-skip:hover {
+  color: #fff;
 }

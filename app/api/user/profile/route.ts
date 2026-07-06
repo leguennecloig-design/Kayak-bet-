@@ -16,14 +16,14 @@ export async function GET() {
   const { data: profile, error } = await adminSb
     .from("users")
     .upsert({ id: user.id, email: user.email }, { onConflict: "id", ignoreDuplicates: true })
-    .select("id, username, email, balance, created_at")
+    .select("id, username, email, balance, avatar_url, bio, created_at")
     .eq("id", user.id)
     .single();
 
   // Si upsert ne retourne rien (ignoreDuplicates), re-fetch
   const row = profile ?? (await adminSb
     .from("users")
-    .select("id, username, email, balance, created_at")
+    .select("id, username, email, balance, avatar_url, bio, created_at")
     .eq("id", user.id)
     .single()
   ).data;
@@ -44,11 +44,20 @@ export async function GET() {
   const totalWon    = betStats?.filter(b => b.status === "won")
     .reduce((sum, b) => sum + (b.gain_reel ?? 0), 0) ?? 0;
 
+  const { data: linkedAthleteRow } = await adminSb
+    .from("athletes")
+    .select("id, nom, prenom, club, categorie")
+    .eq("linked_user_id", user.id)
+    .maybeSingle();
+
   return NextResponse.json({
     id:         user.id,
     email:      user.email ?? row?.email,
     username:   row?.username ?? null,
     balance:    row?.balance ?? 1000,
+    avatarUrl:  row?.avatar_url ?? null,
+    bio:        row?.bio ?? "",
+    linkedAthlete: linkedAthleteRow ?? null,
     created_at: row?.created_at,
     stats: {
       totalBets,
@@ -89,10 +98,40 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (body.username != null) {
+    const username = String(body.username).trim();
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      return NextResponse.json(
+        { error: "Le pseudo doit faire 3 à 20 caractères (lettres, chiffres, underscore uniquement)" },
+        { status: 400 }
+      );
+    }
     const { error } = await adminSb
       .from("users")
-      .update({ username: String(body.username).slice(0, 30) })
+      .update({ username })
       .eq("id", user.id);
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json({ error: "Ce pseudo est déjà pris" }, { status: 409 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.bio != null) {
+    const bio = String(body.bio).slice(0, 280);
+    const { error } = await adminSb.from("users").update({ bio }).eq("id", user.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.avatar_url != null) {
+    const avatarUrl = String(body.avatar_url);
+    const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${user.id}/`;
+    if (!avatarUrl.startsWith(expectedPrefix)) {
+      return NextResponse.json({ error: "URL d'avatar invalide" }, { status: 400 });
+    }
+    const { error } = await adminSb.from("users").update({ avatar_url: avatarUrl }).eq("id", user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

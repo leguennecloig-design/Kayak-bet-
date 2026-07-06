@@ -2,10 +2,22 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import "./login.css";
 
 type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding";
 type OnbStep = "profile" | "athlete" | "source";
+
+type AthleteResult = {
+  id: string;
+  nom: string;
+  prenom: string | null;
+  club: string | null;
+  categorie: string | null;
+  rangNational: number | null;
+  saison: string | null;
+  claimed: boolean;
+};
 
 /* ---- Icons ---- */
 const EyeOpen = () => (
@@ -32,16 +44,6 @@ const DropLogo = () => (
     </defs>
   </svg>
 );
-
-/* ---- Athletes list (onboarding step 2) ---- */
-const ATHLETES = [
-  { id: "castryck",   nm: "T. Castryck",    ctry: "FR", init: "TC" },
-  { id: "prskavec",   nm: "J. Prskavec",    ctry: "CZ", init: "JP" },
-  { id: "slafkovsky", nm: "A. Slafkovský",  ctry: "SK", init: "AS" },
-  { id: "aigner",     nm: "H. Aigner",      ctry: "DE", init: "HA" },
-  { id: "zerouga",    nm: "N. Zerouga",     ctry: "FR", init: "NZ" },
-  { id: "muller",     nm: "K. Müller",      ctry: "DE", init: "KM" },
-];
 
 /* ================================================================
    Welcome overlay — shown after successful login
@@ -83,12 +85,18 @@ function WelcomeOverlay({ onDone }: { onDone: () => void }) {
    Onboarding flow — 3 steps, shown only on first login
 ================================================================ */
 function OnboardingFlow({ onDone }: { onDone: () => void }) {
+  const supabase = createClient();
   const [steps, setSteps] = useState<OnbStep[]>(["profile", "source"]);
   const [stepIdx, setStepIdx] = useState(0);
   const [profile, setProfile] = useState<"athlete" | "bettor" | null>(null);
-  const [athleteId, setAthleteId] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [athleteResults, setAthleteResults] = useState<AthleteResult[]>([]);
+  const [athleteLoading, setAthleteLoading] = useState(false);
+  const [confirming, setConfirming] = useState<AthleteResult | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState("");
 
   const currentStep = steps[stepIdx];
 
@@ -106,9 +114,43 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
     setStepIdx(i => i + 1);
   }
 
-  const filtered = ATHLETES.filter(a =>
-    a.nm.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (debouncedSearch.trim().length < 2) { setAthleteResults([]); return; }
+    let cancelled = false;
+    setAthleteLoading(true);
+    fetch(`/api/athletes/search?q=${encodeURIComponent(debouncedSearch)}`)
+      .then(res => res.json())
+      .then((data) => { if (!cancelled) setAthleteResults(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setAthleteResults([]); })
+      .finally(() => { if (!cancelled) setAthleteLoading(false); });
+    return () => { cancelled = true; };
+  }, [debouncedSearch]);
+
+  async function confirmAthlete() {
+    if (!confirming) return;
+    setClaiming(true);
+    setClaimError("");
+    try {
+      const { data, error } = await supabase.rpc("claim_athlete", { athlete_uuid: confirming.id });
+      if (error) throw error;
+      if (!data?.ok) {
+        setClaimError(
+          data?.error === "already_claimed"
+            ? "Cet athlète a déjà été revendiqué par un autre compte."
+            : data?.error === "already_linked_other"
+            ? "Tu as déjà lié un profil athlète. Contacte le support pour le modifier."
+            : "Impossible de lier ce profil."
+        );
+        setConfirming(null);
+        return;
+      }
+      goNext();
+    } catch {
+      setClaimError("Erreur réseau, réessaie.");
+    } finally {
+      setClaiming(false);
+    }
+  }
 
   return (
     <div className="lp-onb">
@@ -158,7 +200,7 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
           )}
 
           {/* Step 2 — athlete search (conditional) */}
-          {currentStep === "athlete" && (
+          {currentStep === "athlete" && !confirming && (
             <div className="lp-onb-step">
               <h2 className="lp-onb-title">Ton nom d'athlète</h2>
               <p className="lp-onb-sub">Retrouve-toi dans le classement officiel du circuit.</p>
@@ -175,27 +217,51 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
+              {claimError && <p className="lp-onb-error">{claimError}</p>}
               <div className="lp-athlete-list">
-                {filtered.length === 0 ? (
+                {athleteLoading ? (
+                  <div className="lp-athlete-empty">Recherche…</div>
+                ) : search.trim().length < 2 ? (
+                  <div className="lp-athlete-empty">Tape au moins 2 lettres</div>
+                ) : athleteResults.length === 0 ? (
                   <div className="lp-athlete-empty">Aucun athlète trouvé</div>
-                ) : filtered.map(a => (
+                ) : athleteResults.map(a => (
                   <div
                     key={a.id}
-                    className={`lp-athlete-row${athleteId === a.id ? " sel" : ""}`}
+                    className="lp-athlete-row"
                     role="button"
                     tabIndex={0}
-                    onClick={() => setAthleteId(a.id)}
-                    onKeyDown={e => e.key === "Enter" && setAthleteId(a.id)}
+                    onClick={() => setConfirming(a)}
+                    onKeyDown={e => e.key === "Enter" && setConfirming(a)}
                   >
-                    <div className="lp-av">{a.init}</div>
-                    <div className="lp-meta"><b>{a.nm}</b><span>Circuit mondial · Slalom</span></div>
-                    <div className="lp-flag">{a.ctry}</div>
+                    <div className="lp-av">{(a.prenom?.[0] ?? "") + (a.nom?.[0] ?? "")}</div>
+                    <div className="lp-meta"><b>{a.prenom} {a.nom}</b><span>{a.club ?? "Circuit national"} · {a.categorie ?? ""}</span></div>
                   </div>
                 ))}
               </div>
               <div className="lp-onb-row">
                 <button className="lp-btn-skip" onClick={goNext}>Passer</button>
-                <button className="lp-btn-primary" disabled={!athleteId} onClick={goNext}>Continuer</button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2b — confirmation avant de lier l'athlète */}
+          {currentStep === "athlete" && confirming && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">C'est bien toi ?</h2>
+              <p className="lp-onb-sub">Vérifie tes informations avant de confirmer.</p>
+              <div className="lp-athlete-row sel" style={{ marginBottom: 22 }}>
+                <div className="lp-av">{(confirming.prenom?.[0] ?? "") + (confirming.nom?.[0] ?? "")}</div>
+                <div className="lp-meta">
+                  <b>{confirming.prenom} {confirming.nom}</b>
+                  <span>{confirming.club ?? "Circuit national"} · {confirming.categorie ?? ""}{confirming.rangNational ? ` · Rang national ${confirming.rangNational}` : ""}</span>
+                </div>
+              </div>
+              <div className="lp-onb-row">
+                <button className="lp-btn-skip" onClick={() => setConfirming(null)}>Ce n&apos;est pas moi</button>
+                <button className="lp-btn-primary" disabled={claiming} onClick={confirmAthlete}>
+                  {claiming ? "Confirmation…" : "Confirmer"}
+                </button>
               </div>
             </div>
           )}

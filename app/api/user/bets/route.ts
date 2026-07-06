@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import type { BetType } from "@/lib/algo/types";
 
 type Selection = {
   participantId:   string;
+  betType?:        BetType;   // absent = "TOP_1" (rétrocompat anciens clients)
   nom:             string;
   cote:            number;
   competitionId:   string;
   competitionNom:  string;
   categorie:       string;
 };
+
+const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME"];
+
+function coteColumn(betType: BetType, row: Record<string, unknown>): number {
+  switch (betType) {
+    case "TOP_1":        return Number(row.cote_top1);
+    case "TOP_3":        return Number(row.cote_top3);
+    case "TOP_5":        return Number(row.cote_top5);
+    case "TOP_10":       return Number(row.cote_top10);
+    case "TOP_20":       return Number(row.cote_top20);
+    case "EXACT_PLACE":  return Number(row.cote_exact_place);
+    case "EXACT_TIME":   return Number(row.cote_exact_time);
+  }
+}
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
 function fmtDate(iso: string) {
@@ -87,6 +103,76 @@ export async function POST(req: NextRequest) {
   }
   if (selections.some(s => !s.participantId || !s.cote || s.cote <= 1)) {
     return NextResponse.json({ error: "Sélection invalide" }, { status: 400 });
+  }
+  for (const s of selections) {
+    if (s.betType != null && !VALID_BET_TYPES.includes(s.betType)) {
+      return NextResponse.json({ error: "Type de pari invalide" }, { status: 400 });
+    }
+  }
+
+  // Revalidation serveur : ne jamais faire confiance à la cote envoyée par le
+  // client. On recharge participants + cotes et on recalcule chaque cote
+  // côté serveur avant d'accepter le pari.
+  const participantIds = [...new Set(selections.map(s => s.participantId))];
+  const { data: participantsRows, error: partErr } = await adminSb
+    .from("participants")
+    .select("id, competition_id, code_bateau, cote")
+    .in("id", participantIds);
+  if (partErr) return NextResponse.json({ error: partErr.message }, { status: 500 });
+
+  const participantsById = new Map((participantsRows ?? []).map(p => [p.id, p]));
+
+  const compIds = [...new Set(selections.map(s => s.competitionId))];
+  const { data: compsRows } = await adminSb
+    .from("competitions")
+    .select("id, status")
+    .in("id", compIds);
+  const compStatusById = new Map((compsRows ?? []).map(c => [c.id, c.status]));
+
+  const { data: cotesRows } = await adminSb
+    .from("cotes")
+    .select("competition_id, code_bateau, cote_top1, cote_top3, cote_top5, cote_top10, cote_top20, cote_exact_place, cote_exact_time")
+    .in("competition_id", compIds);
+  const cotesByKey = new Map(
+    (cotesRows ?? []).map(c => [`${c.competition_id}:${c.code_bateau}`, c])
+  );
+
+  for (const s of selections) {
+    const participant = participantsById.get(s.participantId);
+    if (!participant) {
+      return NextResponse.json(
+        { error: "Sélection invalide : les cotes ont peut-être été recalculées, réactualise la page." },
+        { status: 400 }
+      );
+    }
+    if (compStatusById.get(participant.competition_id) !== "published") {
+      return NextResponse.json({ error: "Cette compétition n'est plus ouverte aux paris" }, { status: 400 });
+    }
+
+    const betType: BetType = s.betType ?? "TOP_1";
+    let serverCote: number;
+    if (betType === "TOP_1") {
+      // Vainqueur : source de vérité = participants.cote (couvre aussi les
+      // participants ajoutés manuellement, sans code_bateau/ligne cotes).
+      serverCote = Number(participant.cote);
+    } else {
+      if (!participant.code_bateau) {
+        return NextResponse.json({ error: "Cotes avancées indisponibles pour cet athlète" }, { status: 400 });
+      }
+      const cotesRow = cotesByKey.get(`${participant.competition_id}:${participant.code_bateau}`);
+      if (!cotesRow) {
+        return NextResponse.json({ error: "Cotes indisponibles pour cette sélection" }, { status: 400 });
+      }
+      serverCote = coteColumn(betType, cotesRow);
+    }
+
+    if (!Number.isFinite(serverCote) || serverCote <= 1) {
+      return NextResponse.json({ error: "Cote invalide" }, { status: 400 });
+    }
+    if (Math.abs(serverCote - s.cote) > 0.01) {
+      return NextResponse.json({ error: "La cote a changé, réactualise ta sélection" }, { status: 409 });
+    }
+    s.cote = serverCote; // jamais la valeur client pour le calcul financier
   }
 
   // Récupérer le solde actuel

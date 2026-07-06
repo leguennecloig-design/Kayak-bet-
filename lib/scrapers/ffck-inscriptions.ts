@@ -17,6 +17,7 @@
 // après le type bateau : K1[H]M, K1[D]U18, C2[H]U18…).
 
 import { FFCK_SCRAPER_CONFIG } from './ffck-config';
+import { normalizeStr, stringSimilarity } from "@/lib/matching/fuzzy";
 
 export type FFCKCompetitionListItem = {
   ffckCode: number;
@@ -99,49 +100,10 @@ function parseFrDate(s: string): string | null {
 // Helpers matching
 // ---------------------------------------------------------------------------
 
-function normalizeStr(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // supprime les diacritiques
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 // Retire le code postal (5 chiffres en début) de la ville FFCK
 // ex: "73210 AIME-LA-PLAGNE" → "AIME-LA-PLAGNE"
 function extractCityFromVille(ville: string): string {
   return ville.replace(/^\d{5}\s+/, '').trim();
-}
-
-// Distance de Levenshtein (implémentation itérative, sans dépendance)
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = i;
-    for (let j = 1; j <= n; j++) {
-      const curr = a[i - 1] === b[j - 1]
-        ? dp[j - 1]
-        : 1 + Math.min(dp[j - 1], dp[j], prev);
-      dp[j - 1] = prev;
-      prev = curr;
-    }
-    dp[n] = prev;
-  }
-  return dp[n];
-}
-
-// Similarité 0–1 entre deux chaînes normalisées
-function stringSimilarity(a: string, b: string): number {
-  if (!a && !b) return 1;
-  if (!a || !b) return 0;
-  const na = normalizeStr(a), nb = normalizeStr(b);
-  if (na === nb) return 1;
-  const dist = levenshtein(na, nb);
-  const maxLen = Math.max(na.length, nb.length);
-  return maxLen === 0 ? 1 : 1 - dist / maxLen;
 }
 
 // ---------------------------------------------------------------------------
