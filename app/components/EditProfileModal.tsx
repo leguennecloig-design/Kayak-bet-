@@ -25,6 +25,8 @@ export default function EditProfileModal({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (open) {
@@ -35,15 +37,19 @@ export default function EditProfileModal({
     }
   }, [open, avatarUrl, username, bio]);
 
+  // Ne dépend que de `open` : le parent recrée `onClose` à chaque re-render
+  // (ex: le compte à rebours qui tick toutes les secondes) — si cet effet en
+  // dépendait, il se relancerait en boucle et volerait le focus du champ en
+  // cours de saisie via dialogRef.current?.focus().
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     window.addEventListener("keydown", onKeyDown);
     dialogRef.current?.focus();
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

@@ -30,20 +30,25 @@ export default function LinkAthleteModal({ open, onClose, onLinked }: Props) {
   const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (open) { setQuery(""); setResults([]); setConfirming(null); setError(""); }
   }, [open]);
 
+  // Ne dépend que de `open` (voir EditProfileModal pour le pourquoi) : sinon
+  // le focus-grab se relance à chaque re-render du parent (ex: le compte à
+  // rebours qui tick toutes les secondes) et vole le focus du champ de recherche.
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     window.addEventListener("keydown", onKeyDown);
     dialogRef.current?.focus();
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || debounced.trim().length < 2) { setResults([]); return; }

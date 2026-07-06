@@ -69,6 +69,8 @@ export default function CategoryBetModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -83,15 +85,18 @@ export default function CategoryBetModal({
     return () => { cancelled = true; };
   }, [open, competitionId, categorie]);
 
+  // Ne dépend que de `open` — voir EditProfileModal pour le pourquoi (sinon
+  // le re-render périodique du parent, ex: le compte à rebours, relance ce
+  // focus-grab en boucle).
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     window.addEventListener("keydown", onKeyDown);
     dialogRef.current?.focus();
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
