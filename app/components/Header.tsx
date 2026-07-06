@@ -15,7 +15,7 @@ export default function Header() {
   const toast = useToast();
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-[14px] bg-[rgba(7,31,45,.78)] border-b border-[var(--border)]">
+    <header className="sticky top-0 z-40 backdrop-blur-[14px] bg-[rgba(7,31,45,.78)] border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
       <div className="wrap flex items-center justify-between h-[72px]">
         <a href="#top" aria-label="Kayakbet">
           <Logo id="head" />

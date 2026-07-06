@@ -24,7 +24,7 @@
   .kb-toast-host {
     left: 16px;
     right: 16px;
-    bottom: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
     width: auto;
     align-items: stretch;
   }

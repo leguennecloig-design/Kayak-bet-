@@ -18,6 +18,7 @@
   backdrop-filter: blur(14px);
   background: rgba(7, 31, 45, 0.82);
   border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top);
 }
 .kb-app .nav-in {
   display: flex;
@@ -741,7 +742,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 22px 18px;
+  padding: calc(22px + env(safe-area-inset-top)) 22px 18px;
   border-bottom: 1px solid var(--border);
 }
 .kb-app .drawer-head .ttl {
@@ -853,7 +854,7 @@
 
 .kb-app .drawer-foot {
   border-top: 1px solid var(--border);
-  padding: 18px 22px 22px;
+  padding: 18px 22px calc(22px + env(safe-area-inset-bottom));
   background: rgba(7, 31, 45, 0.6);
 }
 .kb-app .stake {
@@ -1097,7 +1098,7 @@
   }
   .kb-app .fab {
     right: 18px;
-    bottom: 84px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }
 
