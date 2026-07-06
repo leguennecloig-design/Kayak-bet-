@@ -106,7 +106,7 @@ const StarIcon  = ({ filled }: { filled?: boolean }) => (
 /* ----------------------------------------------------------------
    Types
 ---------------------------------------------------------------- */
-type View = "home" | "competitions" | "classement" | "profil";
+type View = "home" | "competitions" | "classement" | "profil" | "joueur";
 
 type Odd = {
   id: string;            // clé composite `${participantId}:${betType}`
@@ -136,11 +136,13 @@ type Competition = {
 };
 
 type Player = {
+  id: string;
   rank: number;
   name: string;
   ini: string;
   wins: number;
   balance: number;
+  avatarUrl?: string | null;
   streak: number;
   isMe?: boolean;
 };
@@ -230,6 +232,26 @@ type CompetitionsViewProps = {
 
 type ClassementViewProps = {
   effectiveLb: Player[];
+  onOpenProfile: (id: string) => void;
+};
+
+type PlayerProfileViewProps = {
+  playerId: string;
+  onBack: () => void;
+};
+
+type PublicProfile = {
+  id: string;
+  username: string;
+  initials: string;
+  avatarUrl: string | null;
+  bio: string;
+  balance: number;
+  rank: number;
+  wins: number;
+  totalBets: number;
+  winRate: number;
+  bets: BetRecord[];
 };
 
 type ProfilViewProps = {
@@ -561,10 +583,17 @@ function CompetitionsView({
   );
 }
 
-function ClassementView({ effectiveLb }: ClassementViewProps) {
+function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
   const top3 = effectiveLb.filter((p) => p.rank <= 3);
   const rest = effectiveLb.filter((p) => p.rank > 3 && !p.isMe);
   const me   = effectiveLb.find((p) => p.isMe);
+
+  function openProfile(p: Player) {
+    if (p.id) onOpenProfile(p.id);
+  }
+  function onProfileKeyDown(e: React.KeyboardEvent, p: Player) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProfile(p); }
+  }
 
   return (
     <>
@@ -575,10 +604,17 @@ function ClassementView({ effectiveLb }: ClassementViewProps) {
 
       <div className="podium">
         {[top3[1], top3[0], top3[2]].filter(Boolean).map((p) => (
-          <div key={p!.name} className={`pod pod-${p!.rank}`}>
+          <div
+            key={p!.id}
+            className={`pod pod-${p!.rank}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => openProfile(p!)}
+            onKeyDown={(e) => onProfileKeyDown(e, p!)}
+          >
             <div className="pod-star"><StarIcon filled /></div>
             <div className="pod-avatar" style={{ borderColor: rankColors[p!.rank] }}>
-              <span>{p!.ini}</span>
+              {p!.avatarUrl ? <img src={p!.avatarUrl} alt="" /> : <span>{p!.ini}</span>}
             </div>
             <div className="pod-rank" style={{ color: rankColors[p!.rank] }}>#{p!.rank}</div>
             <div className="pod-name">{p!.name}</div>
@@ -589,9 +625,16 @@ function ClassementView({ effectiveLb }: ClassementViewProps) {
 
       <div className="lb-list">
         {rest.map((p) => (
-          <div key={p.name} className="lb-row">
+          <div
+            key={p.id}
+            className="lb-row"
+            role="button"
+            tabIndex={0}
+            onClick={() => openProfile(p)}
+            onKeyDown={(e) => onProfileKeyDown(e, p)}
+          >
             <span className="lb-rank">{p.rank}</span>
-            <div className="lb-avatar"><span>{p.ini}</span></div>
+            <div className="lb-avatar">{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
             <span className="lb-name">{p.name}</span>
             <span className="lb-wins">{p.wins} victoires</span>
             <span className="lb-bal">{p.balance.toLocaleString("fr-FR")} cr.</span>
@@ -602,9 +645,15 @@ function ClassementView({ effectiveLb }: ClassementViewProps) {
         {me && (
           <>
             <div className="lb-gap">···</div>
-            <div className="lb-row lb-me">
+            <div
+              className="lb-row lb-me"
+              role="button"
+              tabIndex={0}
+              onClick={() => openProfile(me)}
+              onKeyDown={(e) => onProfileKeyDown(e, me)}
+            >
               <span className="lb-rank">{me.rank}</span>
-              <div className="lb-avatar lb-avatar-me"><span>{me.ini}</span></div>
+              <div className="lb-avatar lb-avatar-me">{me.avatarUrl ? <img src={me.avatarUrl} alt="" /> : <span>{me.ini}</span>}</div>
               <span className="lb-name">{me.name} <span className="me-tag">Moi</span></span>
               <span className="lb-wins">{me.wins} victoires</span>
               <span className="lb-bal">{me.balance.toLocaleString("fr-FR")} cr.</span>
@@ -613,6 +662,115 @@ function ClassementView({ effectiveLb }: ClassementViewProps) {
           </>
         )}
       </div>
+    </>
+  );
+}
+
+function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    fetch(`/api/users/${playerId}/profile`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erreur");
+        return res.json();
+      })
+      .then((data) => { if (!cancelled) setProfile(data); })
+      .catch(() => { if (!cancelled) setError("Impossible de charger ce profil."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [playerId]);
+
+  return (
+    <>
+      <button className="player-back" onClick={onBack}>
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        Retour au classement
+      </button>
+
+      {loading && <p style={{ color: "var(--sub, #5c7c8c)", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>Chargement du profil…</p>}
+      {!loading && error && <p style={{ color: "#FF7A45", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>{error}</p>}
+
+      {!loading && !error && profile && (
+        <>
+          <div className="profil-hero">
+            <div className="glow" />
+            <svg className="water" viewBox="0 0 1130 140" preserveAspectRatio="none" fill="none">
+              <path d="M0 74c142 0 142-32 284-32s142 32 284 32 142-32 284-32 142 32 284 32v66H0Z" fill="#0E3A52" opacity=".6" />
+              <path d="M0 92c142 0 142-24 284-24s142 24 284 24 142-24 284-24 142 24 284 24v48H0Z" fill="#11C2C2" opacity=".1" />
+            </svg>
+            <div className="profil-hero-inner">
+              <div className="profil-avatar">
+                {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : <span>{profile.initials}</span>}
+              </div>
+              <span className="profil-eyebrow">Profil joueur · Saison 2026</span>
+              <h1 className="profil-name">{profile.username}</h1>
+              {profile.bio && <p className="profil-bio">{profile.bio}</p>}
+              <span className="profil-rank">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+                Rang {profile.rank} · Saison 2026
+              </span>
+            </div>
+          </div>
+
+          <div className="profil-stats">
+            <div className="profil-stat">
+              <span className="ps-val">{profile.totalBets}</span>
+              <span className="ps-label">Paris</span>
+            </div>
+            <div className="profil-stat">
+              <span className="ps-val">{profile.wins}</span>
+              <span className="ps-label">Victoires</span>
+            </div>
+            <div className="profil-stat">
+              <span className="ps-val">{profile.winRate}%</span>
+              <span className="ps-label">Win rate</span>
+            </div>
+            <div className="profil-stat">
+              <span className="ps-val">{profile.balance.toLocaleString("fr-FR")}</span>
+              <span className="ps-label">Crédits</span>
+            </div>
+          </div>
+
+          <div className="profil-section">
+            <div className="profil-section-head">
+              <span>Historique des paris</span>
+              <span className="ps-count">{profile.bets.length} paris</span>
+            </div>
+            <div className="history-list">
+              {profile.bets.length === 0 ? (
+                <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
+                  Aucun pari pour l&apos;instant.
+                </p>
+              ) : profile.bets.map((b) => {
+                const showGain = b.result === "win"
+                  ? `+${(b.gainReel ?? b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")}`
+                  : b.result === "loss"
+                    ? `-${b.stake}`
+                    : `${(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} en jeu`;
+                return (
+                  <div key={b.id} className={`history-item hi-${b.result}`}>
+                    <div className={`hi-dot hi-dot-${b.result}`} />
+                    <div className="hi-body">
+                      <div className="hi-event">{b.event}</div>
+                      <div className="hi-athlete">{b.athlete} · {b.odds.toFixed(2)}</div>
+                    </div>
+                    <div className="hi-right">
+                      <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
+                      <div className="hi-date">{fmtDate(b.date)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -756,6 +914,7 @@ export default function DashboardPage() {
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [catFilter,     setCatFilter]     = useState<Record<string, string>>({});
   const [betModal, setBetModal] = useState<{ compId: string; compNom: string; categorie: string } | null>(null);
+  const [viewedPlayerId, setViewedPlayerId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
   });
@@ -911,6 +1070,11 @@ export default function DashboardPage() {
     setBetModal({ compId, compNom, categorie });
   }
 
+  function openPlayerProfile(id: string) {
+    setViewedPlayerId(id);
+    navigate("joueur");
+  }
+
   async function addCredits() {
     try {
       const res = await fetch("/api/user/profile", {
@@ -987,8 +1151,8 @@ export default function DashboardPage() {
     if (v !== "competitions") setExpandedComp(null);
   }
 
-  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1 }[view] ?? -1;
-  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4 }[view] ?? -1;
+  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1 }[view] ?? -1;
+  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4, joueur: -1 }[view] ?? -1;
 
   useLayoutEffect(() => {
     const nav  = navRef.current;
@@ -1097,7 +1261,10 @@ export default function DashboardPage() {
               openBetModal={openBetModal}
             />
           )}
-          {view === "classement" && <ClassementView effectiveLb={effectiveLb} />}
+          {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} />}
+          {view === "joueur" && viewedPlayerId && (
+            <PlayerProfileView playerId={viewedPlayerId} onBack={() => navigate("classement")} />
+          )}
           {view === "profil" && (
             <ProfilView
               name={name}

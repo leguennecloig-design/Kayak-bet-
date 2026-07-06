@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import { displayName, initials } from "@/lib/display-name";
 
 // GET /api/user/leaderboard
 // Retourne le top 10 des joueurs par solde + la position de l'utilisateur connecté.
@@ -14,7 +15,7 @@ export async function GET() {
   // Top 10 par solde
   const { data: top, error } = await adminSb
     .from("users")
-    .select("id, username, email, balance")
+    .select("id, username, email, balance, avatar_url")
     .order("balance", { ascending: false })
     .limit(10);
 
@@ -31,32 +32,20 @@ export async function GET() {
     winsMap.set(b.user_id, (winsMap.get(b.user_id) ?? 0) + 1);
   }
 
-  function displayName(row: { username?: string | null; email?: string | null }): string {
-    if (row.username) return row.username;
-    const e = row.email ?? "";
-    const base = e.split("@")[0].replace(/[._-]+/g, " ").trim();
-    return base.charAt(0).toUpperCase() + base.slice(1);
-  }
-
-  function initials(name: string): string {
-    const parts = name.split(" ");
-    return parts.length > 1
-      ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase();
-  }
-
   const rows = (top ?? []).map((u, i) => {
     const name = displayName(u);
     const ini  = initials(name);
     const wins = winsMap.get(u.id) ?? 0;
     return {
-      rank:    i + 1,
+      id:        u.id,
+      rank:      i + 1,
       name,
       ini,
       wins,
-      balance: Number(u.balance),
-      streak:  0,
-      isMe:    u.id === currentUserId,
+      balance:   Number(u.balance),
+      avatarUrl: u.avatar_url ?? null,
+      streak:    0,
+      isMe:      u.id === currentUserId,
     };
   });
 
@@ -71,20 +60,22 @@ export async function GET() {
 
     const { data: myRow } = await adminSb
       .from("users")
-      .select("id, username, email, balance")
+      .select("id, username, email, balance, avatar_url")
       .eq("id", currentUserId)
       .single();
 
     if (myRow) {
       const name = displayName(myRow);
       rows.push({
-        rank:    myRank,
+        id:        myRow.id,
+        rank:      myRank,
         name,
-        ini:     initials(name),
-        wins:    winsMap.get(currentUserId) ?? 0,
-        balance: Number(myRow.balance),
-        streak:  0,
-        isMe:    true,
+        ini:       initials(name),
+        wins:      winsMap.get(currentUserId) ?? 0,
+        balance:   Number(myRow.balance),
+        avatarUrl: myRow.avatar_url ?? null,
+        streak:    0,
+        isMe:      true,
       });
     }
   }
