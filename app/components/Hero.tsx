@@ -15,6 +15,7 @@ const GoogleIcon = () => (
 export default function Hero() {
   const ferroWrapRef = useRef<HTMLDivElement>(null);
   const h1Ref = useRef<HTMLHeadingElement>(null);
+  const trustPanelRef = useRef<HTMLDivElement>(null);
 
   async function signInWithGoogle() {
     const supabase = createClient();
@@ -61,18 +62,6 @@ export default function Hero() {
     let split: { chars: Element[]; revert: () => void } | null = null;
     let cancelled = false;
 
-    function playSplit() {
-      if (!split || cancelled) return;
-      import("gsap").then(({ gsap }) => {
-        if (cancelled || !split) return;
-        gsap.fromTo(
-          split.chars,
-          { opacity: 0, y: 42 },
-          { opacity: 1, y: 0, duration: 0.75, ease: "power3.out", stagger: 0.026 }
-        );
-      });
-    }
-
     Promise.all([document.fonts.ready, import("gsap"), import("gsap/SplitText")]).then(
       ([, { gsap }, { SplitText }]) => {
         if (cancelled || !h1Ref.current) return;
@@ -83,17 +72,49 @@ export default function Hero() {
           revert: () => void;
         };
         split.chars.forEach((c) => c.classList.add("split-char"));
-        playSplit();
+        gsap.fromTo(
+          split.chars,
+          { opacity: 0, y: 42 },
+          { opacity: 1, y: 0, duration: 0.75, ease: "power3.out", stagger: 0.026 }
+        );
       }
     );
 
-    function onReplay() { playSplit(); }
-    window.addEventListener("kb:replay-hero", onReplay);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("kb:replay-hero", onReplay);
-      split?.revert();
-    };
+    return () => { cancelled = true; split?.revert(); };
+  }, []);
+
+  // ---- chiffres du bandeau de confiance, lettre par lettre à l'entrée ----
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const panel = trustPanelRef.current;
+    if (!panel) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          io.unobserve(e.target);
+          const nums = Array.from(panel.querySelectorAll<HTMLElement>(".tn"));
+          if (!nums.length) return;
+          Promise.all([document.fonts.ready, import("gsap"), import("gsap/SplitText")]).then(
+            ([, { gsap }, { SplitText }]) => {
+              gsap.registerPlugin(SplitText);
+              nums.forEach((el, i) => {
+                const split = new SplitText(el, { type: "chars", smartWrap: true });
+                gsap.fromTo(
+                  split.chars,
+                  { opacity: 0, y: 22, scale: 0.6 },
+                  { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(2.2)", stagger: 0.035, delay: i * 0.08 }
+                );
+              });
+            }
+          );
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+    );
+    io.observe(panel);
+    return () => io.disconnect();
   }, []);
 
   return (
@@ -145,6 +166,27 @@ export default function Hero() {
             Déjà membre ?{" "}
             <a className="text-cyan font-bold cursor-pointer" href="/login">Connexion</a>
           </p>
+
+          <div ref={trustPanelRef} className="hero-stats" id="trustPanel">
+            <div className="hstat">
+              <span className="ic">
+                <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg>
+              </span>
+              <span className="tx"><span className="tn">100%</span><span className="tl">Gratuit</span></span>
+            </div>
+            <div className="hstat">
+              <span className="ic">
+                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18" /><path d="M5 4l14 16" /></svg>
+              </span>
+              <span className="tx"><span className="tn">0€</span><span className="tl">Dépôt requis</span></span>
+            </div>
+            <div className="hstat">
+              <span className="ic">
+                <svg viewBox="0 0 24 24"><path d="M6.5 9a3.5 3.5 0 1 0 0 6c2.5 0 4-3 5.5-3s3 3 5.5 3a3.5 3.5 0 1 0 0-6c-2.5 0-4 3-5.5 3S9 9 6.5 9z" /></svg>
+              </span>
+              <span className="tx"><span className="tn">∞</span><span className="tl">Crédits fictifs</span></span>
+            </div>
+          </div>
         </div>
 
         {/* Visual */}

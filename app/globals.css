@@ -225,84 +225,70 @@ a { color: inherit; text-decoration: none; }
 .animate-bob-a { animation: bob 6s   ease-in-out infinite; }
 .animate-bob-b { animation: bob 5s   ease-in-out .4s infinite; }
 
-/* ---- trust panel (stats) ---- */
-.trust-panel {
-  position: relative;
-  display: inline-flex;
+/* ---- hero trust strip (inline, dans .hero-copy) ---- */
+.hero-stats {
+  display: flex;
   align-items: stretch;
-  background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.015));
+  gap: 0;
+  margin-top: 40px;
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012));
   border: 1px solid var(--border-2);
-  border-radius: 20px;
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.08);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 22px 46px -28px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.07);
+  backdrop-filter: blur(6px);
 }
-.trust-panel::before {
+.hero-stats::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(40,215,230,.6), transparent);
+  background: linear-gradient(90deg, transparent, rgba(40,215,230,.55), transparent);
 }
-.trust {
+.hstat {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 22px 44px;
+  gap: 11px;
+  padding: 15px 16px;
   position: relative;
   transition: background .18s;
 }
-.trust:hover { background: rgba(40,215,230,.05); }
-.trust + .trust { border-left: 1px solid var(--border); }
-.trust .tn {
-  font: 400 italic 36px/.85 var(--font-anton), sans-serif;
+.hstat:hover { background: rgba(40,215,230,.06); }
+.hstat + .hstat { border-left: 1px solid var(--border); }
+.hstat .ic {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+  background: linear-gradient(140deg, rgba(40,215,230,.22), rgba(31,115,255,.10));
+  border: 1px solid rgba(40,215,230,.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+}
+.hstat .ic svg { width: 17px; height: 17px; stroke: var(--cyan); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hstat .tx { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
+.hstat .tn {
+  font: 400 italic 26px/0.82 var(--font-anton), sans-serif;
   color: var(--cyan);
   letter-spacing: .01em;
-  text-shadow: 0 0 24px rgba(40,215,230,.45);
+  text-shadow: 0 0 20px rgba(40,215,230,.4);
+  white-space: nowrap;
 }
-.trust .tl {
-  font: 700 12px/1.3 var(--font-grotesk), monospace;
-  letter-spacing: .13em;
+.hstat .tl {
+  font: 700 9.5px/1.25 var(--font-grotesk), monospace;
+  letter-spacing: .11em;
   text-transform: uppercase;
   color: var(--soft);
-  max-width: 120px;
+  word-break: keep-all;
 }
 @media (max-width: 560px) {
-  .trust-panel { flex-direction: column; width: 100%; }
-  .trust { justify-content: center; padding: 18px 0; }
-  .trust + .trust { border-left: none; border-top: 1px solid var(--border); }
-}
-
-/* ---- anim style switcher (bottom-right) ---- */
-.anim-switch {
-  position: fixed;
-  right: 16px; bottom: 16px;
-  z-index: 999;
-  display: flex;
-  gap: 6px;
-  background: rgba(7,31,45,.86);
-  border: 1px solid var(--border-2);
-  border-radius: 12px;
-  padding: 6px;
-  backdrop-filter: blur(10px);
-  box-shadow: var(--shadow);
-}
-.anim-switch button {
-  appearance: none;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--soft);
-  font: 700 11.5px/1 var(--font-archivo);
-  letter-spacing: .01em;
-  padding: 8px 11px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: .15s;
-}
-.anim-switch button:hover { color: #fff; }
-.anim-switch button.on {
-  background: rgba(40,215,230,.14);
-  border-color: rgba(40,215,230,.4);
-  color: var(--cyan);
+  .hero-stats { width: 100%; flex-direction: column; }
+  .hstat { padding: 14px 18px; }
+  .hstat + .hstat { border-left: none; border-top: 1px solid var(--border); }
 }
 
 /* ---- reveal on scroll ---- */
@@ -373,6 +359,7 @@ body.play .hero-copy h1           { animation: var(--e-kf) var(--e-dur) var(--e-
 body.play .hero-copy .lede        { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .25s both; }
 body.play .hero-copy .hero-cta    { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .35s both; }
 body.play .hero-copy .hero-alt    { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .42s both; }
+body.play .hero-copy .hero-stats  { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .5s both; }
 body.play .hero-vis .r3           { animation: ringIn .7s ease-out .18s both; }
 body.play .hero-vis .r2           { animation: ringIn .7s ease-out .26s both; }
 body.play .hero-vis .r1           { animation: ringIn .7s ease-out .34s both; }

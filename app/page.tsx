@@ -5,13 +5,9 @@ import { ToastProvider } from "./components/Toast";
 import { useReveal } from "./components/useReveal";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
-import Stats from "./components/Stats";
-import Features from "./components/Features";
-import Steps from "./components/Steps";
 import FeaturedEvent from "./components/FeaturedEvent";
 import CtaBand from "./components/CtaBand";
 import Footer from "./components/Footer";
-import AnimSwitch from "./components/AnimSwitch";
 
 export default function Home() {
   useReveal();
@@ -21,10 +17,8 @@ export default function Home() {
       document.documentElement.classList.add("js-anim");
     }
 
-    const STYLES = ["soft", "spring", "drift"];
-    const saved  = localStorage.getItem("kb-hero-anim");
-    const style  = STYLES.includes(saved!) ? saved! : "spring";
-    document.body.setAttribute("data-anim-style", style);
+    // Style d'entrée toujours "dynamique" (spring) — plus de switcher visible.
+    document.body.setAttribute("data-anim-style", "spring");
 
     const id = setTimeout(() => {
       document.body.classList.add("play");
@@ -59,14 +53,10 @@ export default function Home() {
       <Header />
       <main id="top">
         <Hero />
-        <Stats />
-        <Features />
-        <Steps />
         <FeaturedEvent />
         <CtaBand />
       </main>
       <Footer />
-      <AnimSwitch />
     </ToastProvider>
   );
 }
