@@ -239,7 +239,7 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
                 <path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
-            {importState === "uploading" ? "Import…" : "Importer PDF"}
+            {importState === "uploading" ? "Import…" : "Importer PDF / TXT"}
           </button>
 
           {/* Saisie manuelle */}
