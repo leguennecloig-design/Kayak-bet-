@@ -23,6 +23,7 @@ export default function AnimSwitch() {
     document.body.classList.remove("play");
     void document.body.offsetWidth;
     document.body.classList.add("play");
+    window.dispatchEvent(new Event("kb:replay-hero"));
   }
 
   return (

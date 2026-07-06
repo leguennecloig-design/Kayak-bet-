@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
 const ODDS = [
   { nm: "D. Tostain",  ct: "FR", v: "1.65", fav: false },
   { nm: "N. Zerouga",  ct: "FR", v: "1.98", fav: false },
@@ -26,6 +30,37 @@ const Water = () => (
 );
 
 export default function FeaturedEvent() {
+  const ferroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!ferroRef.current) return;
+    let handle: { destroy: () => void } | null = null;
+    let cancelled = false;
+    import("./ferrofluid").then(({ mountFerrofluid }) => {
+      if (cancelled || !ferroRef.current) return;
+      try {
+        handle = mountFerrofluid(ferroRef.current, {
+          colors: ["#0A2A3D", "#1F73FF", "#28D7E6", "#11C2C2"],
+          flowDirection: "left",
+          speed: 0.3,
+          scale: 1.1,
+          opacity: 0.7,
+          turbulence: 0.7,
+          fluidity: 0.16,
+          rimWidth: 0.22,
+          sharpness: 3,
+          shimmer: 0.8,
+          glow: 1.6,
+          mouseInteraction: false,
+        });
+      } catch (e) {
+        console.error("Ferrofluid failed to mount", e);
+      }
+    });
+    return () => { cancelled = true; handle?.destroy(); };
+  }, []);
+
   return (
     <section className="py-[62px] min-[881px]:py-[92px] bg-deep" id="event">
       <div className="wrap">
@@ -41,6 +76,7 @@ export default function FeaturedEvent() {
               "radial-gradient(130% 160% at 90% -20%, #11405C, #0A2A3D 60%)",
           }}
         >
+          <div ref={ferroRef} className="ferro-wrap ferro-corner" />
           <Water />
 
           <div className="relative z-[1] flex flex-col min-[881px]:flex-row items-start justify-between gap-[22px]">

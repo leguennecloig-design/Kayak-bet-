@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 
 const GoogleIcon = () => (
@@ -12,6 +13,9 @@ const GoogleIcon = () => (
 );
 
 export default function Hero() {
+  const ferroWrapRef = useRef<HTMLDivElement>(null);
+  const h1Ref = useRef<HTMLHeadingElement>(null);
+
   async function signInWithGoogle() {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
@@ -19,6 +23,78 @@ export default function Hero() {
       options: { redirectTo: `${location.origin}/auth/callback` },
     });
   }
+
+  // ---- ferrofluid ambient blob ----
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!ferroWrapRef.current) return;
+    let handle: { destroy: () => void } | null = null;
+    let cancelled = false;
+    import("./ferrofluid").then(({ mountFerrofluid }) => {
+      if (cancelled || !ferroWrapRef.current) return;
+      try {
+        handle = mountFerrofluid(ferroWrapRef.current, {
+          colors: ["#0A2A3D", "#1F73FF", "#28D7E6", "#11C2C2"],
+          flowDirection: "up",
+          speed: 0.35,
+          scale: 1.3,
+          opacity: 0.9,
+          turbulence: 0.7,
+          fluidity: 0.16,
+          rimWidth: 0.22,
+          sharpness: 3,
+          shimmer: 0.8,
+          glow: 1.6,
+          mouseInteraction: false,
+        });
+      } catch (e) {
+        console.error("Ferrofluid failed to mount", e);
+      }
+    });
+    return () => { cancelled = true; handle?.destroy(); };
+  }, []);
+
+  // ---- H1 lettre par lettre (GSAP SplitText) ----
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!h1Ref.current) return;
+    let split: { chars: Element[]; revert: () => void } | null = null;
+    let cancelled = false;
+
+    function playSplit() {
+      if (!split || cancelled) return;
+      import("gsap").then(({ gsap }) => {
+        if (cancelled || !split) return;
+        gsap.fromTo(
+          split.chars,
+          { opacity: 0, y: 42 },
+          { opacity: 1, y: 0, duration: 0.75, ease: "power3.out", stagger: 0.026 }
+        );
+      });
+    }
+
+    Promise.all([document.fonts.ready, import("gsap"), import("gsap/SplitText")]).then(
+      ([, { gsap }, { SplitText }]) => {
+        if (cancelled || !h1Ref.current) return;
+        gsap.registerPlugin(SplitText);
+        h1Ref.current.classList.add("h1-gsap-managed");
+        split = new SplitText(h1Ref.current, { type: "chars,words", smartWrap: true }) as unknown as {
+          chars: Element[];
+          revert: () => void;
+        };
+        split.chars.forEach((c) => c.classList.add("split-char"));
+        playSplit();
+      }
+    );
+
+    function onReplay() { playSplit(); }
+    window.addEventListener("kb:replay-hero", onReplay);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("kb:replay-hero", onReplay);
+      split?.revert();
+    };
+  }, []);
 
   return (
     <section
@@ -47,7 +123,7 @@ export default function Hero() {
           <span className="eyebrow">
             <span className="tick" /> Paris sportifs · 100% gratuit
           </span>
-          <h1 className="font-anton italic uppercase text-white mt-6 text-[60px] min-[561px]:text-[74px] min-[921px]:text-[96px] leading-[0.84] tracking-[.005em]">
+          <h1 ref={h1Ref} className="font-anton italic uppercase text-white mt-6 text-[60px] min-[561px]:text-[74px] min-[921px]:text-[96px] leading-[0.84] tracking-[.005em]">
             Ride the<br /><span className="text-cyan">rankings.</span>
           </h1>
           <p className="lede text-[18.5px] leading-[1.65] text-soft max-w-[476px] mt-[26px]">
@@ -73,7 +149,7 @@ export default function Hero() {
 
         {/* Visual */}
         <div className="hero-vis relative flex items-center justify-center min-h-[340px] min-[921px]:min-h-[440px] order-first min-[921px]:order-none" aria-hidden="true">
-          <div className="ferro-wrap" />
+          <div ref={ferroWrapRef} className="ferro-wrap" />
           <span className="ring r3 absolute rounded-full border-[1.5px] border-[rgba(40,215,230,.22)] w-[584px] h-[584px] opacity-[.55] hidden min-[921px]:block" />
           <span className="ring r2 absolute rounded-full border-[1.5px] border-[rgba(40,215,230,.22)] w-[456px] h-[456px]" />
           <span className="ring r1 absolute rounded-full border-[1.5px] border-[rgba(40,215,230,.22)] w-[340px] h-[340px]" />

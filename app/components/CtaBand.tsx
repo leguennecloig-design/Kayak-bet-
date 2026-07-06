@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 
 const GoogleIcon = () => (
@@ -12,6 +13,37 @@ const GoogleIcon = () => (
 );
 
 export default function CtaBand() {
+  const ferroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!ferroRef.current) return;
+    let handle: { destroy: () => void } | null = null;
+    let cancelled = false;
+    import("./ferrofluid").then(({ mountFerrofluid }) => {
+      if (cancelled || !ferroRef.current) return;
+      try {
+        handle = mountFerrofluid(ferroRef.current, {
+          colors: ["#0A2A3D", "#1F73FF", "#28D7E6", "#11C2C2"],
+          flowDirection: "right",
+          speed: 0.32,
+          scale: 1.15,
+          opacity: 0.75,
+          turbulence: 0.7,
+          fluidity: 0.16,
+          rimWidth: 0.22,
+          sharpness: 3,
+          shimmer: 0.8,
+          glow: 1.6,
+          mouseInteraction: false,
+        });
+      } catch (e) {
+        console.error("Ferrofluid failed to mount", e);
+      }
+    });
+    return () => { cancelled = true; handle?.destroy(); };
+  }, []);
+
   async function signInWithGoogle() {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
@@ -30,6 +62,7 @@ export default function CtaBand() {
               "radial-gradient(130% 160% at 90% -20%, #11405C, #0A2A3D 60%)",
           }}
         >
+          <div ref={ferroRef} className="ferro-wrap ferro-corner" />
           <div
             className="absolute left-1/2 -top-[120px] w-[420px] h-[420px] -translate-x-1/2 rounded-full pointer-events-none"
             style={{
