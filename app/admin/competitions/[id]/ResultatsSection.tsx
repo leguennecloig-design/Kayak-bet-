@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, Fragment } from "react";
+import { useToast } from "@/app/components/Toast";
 
 type Resultat = {
   id:        string;
@@ -46,7 +47,8 @@ const ATHLETE_CATEGORIES = [
   "K1HU18","K1HU21",
 ];
 
-export default function ResultatsSection({ competitionId }: { competitionId: string }) {
+export default function ResultatsSection({ competitionId, competitionNom }: { competitionId: string; competitionNom: string }) {
+  const notify = useToast();
   const [resultats,     setResultats]     = useState<Resultat[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [importState,   setImportState]   = useState<"idle"|"uploading"|"ok"|"error">("idle");
@@ -104,6 +106,11 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
         .join(", ");
       setImportMsg(`${json.total} résultats importés · ${cats}`);
       setImportState("ok");
+      notify({
+        course: competitionNom,
+        category: `${json.total} résultats`,
+        href: `/admin/competitions/${competitionId}`,
+      });
       await fetchResultats();
     } catch (err) {
       setImportMsg(err instanceof Error ? err.message : "Erreur inconnue");
@@ -153,6 +160,11 @@ export default function ResultatsSection({ competitionId }: { competitionId: str
     if (!res.ok) { setSaveMsg(json.error ?? "Erreur"); return; }
 
     setSaveMsg("Ajouté ✓");
+    notify({
+      course: competitionNom,
+      category: entry.categorie,
+      href: `/admin/competitions/${competitionId}`,
+    });
     setForm(f => ({ ...EMPTY_FORM, categorie: f.categorie }));
     setTimeout(() => setSaveMsg(""), 2000);
     await fetchResultats();

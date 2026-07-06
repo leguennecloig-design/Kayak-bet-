@@ -625,7 +625,7 @@ export default function EditClient({
       </div>
 
       {/* ---- Section Résultats ---- */}
-      <ResultatsSection competitionId={compId} />
+      <ResultatsSection competitionId={compId} competitionNom={nom} />
 
       {/* ---- Clôture & règlement des paris ---- */}
       <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-[18px] p-6 mt-6">

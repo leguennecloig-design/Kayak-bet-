@@ -2,8 +2,11 @@
 // La vérification admin est faite dans chaque page individuelle
 // (layout.tsx ne peut pas utiliser redirect() de façon fiable dans Next.js 14)
 
+import { ToastProvider } from "@/app/components/Toast";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-deep text-white">
       <div className="border-b border-[var(--border)] bg-[rgba(7,31,45,0.9)] backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-6">
@@ -67,5 +70,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
       <main className="max-w-5xl mx-auto px-6 py-10">{children}</main>
     </div>
+    </ToastProvider>
   );
 }
