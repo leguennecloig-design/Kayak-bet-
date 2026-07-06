@@ -82,6 +82,46 @@ a { color: inherit; text-decoration: none; }
   .eyebrow .tick::before { animation: none; display: none; }
 }
 
+/* ---- live badge (featured event) — même style pilule que .eyebrow ---- */
+.live {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: 700 11px/1 var(--font-grotesk), monospace;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #cff6fa;
+  background: linear-gradient(135deg, rgba(40,215,230,.16), rgba(40,215,230,.05));
+  border: 1px solid rgba(40,215,230,.38);
+  border-radius: 999px;
+  padding: 9px 16px 9px 13px;
+  white-space: nowrap;
+  box-shadow: 0 0 0 4px rgba(40,215,230,.05),
+              inset 0 1px 0 rgba(255,255,255,.1),
+              0 8px 20px -12px rgba(40,215,230,.5);
+}
+.live .bolt {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px rgba(40,215,230,.9);
+  flex: none;
+}
+.live .bolt::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: rgba(40,215,230,.55);
+  animation: tickPulse 2.2s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live .bolt::before { animation: none; display: none; }
+}
+
 /* section titles */
 .sec-title {
   font: 400 italic 52px/.92 var(--font-anton), sans-serif;

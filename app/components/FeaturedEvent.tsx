@@ -81,12 +81,8 @@ export default function FeaturedEvent() {
 
           <div className="relative z-[1] flex flex-col min-[881px]:flex-row items-start justify-between gap-[22px]">
             <div className="flex-1 min-w-0">
-              <span className="inline-flex items-center gap-2 font-grotesk font-bold text-[11px] leading-none tracking-[.12em] uppercase text-cyan bg-[rgba(40,215,230,.1)] border border-[rgba(40,215,230,.32)] rounded-[9px] px-3 py-2">
-                <span className="w-[13px] h-[13px]">
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2 4 13.5h6.2L9 22l10-12.2h-6.3L14 2Z" fill="#FF7A45" />
-                  </svg>
-                </span>
+              <span className="live">
+                <span className="bolt" />
                 En approche · 16 juillet 2026
               </span>
               <h3 className="font-anton italic uppercase text-white text-[30px] min-[881px]:text-[38px] leading-[0.94] my-4">
