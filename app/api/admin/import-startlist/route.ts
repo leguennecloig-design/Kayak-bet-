@@ -171,12 +171,19 @@ export async function POST(req: NextRequest) {
 
   // 4. Créer (ou retrouver) une entrée dans la table "competitions" (paris)
   // pour que la compétition apparaisse dans le panneau admin.
+  // Matché par nom + date (comme ffck_competitions plus haut) — un match par
+  // nom seul faisait réutiliser une compétition existante sans rapport dès
+  // qu'une autre compétition portait le même nom à une date différente
+  // (ex : édition précédente du même événement).
   let bettingCompId: string | null = null;
-  const { data: existingBetting } = await supabase
+  const bettingBaseQ = supabase
     .from("competitions")
     .select("id")
-    .eq("nom", body.nom_competition)
-    .maybeSingle();
+    .eq("nom", body.nom_competition);
+  const { data: existingBetting } = await (dateDebut
+    ? bettingBaseQ.eq("date", dateDebut)
+    : bettingBaseQ.is("date", null)
+  ).maybeSingle();
 
   if (existingBetting?.id) {
     bettingCompId = existingBetting.id;
