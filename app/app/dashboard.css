@@ -2006,20 +2006,33 @@
 .kb-app .home-lb-row .av img { width: 100%; height: 100%; object-fit: cover; }
 .kb-app .home-lb-row { cursor: pointer; }
 
-/* ============ INSTAGRAM ============ */
-.kb-app .insta-link {
+/* ============ INSTAGRAM / DISCORD ============ */
+.kb-app .insta-link,
+.kb-app .discord-link {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  margin-left: 7px;
+  gap: 4px;
+  margin-left: 8px;
   color: var(--idle);
   vertical-align: middle;
   transition: color .15s;
+  font: 700 11px/1 var(--font-grotesk), monospace;
+  letter-spacing: .01em;
 }
-.kb-app .insta-link:hover { color: var(--cyan); }
-.kb-app .insta-link svg { width: 14px; height: 14px; }
+.kb-app .insta-link:hover,
+.kb-app .discord-link:hover { color: var(--cyan); }
+.kb-app .insta-link svg,
+.kb-app .discord-link svg { width: 14px; height: 14px; flex: none; }
+.kb-app .profil-name .insta-link,
+.kb-app .profil-name .discord-link,
+.kb-app .pod-name .insta-link,
+.kb-app .pod-name .discord-link {
+  font-size: 12px;
+}
 .kb-app .profil-name .insta-link svg,
-.kb-app .pod-name .insta-link svg { width: 16px; height: 16px; }
+.kb-app .profil-name .discord-link svg,
+.kb-app .pod-name .insta-link svg,
+.kb-app .pod-name .discord-link svg { width: 16px; height: 16px; }
 
 /* ============ AMIS ============ */
 .kb-app .friend-requests {

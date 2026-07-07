@@ -86,6 +86,9 @@ const ColMedal  = () => <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 3.5 1
 const ColUsers  = () => <svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.5" r="3" stroke="#28D7E6" strokeWidth="1.7" /><path d="M3.5 19c0-3 2.5-4.6 5.5-4.6s5.5 1.6 5.5 4.6" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" /><path d="M16 5.4a3 3 0 0 1 0 6M17.5 14.6c2.4.4 4 2 4 4.4" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" /></svg>;
 
 const InstaIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.7" /><circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" /></svg>;
+const DiscordIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 5.8c-2.7.5-4 1.4-4 1.4S2 9.6 2 15c0 0 1.4 2.4 5 2.5 0 0 .6-.7 1.1-1.3-2.1-.6-2.9-1.9-2.9-1.9s.2.1.5.3h.1c.1 0 .1 0 .2.1h0c.4.2.8.4 1.2.5.7.3 1.5.5 2.4.6 1.5.2 3.2.2 4.9-.4.8-.3 1.6-.6 2.4-1.1.1 0 .1-.1.2-.1h0l.1-.1c.3-.2.5-.3.5-.3s-.8 1.3-2.9 1.9c.4.6 1.1 1.3 1.1 1.3 3.6-.1 5-2.5 5-2.5 0-5.4-2.5-7.8-2.5-7.8s-1.3-.9-4-1.4l-.1.2s1.9.6 2.7 1.5c0 0-1.5-.8-3.6-1.1-.9-.1-1.8-.1-2.6 0-2.1.3-3.6 1.1-3.6 1.1.8-.9 2.8-1.5 2.8-1.5l-.1-.2Z" fill="currentColor" /><circle cx="9" cy="12.2" r="1.4" fill="var(--surface, #0c3146)" /><circle cx="15" cy="12.2" r="1.4" fill="var(--surface, #0c3146)" /></svg>;
+
+const DISCORD_INVITE_URL = "https://discord.gg/js55sFydj";
 
 function InstaLink({ handle, className = "insta-link" }: { handle?: string | null; className?: string }) {
   if (!handle) return null;
@@ -98,7 +101,22 @@ function InstaLink({ handle, className = "insta-link" }: { handle?: string | nul
       onClick={(e) => e.stopPropagation()}
       aria-label={`Instagram @${handle}`}
     >
-      <InstaIcon />
+      <InstaIcon /><span>@{handle}</span>
+    </a>
+  );
+}
+
+function DiscordLink({ className = "discord-link" }: { className?: string }) {
+  return (
+    <a
+      href={DISCORD_INVITE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      onClick={(e) => e.stopPropagation()}
+      aria-label="Rejoindre le Discord Kayakbet"
+    >
+      <DiscordIcon />
     </a>
   );
 }
@@ -594,7 +612,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
               {p!.avatarUrl ? <img src={p!.avatarUrl} alt="" /> : <span>{p!.ini}</span>}
             </div>
             <div className="pod-rank" style={{ color: rankColors[p!.rank] }}>#{p!.rank}</div>
-            <div className="pod-name">{p!.name}<InstaLink handle={p!.instagram} /></div>
+            <div className="pod-name">{p!.name}<InstaLink handle={p!.instagram} /><DiscordLink /></div>
             <div className="pod-bal">{p!.balance.toLocaleString("fr-FR")} cr.</div>
           </div>
         ))}
@@ -612,7 +630,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
           >
             <span className="lb-rank">{p.rank}</span>
             <div className="lb-avatar">{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
-            <span className="lb-name">{p.name}<InstaLink handle={p.instagram} /></span>
+            <span className="lb-name">{p.name}<InstaLink handle={p.instagram} /><DiscordLink /></span>
             <span className="lb-wins">{p.wins} victoires</span>
             <span className="lb-bal">{p.balance.toLocaleString("fr-FR")} cr.</span>
             {p.streak > 0 && <span className="lb-streak"><ColFlame />{p.streak}</span>}
@@ -631,7 +649,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
             >
               <span className="lb-rank">{me.rank}</span>
               <div className="lb-avatar lb-avatar-me">{me.avatarUrl ? <img src={me.avatarUrl} alt="" /> : <span>{me.ini}</span>}</div>
-              <span className="lb-name">{me.name} <span className="me-tag">Moi</span><InstaLink handle={me.instagram} /></span>
+              <span className="lb-name">{me.name} <span className="me-tag">Moi</span><InstaLink handle={me.instagram} /><DiscordLink /></span>
               <span className="lb-wins">{me.wins} victoires</span>
               <span className="lb-bal">{me.balance.toLocaleString("fr-FR")} cr.</span>
               {me.streak > 0 && <span className="lb-streak"><ColFlame />{me.streak}</span>}
@@ -735,7 +753,7 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
                 {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : <span>{profile.initials}</span>}
               </div>
               <span className="profil-eyebrow">Profil joueur · Saison 2026</span>
-              <h1 className="profil-name">{profile.username}<InstaLink handle={profile.instagram} /></h1>
+              <h1 className="profil-name">{profile.username}<InstaLink handle={profile.instagram} /><DiscordLink /></h1>
               {profile.bio && <p className="profil-bio">{profile.bio}</p>}
               <span className="profil-rank">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
@@ -1025,7 +1043,7 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
             {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{initials}</span>}
           </div>
           <span className="profil-eyebrow">Mon profil · Saison 2026</span>
-          <h1 className="profil-name">{name}<InstaLink handle={instagram} /></h1>
+          <h1 className="profil-name">{name}<InstaLink handle={instagram} /><DiscordLink /></h1>
           <p className="profil-email">{userEmail}</p>
           {bio && <p className="profil-bio">{bio}</p>}
           <span className="profil-rank">
