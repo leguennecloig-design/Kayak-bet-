@@ -24,7 +24,15 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Sans ça, Safari mobile peut agrandir automatiquement le texte après
+     coup (accessibilité) — un h1 découpé caractère par caractère par GSAP
+     SplitText est alors décalé/mal proportionné car ses positions sont
+     calculées avant cette inflation (transform scale/translate parasite). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   margin: 0;
   background: var(--deep);
