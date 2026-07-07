@@ -51,20 +51,23 @@ const COTE_FIELD: Record<BetType, keyof CotesRow> = {
   EXACT_TIME: "cote_exact_time",
 };
 
+const TYPE_LABEL: Record<string, string> = { sprint: "Sprint", classique: "Classique" };
+
 type Props = {
   open: boolean;
   onClose: () => void;
   competitionId: string;
   competitionNom: string;
-  categorie: string;
-  participants: BetOdd[]; // odds "Vainqueur" déjà chargés pour cette catégorie
+  odds: BetOdd[]; // toutes catégories confondues — la startlist complète de la compétition
+  typeCompetition?: string | null;
   coupon: Record<string, BetOdd>;
   toggle: (o: BetOdd) => void;
 };
 
 export default function CategoryBetModal({
-  open, onClose, competitionId, competitionNom, categorie, participants, coupon, toggle,
+  open, onClose, competitionId, competitionNom, odds, typeCompetition, coupon, toggle,
 }: Props) {
+  const [selectedCat, setSelectedCat] = useState("");
   const [cotes, setCotes] = useState<CotesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -72,18 +75,30 @@ export default function CategoryBetModal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  const cats = [...new Set(odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
+
+  // Choisit une catégorie par défaut à l'ouverture. Ne dépend volontairement
+  // que de [open, competitionId] (pas de `cats`) — sinon un re-render parent
+  // (ex: le compte à rebours) pourrait réinitialiser la sélection de
+  // l'utilisateur en cours de consultation.
   useEffect(() => {
     if (!open) return;
+    setSelectedCat(prev => (cats.includes(prev) && prev) || cats[0] || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, competitionId]);
+
+  useEffect(() => {
+    if (!open || !selectedCat) return;
     let cancelled = false;
     setLoading(true);
     setError("");
-    fetch(`/api/competitions/${competitionId}/cotes?categorie=${encodeURIComponent(categorie)}`)
+    fetch(`/api/competitions/${competitionId}/cotes?categorie=${encodeURIComponent(selectedCat)}`)
       .then(res => res.json())
       .then((data) => { if (!cancelled) setCotes(Array.isArray(data) ? data : []); })
       .catch(() => { if (!cancelled) setError("Impossible de charger les cotes."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, competitionId, categorie]);
+  }, [open, competitionId, selectedCat]);
 
   // Ne dépend que de `open` — voir EditProfileModal pour le pourquoi (sinon
   // le re-render périodique du parent, ex: le compte à rebours, relance ce
@@ -101,6 +116,7 @@ export default function CategoryBetModal({
   if (!open) return null;
 
   const cotesByCode = new Map((cotes ?? []).map(c => [c.code_bateau, c]));
+  const participants = odds.filter(o => o.categorie === selectedCat);
 
   return (
     <div className="catmodal-scrim" onClick={onClose}>
@@ -108,20 +124,39 @@ export default function CategoryBetModal({
         className="catmodal"
         role="dialog"
         aria-modal="true"
-        aria-label={`Paris ${categorie} — ${competitionNom}`}
+        aria-label={`Paris ${selectedCat} — ${competitionNom}`}
         tabIndex={-1}
         ref={dialogRef}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="catmodal-head">
           <div>
-            <div className="catmodal-cat">{categorie}</div>
+            <div className="catmodal-cat">
+              {selectedCat}
+              {typeCompetition && TYPE_LABEL[typeCompetition] && (
+                <span className="catmodal-type"> · {TYPE_LABEL[typeCompetition]}</span>
+              )}
+            </div>
             <h3>{competitionNom}</h3>
           </div>
           <button className="catmodal-close" aria-label="Fermer" onClick={onClose}>
             <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           </button>
         </div>
+
+        {cats.length > 1 && (
+          <div className="cat-tabs catmodal-cat-tabs">
+            {cats.map(cat => (
+              <button
+                key={cat}
+                className={`cat-tab${selectedCat === cat ? " active" : ""}`}
+                onClick={() => setSelectedCat(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="catmodal-body">
           {loading && <p className="catmodal-status">Chargement des cotes…</p>}
@@ -152,7 +187,7 @@ export default function CategoryBetModal({
                         onClick={() => toggle({
                           id, participantId: p.participantId, betType: type, betLabel: label,
                           nm: p.nm, ctry: p.ctry, note: p.note, val,
-                          competitionId, categorie,
+                          competitionId, categorie: selectedCat,
                         })}
                       >
                         <span className="lb">{label}</span>

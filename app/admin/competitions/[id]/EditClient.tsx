@@ -13,6 +13,7 @@ type Competition = {
   status: string;
   ffck_inscription_code: number | null;
   ffck_match_status: string;
+  type_competition: string | null;
 };
 
 type InscriptionRow = {
@@ -77,6 +78,7 @@ export default function EditClient({
   const [nom,        setNom]        = useState(competition.nom);
   const [date,       setDate]       = useState(competition.date ?? "");
   const [discipline, setDiscipline] = useState(competition.discipline ?? "");
+  const [typeCompetition, setTypeCompetition] = useState(competition.type_competition ?? "");
   const [lieu,       setLieu]       = useState(competition.lieu ?? "");
   const [status,     setStatus]     = useState(competition.status);
   const [saving,     setSaving]     = useState(false);
@@ -131,7 +133,7 @@ export default function EditClient({
     const res = await fetch(`/api/admin/competitions/${compId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom, date, discipline, lieu }),
+      body: JSON.stringify({ nom, date, discipline, lieu, type_competition: typeCompetition || null }),
     });
     setSaving(false);
     setSaveMsg(res.ok ? "Enregistré ✓" : "Erreur lors de la sauvegarde");
@@ -359,6 +361,15 @@ export default function EditClient({
               className={`${inputCls} appearance-none`}>
               <option value="" className="bg-[#0a2a3d]">— Choisir —</option>
               {DISCIPLINES.map((d) => <option key={d} value={d} className="bg-[#0a2a3d]">{d}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className={labelCls}>Type</label>
+            <select value={typeCompetition} onChange={(e) => setTypeCompetition(e.target.value)}
+              className={`${inputCls} appearance-none`}>
+              <option value="" className="bg-[#0a2a3d]">— Choisir —</option>
+              <option value="sprint" className="bg-[#0a2a3d]">Sprint</option>
+              <option value="classique" className="bg-[#0a2a3d]">Classique</option>
             </select>
           </div>
           <div className="flex flex-col gap-1.5">

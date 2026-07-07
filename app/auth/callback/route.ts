@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const REDIRECT_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<script>window.location.replace('/app')</script></head><body></body></html>`;
+<script>window.location.replace('/login?welcome=1')</script></head><body></body></html>`;
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);

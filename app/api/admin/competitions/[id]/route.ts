@@ -20,6 +20,7 @@ export async function PATCH(
   if (body.discipline !== undefined) allowed.discipline = body.discipline || null;
   if (body.lieu       !== undefined) allowed.lieu       = body.lieu || null;
   if (body.status     !== undefined) allowed.status     = body.status;
+  if (body.type_competition !== undefined) allowed.type_competition = body.type_competition || null;
 
   const supabase = createAdminSupabase();
   const { error } = await supabase

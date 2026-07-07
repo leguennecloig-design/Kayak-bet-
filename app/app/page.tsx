@@ -133,6 +133,7 @@ type Competition = {
   bettors: number;
   featured?: boolean;
   odds: Odd[];
+  typeCompetition?: string | null;
 };
 
 type Player = {
@@ -194,40 +195,22 @@ const rankColors: Record<number, string> = { 1: "#FFD700", 2: "#C0C0C0", 3: "#CD
 /* ----------------------------------------------------------------
    Sub-view prop types
 ---------------------------------------------------------------- */
-type OddsGridProps = {
-  odds: Odd[];
-  eventName: string;
-  coupon: Record<string, Odd>;
-  toggle: (o: Odd) => void;
-};
-
 type HomeViewProps = {
   competitions: Competition[];
   name: string;
   cd: { d: string; h: string; m: string; s: string };
-  catFilter: Record<string, string>;
-  setCatFilter: Dispatch<SetStateAction<Record<string, string>>>;
   navigate: (v: View | "drawer") => void;
-  setExpandedComp: Dispatch<SetStateAction<string | null>>;
-  coupon: Record<string, Odd>;
-  toggle: (o: Odd) => void;
   myRank: number | null;
   pendingCount: number;
   streak: number;
   effectiveBets: BetRecord[];
   effectiveLb: Player[];
-  openBetModal: (compId: string, compNom: string, categorie: string) => void;
+  openBetModal: (compId: string, compNom: string) => void;
 };
 
 type CompetitionsViewProps = {
   competitions: Competition[];
-  expandedComp: string | null;
-  setExpandedComp: Dispatch<SetStateAction<string | null>>;
-  catFilter: Record<string, string>;
-  setCatFilter: Dispatch<SetStateAction<Record<string, string>>>;
-  coupon: Record<string, Odd>;
-  toggle: (o: Odd) => void;
-  openBetModal: (compId: string, compNom: string, categorie: string) => void;
+  openBetModal: (compId: string, compNom: string) => void;
 };
 
 type ClassementViewProps = {
@@ -239,6 +222,8 @@ type PlayerProfileViewProps = {
   playerId: string;
   onBack: () => void;
 };
+
+type FriendshipStatus = "none" | "pending_outgoing" | "pending_incoming" | "friends";
 
 type PublicProfile = {
   id: string;
@@ -252,6 +237,16 @@ type PublicProfile = {
   totalBets: number;
   winRate: number;
   bets: BetRecord[];
+  friendshipStatus?: FriendshipStatus;
+  friendshipId?: string | null;
+};
+
+type FriendEntry = {
+  friendshipId: string;
+  userId: string;
+  username: string;
+  initials: string;
+  avatarUrl: string | null;
 };
 
 type ProfilViewProps = {
@@ -267,6 +262,7 @@ type ProfilViewProps = {
   onEditProfile: () => void;
   linkedAthlete: LinkedAthlete | null;
   onLinkAthlete: () => void;
+  onOpenProfile: (id: string) => void;
 };
 
 type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null };
@@ -276,33 +272,9 @@ type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: str
    unmounts/remounts them on parent re-renders (e.g. countdown tick)
 ---------------------------------------------------------------- */
 
-function OddsGrid({ odds, eventName, coupon, toggle }: OddsGridProps) {
-  void eventName;
-  return (
-    <div className="odds-grid">
-      {odds.map((o) => {
-        const sel = !!coupon[o.id];
-        return (
-          <button key={o.id} className={`odd${o.fav ? " fav" : ""}${sel ? " sel" : ""}`} onClick={() => toggle(o)}>
-            <div className="who">
-              <div className="nm">{o.nm}</div>
-              <div className="sub">
-                <span className="ctry">{o.ctry}</span>
-                {o.note}
-              </div>
-            </div>
-            <div className="val">{o.val.toFixed(2)}</div>
-            <div className="check"><Check c="#0A2A3D" /></div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function HomeView({
-  competitions, name, cd, catFilter, setCatFilter, navigate,
-  setExpandedComp, coupon, toggle, myRank, pendingCount, streak,
+  competitions, name, cd, navigate,
+  myRank, pendingCount, streak,
   effectiveBets, effectiveLb, openBetModal,
 }: HomeViewProps) {
   const feat    = competitions[0];
@@ -350,6 +322,7 @@ function HomeView({
               <div className="ft-meta">
                 {feat.location && <span className="m"><ColPin /><span>{feat.location}</span>{feat.flag && <span className="flag">{feat.flag}</span>}</span>}
                 {feat.category && <span className="m"><ColMedal /><span>{feat.category}</span></span>}
+                {feat.typeCompetition && <span className="m">{feat.typeCompetition === "sprint" ? "Sprint" : "Classique"}</span>}
                 {feat.bettors > 0 && <span className="m"><ColUsers /><span>{feat.bettors.toLocaleString("fr-FR")} parieurs engagés</span></span>}
               </div>
             </div>
@@ -360,35 +333,14 @@ function HomeView({
             </div>
           </div>
           <div className="ft-line">
-            <span className="lab"><span className="bar" /> Vainqueur — Classement général</span>
+            <span className="lab"><span className="bar" /> Startlist & cotes</span>
             <button className="all" onClick={() => navigate("competitions")}>Toutes les compétitions <Arrow /></button>
           </div>
-          {feat.odds.length > 0 ? (() => {
-            const cats = [...new Set(feat.odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
-            const sel  = catFilter[feat.id] ?? "";
-            const filtOdds = sel ? feat.odds.filter(o => o.categorie === sel) : feat.odds;
-            return (
-              <>
-                {cats.length > 1 && (
-                  <div className="cat-tabs">
-                    <button className={`cat-tab${!sel ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [feat.id]: "" }))}>Toutes</button>
-                    {cats.map(cat => (
-                      <button key={cat} className={`cat-tab${sel === cat ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [feat.id]: cat }))}>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {sel ? (
-                  <button className="cat-open-modal" onClick={() => openBetModal(feat.id, feat.name, sel)}>
-                    Voir les paris {sel} <Arrow />
-                  </button>
-                ) : (
-                  <OddsGrid odds={filtOdds} eventName={feat.name} coupon={coupon} toggle={toggle} />
-                )}
-              </>
-            );
-          })() : <p className="no-odds">Les cotes seront disponibles bientôt.</p>}
+          {feat.odds.length > 0 ? (
+            <button className="cat-open-modal" onClick={() => openBetModal(feat.id, feat.name)}>
+              Voir la startlist & parier <Arrow />
+            </button>
+          ) : <p className="no-odds">Les cotes seront disponibles bientôt.</p>}
         </section>
       )}
 
@@ -416,7 +368,7 @@ function HomeView({
               const day = dt ? dt.getDate() : "—";
               const mon = dt ? dt.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "") : "";
               return (
-                <div key={c.id} className="mini" onClick={() => { navigate("competitions"); setExpandedComp(c.id); }}>
+                <div key={c.id} className="mini" onClick={() => openBetModal(c.id, c.name)}>
                   <div className="when">
                     <div className="day">{day}</div>
                     <div className="mon">{mon}</div>
@@ -512,72 +464,41 @@ function HomeView({
 }
 
 function CompetitionsView({
-  competitions, expandedComp, setExpandedComp, catFilter, setCatFilter, coupon, toggle, openBetModal,
+  competitions, openBetModal,
 }: CompetitionsViewProps) {
   return (
     <>
       <div className="view-header">
         <h1>Compétitions</h1>
-        <p>{competitions.length} événement{competitions.length !== 1 ? "s" : ""} à venir · Sélectionne une cote pour parier</p>
+        <p>{competitions.length} événement{competitions.length !== 1 ? "s" : ""} à venir · Clique pour voir la startlist et parier</p>
       </div>
       <div className="comp-list">
-        {competitions.map((c) => {
-          const isOpen = expandedComp === c.id;
-          return (
-            <div key={c.id} className={`comp-card${c.featured ? " comp-featured" : ""}${isOpen ? " comp-open" : ""}`}>
-              <div className="comp-card-top" onClick={() => setExpandedComp(isOpen ? null : c.id)}>
-                <div className="comp-left">
-                  {c.featured && <span className="comp-badge"><Bolt c="#FF7A45" /> Featured</span>}
-                  <h2 className="comp-name">{c.name}</h2>
-                  <div className="comp-meta">
-                    <span><ColPin />{c.location}</span>
-                    <span className="cflag">{c.flag}</span>
-                    <span>{fmtDate(c.date)}</span>
-                    <span>{c.category}</span>
-                  </div>
-                </div>
-                <div className="comp-right">
-                  {c.bettors > 0 && (
-                    <div className="comp-bettors">
-                      <span className="bv">{c.bettors.toLocaleString("fr-FR")}</span>
-                      <span className="bl">parieurs</span>
-                    </div>
-                  )}
-                  <div className={`comp-chevron${isOpen ? " open" : ""}`}><ChevRight /></div>
+        {competitions.map((c) => (
+          <div key={c.id} className={`comp-card${c.featured ? " comp-featured" : ""}`}>
+            <div className="comp-card-top" onClick={() => openBetModal(c.id, c.name)}>
+              <div className="comp-left">
+                {c.featured && <span className="comp-badge"><Bolt c="#FF7A45" /> Featured</span>}
+                <h2 className="comp-name">{c.name}</h2>
+                <div className="comp-meta">
+                  <span><ColPin />{c.location}</span>
+                  <span className="cflag">{c.flag}</span>
+                  <span>{fmtDate(c.date)}</span>
+                  <span>{c.category}</span>
+                  {c.typeCompetition && <span>{c.typeCompetition === "sprint" ? "Sprint" : "Classique"}</span>}
                 </div>
               </div>
-              {isOpen && (() => {
-                const cats = [...new Set(c.odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
-                const sel  = catFilter[c.id] ?? "";
-                const filtOdds = sel ? c.odds.filter(o => o.categorie === sel) : c.odds;
-                return (
-                  <div className="comp-odds-wrap">
-                    {cats.length > 1 && (
-                      <div className="cat-tabs">
-                        <button className={`cat-tab${!sel ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [c.id]: "" }))}>Toutes</button>
-                        {cats.map(cat => (
-                          <button key={cat} className={`cat-tab${sel === cat ? " active" : ""}`} onClick={() => setCatFilter(f => ({ ...f, [c.id]: cat }))}>
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {sel ? (
-                      <button className="cat-open-modal" onClick={() => openBetModal(c.id, c.name, sel)}>
-                        Voir les paris {sel} <Arrow />
-                      </button>
-                    ) : (
-                      <>
-                        <div className="comp-odds-label"><span className="bar" /> Vainqueur — {c.category}</div>
-                        <OddsGrid odds={filtOdds} eventName={c.name} coupon={coupon} toggle={toggle} />
-                      </>
-                    )}
+              <div className="comp-right">
+                {c.bettors > 0 && (
+                  <div className="comp-bettors">
+                    <span className="bv">{c.bettors.toLocaleString("fr-FR")}</span>
+                    <span className="bl">parieurs</span>
                   </div>
-                );
-              })()}
+                )}
+                <div className="comp-chevron"><ChevRight /></div>
+              </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </>
   );
@@ -670,21 +591,70 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
+  const [historyFilter, setHistoryFilter] = useState<"all" | "won">("all");
+  const [friendState, setFriendState] = useState<{ status: FriendshipStatus; id: string | null } | null>(null);
+  const [friendBusy, setFriendBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    fetch(`/api/users/${playerId}/profile`)
+    const qs = historyFilter === "won" ? "?result=won" : "";
+    fetch(`/api/users/${playerId}/profile${qs}`)
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erreur");
         return res.json();
       })
-      .then((data) => { if (!cancelled) setProfile(data); })
+      .then((data) => {
+        if (cancelled) return;
+        setProfile(data);
+        if (data.friendshipStatus) setFriendState({ status: data.friendshipStatus, id: data.friendshipId ?? null });
+      })
       .catch(() => { if (!cancelled) setError("Impossible de charger ce profil."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [playerId]);
+  }, [playerId, historyFilter]);
+
+  async function addFriend() {
+    setFriendBusy(true);
+    try {
+      const res = await fetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: playerId }),
+      });
+      const data = await res.json();
+      if (res.ok) setFriendState({ status: data.status, id: data.friendshipId });
+    } finally {
+      setFriendBusy(false);
+    }
+  }
+
+  async function respondFriend(action: "accept" | "decline") {
+    if (!friendState?.id) return;
+    setFriendBusy(true);
+    try {
+      const res = await fetch(`/api/friends/${friendState.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) setFriendState(s => s && { ...s, status: action === "accept" ? "friends" : "none" });
+    } finally {
+      setFriendBusy(false);
+    }
+  }
+
+  async function removeFriend() {
+    if (!friendState?.id) return;
+    setFriendBusy(true);
+    try {
+      const res = await fetch(`/api/friends/${friendState.id}`, { method: "DELETE" });
+      if (res.ok) setFriendState({ status: "none", id: null });
+    } finally {
+      setFriendBusy(false);
+    }
+  }
 
   return (
     <>
@@ -693,10 +663,10 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
         Retour au classement
       </button>
 
-      {loading && <p style={{ color: "var(--sub, #5c7c8c)", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>Chargement du profil…</p>}
+      {loading && !profile && <p style={{ color: "var(--sub, #5c7c8c)", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>Chargement du profil…</p>}
       {!loading && error && <p style={{ color: "#FF7A45", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>{error}</p>}
 
-      {!loading && !error && profile && (
+      {!error && profile && (
         <>
           <div className="profil-hero">
             <div className="glow" />
@@ -715,6 +685,25 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
                 <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
                 Rang {profile.rank} · Saison 2026
               </span>
+              {friendState && (
+                <div className="profil-friend-actions">
+                  {friendState.status === "none" && (
+                    <button className="editprofile-save" disabled={friendBusy} onClick={addFriend}>+ Ajouter en ami</button>
+                  )}
+                  {friendState.status === "pending_outgoing" && (
+                    <button className="linkathlete-skip" disabled={friendBusy} onClick={removeFriend}>Demande envoyée · Annuler</button>
+                  )}
+                  {friendState.status === "pending_incoming" && (
+                    <div className="linkathlete-actions">
+                      <button className="editprofile-save" disabled={friendBusy} onClick={() => respondFriend("accept")}>Accepter</button>
+                      <button className="linkathlete-skip" disabled={friendBusy} onClick={() => respondFriend("decline")}>Refuser</button>
+                    </div>
+                  )}
+                  {friendState.status === "friends" && (
+                    <button className="linkathlete-skip" disabled={friendBusy} onClick={removeFriend}>Amis ✓ · Retirer</button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -742,10 +731,14 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
               <span>Historique des paris</span>
               <span className="ps-count">{profile.bets.length} paris</span>
             </div>
+            <div className="cat-tabs">
+              <button className={`cat-tab${historyFilter === "all" ? " active" : ""}`} onClick={() => setHistoryFilter("all")}>Tous</button>
+              <button className={`cat-tab${historyFilter === "won" ? " active" : ""}`} onClick={() => setHistoryFilter("won")}>Victoires</button>
+            </div>
             <div className="history-list">
               {profile.bets.length === 0 ? (
                 <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
-                  Aucun pari pour l&apos;instant.
+                  {historyFilter === "won" ? "Aucun pari gagné pour l'instant." : "Aucun pari pour l'instant."}
                 </p>
               ) : profile.bets.map((b) => {
                 const showGain = b.result === "win"
@@ -775,10 +768,35 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, onEditProfile, linkedAthlete, onLinkAthlete }: ProfilViewProps) {
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
+
+  const [friends, setFriends] = useState<FriendEntry[]>([]);
+  const [incoming, setIncoming] = useState<FriendEntry[]>([]);
+  const [friendsLoaded, setFriendsLoaded] = useState(false);
+
+  function loadFriends() {
+    fetch("/api/friends")
+      .then(res => res.json())
+      .then((data) => {
+        setFriends(data.friends ?? []);
+        setIncoming(data.incoming ?? []);
+      })
+      .finally(() => setFriendsLoaded(true));
+  }
+
+  useEffect(() => { loadFriends(); }, []);
+
+  async function respondIncoming(friendshipId: string, action: "accept" | "decline") {
+    await fetch(`/api/friends/${friendshipId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    loadFriends();
+  }
 
   return (
     <>
@@ -863,6 +881,39 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
         </div>
       </div>
 
+      <div className="profil-section">
+        <div className="profil-section-head">
+          <span>Mes amis</span>
+          <span className="ps-count">{friends.length} ami{friends.length !== 1 ? "s" : ""}</span>
+        </div>
+        {incoming.length > 0 && (
+          <div className="friend-requests">
+            {incoming.map((f) => (
+              <div key={f.friendshipId} className="friend-request-row">
+                <div className="av">{f.avatarUrl ? <img src={f.avatarUrl} alt="" /> : f.initials}</div>
+                <span className="nm">{f.username}</span>
+                <div className="friend-request-actions">
+                  <button className="editprofile-save" onClick={() => respondIncoming(f.friendshipId, "accept")}>Accepter</button>
+                  <button className="linkathlete-skip" onClick={() => respondIncoming(f.friendshipId, "decline")}>Refuser</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="history-list">
+          {friendsLoaded && friends.length === 0 && incoming.length === 0 ? (
+            <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
+              Pas encore d&apos;amis. Ajoute des joueurs depuis le classement !
+            </p>
+          ) : friends.map((f) => (
+            <div key={f.friendshipId} className="home-lb-row" role="button" tabIndex={0} onClick={() => onOpenProfile(f.userId)}>
+              <div className="av">{f.avatarUrl ? <img src={f.avatarUrl} alt="" /> : f.initials}</div>
+              <div className="nm">{f.username}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {["loig.le.guennec@icloud.com", "leguennec.loig@gmail.com"].includes(userEmail ?? "") && (
         <a
           href="/admin"
@@ -891,7 +942,6 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const [view,          setView]          = useState<View>("home");
-  const [expandedComp,  setExpandedComp]  = useState<string | null>(null);
   const [balance,       setBalance]       = useState(0);
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
   const [stake,         setStake]         = useState(50);
@@ -912,8 +962,7 @@ export default function DashboardPage() {
   const [linkAthleteOpen, setLinkAthleteOpen] = useState(false);
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
-  const [catFilter,     setCatFilter]     = useState<Record<string, string>>({});
-  const [betModal, setBetModal] = useState<{ compId: string; compNom: string; categorie: string } | null>(null);
+  const [betModal, setBetModal] = useState<{ compId: string; compNom: string } | null>(null);
   const [viewedPlayerId, setViewedPlayerId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
@@ -995,7 +1044,7 @@ export default function DashboardPage() {
     async function fetchComps() {
       const { data } = await supabase
         .from("competitions")
-        .select("id, nom, date, discipline, lieu, participants(id, nom, pays, cote, categorie, code_bateau)")
+        .select("id, nom, date, discipline, lieu, type_competition, participants(id, nom, pays, cote, categorie, code_bateau)")
         .eq("status", "published")
         .order("date", { ascending: true });
       if (!data || data.length === 0) return;
@@ -1012,6 +1061,7 @@ export default function DashboardPage() {
           category: c.discipline ?? "",
           bettors: 0,
           featured: i === 0,
+          typeCompetition: c.type_competition ?? null,
           odds: parts.map((p: any) => ({
             id:            `${p.id}:TOP_1`,
             participantId: p.id,
@@ -1066,8 +1116,8 @@ export default function DashboardPage() {
     setCoupon((prev) => { const next = { ...prev }; delete next[id]; return next; });
   }
 
-  function openBetModal(compId: string, compNom: string, categorie: string) {
-    setBetModal({ compId, compNom, categorie });
+  function openBetModal(compId: string, compNom: string) {
+    setBetModal({ compId, compNom });
   }
 
   function openPlayerProfile(id: string) {
@@ -1148,7 +1198,6 @@ export default function DashboardPage() {
   function navigate(v: View | "drawer") {
     if (v === "drawer") { setDrawerOpen(true); return; }
     setView(v);
-    if (v !== "competitions") setExpandedComp(null);
   }
 
   const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1 }[view] ?? -1;
@@ -1235,12 +1284,7 @@ export default function DashboardPage() {
               competitions={competitions}
               name={name}
               cd={cd}
-              catFilter={catFilter}
-              setCatFilter={setCatFilter}
               navigate={navigate}
-              setExpandedComp={setExpandedComp}
-              coupon={coupon}
-              toggle={toggle}
               myRank={myRank}
               pendingCount={pendingCount}
               streak={streak}
@@ -1252,12 +1296,6 @@ export default function DashboardPage() {
           {view === "competitions" && (
             <CompetitionsView
               competitions={competitions}
-              expandedComp={expandedComp}
-              setExpandedComp={setExpandedComp}
-              catFilter={catFilter}
-              setCatFilter={setCatFilter}
-              coupon={coupon}
-              toggle={toggle}
               openBetModal={openBetModal}
             />
           )}
@@ -1279,6 +1317,7 @@ export default function DashboardPage() {
               onEditProfile={() => setEditProfileOpen(true)}
               linkedAthlete={linkedAthlete}
               onLinkAthlete={() => setLinkAthleteOpen(true)}
+              onOpenProfile={openPlayerProfile}
             />
           )}
         </div>
@@ -1348,11 +1387,8 @@ export default function DashboardPage() {
           onClose={() => setBetModal(null)}
           competitionId={betModal.compId}
           competitionNom={betModal.compNom}
-          categorie={betModal.categorie}
-          participants={
-            (competitions.find(c => c.id === betModal.compId)?.odds ?? [])
-              .filter(o => o.categorie === betModal.categorie)
-          }
+          odds={competitions.find(c => c.id === betModal.compId)?.odds ?? []}
+          typeCompetition={competitions.find(c => c.id === betModal.compId)?.typeCompetition}
           coupon={coupon}
           toggle={toggle}
         />

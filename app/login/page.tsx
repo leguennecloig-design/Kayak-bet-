@@ -292,7 +292,11 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
    Main login page
 ================================================================ */
 export default function LoginPage() {
-  const [mode,     setMode]     = useState<Mode>("login");
+  const [mode,     setMode]     = useState<Mode>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("welcome") === "1"
+      ? "welcome"
+      : "login"
+  );
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);

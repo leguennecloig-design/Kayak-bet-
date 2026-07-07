@@ -41,6 +41,7 @@ export default function NouvelleCompetition() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [typeCompetition, setTypeCompetition] = useState("");
 
   function isAccepted(file: File): boolean {
     const n = file.name.toLowerCase();
@@ -80,7 +81,7 @@ export default function NouvelleCompetition() {
       const res = await fetch("/api/admin/import-startlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
+        body: JSON.stringify({ ...result, type_competition: typeCompetition || null }),
       });
       if (!res.ok) {
         const j = await res.json();
@@ -213,6 +214,18 @@ export default function NouvelleCompetition() {
               <p className="font-grotesk font-semibold text-white text-[13px]">
                 {result.type_epreuve}
               </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Type</p>
+              <select
+                value={typeCompetition}
+                onChange={(e) => setTypeCompetition(e.target.value)}
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none appearance-none w-full"
+              >
+                <option value="" className="bg-[#0a2a3d]">— Choisir —</option>
+                <option value="sprint" className="bg-[#0a2a3d]">Sprint</option>
+                <option value="classique" className="bg-[#0a2a3d]">Classique</option>
+              </select>
             </div>
           </div>
 

@@ -35,6 +35,7 @@ type ImportBody = {
   date_fin: string | null;
   type_epreuve: string;
   categories: ImportedCategory[];
+  type_competition?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -187,6 +188,7 @@ export async function POST(req: NextRequest) {
         date: dateDebut,
         lieu: body.lieu,
         discipline: null,
+        type_competition: body.type_competition ?? null,
       })
       .select("id")
       .single();

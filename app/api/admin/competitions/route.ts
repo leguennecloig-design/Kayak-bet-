@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
-  const { nom, date, discipline, lieu } = await req.json();
+  const { nom, date, discipline, lieu, type_competition } = await req.json();
 
   if (!nom?.trim()) {
     return NextResponse.json({ error: "Le nom est obligatoire" }, { status: 400 });
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
       date: date || null,
       discipline: discipline || null,
       lieu: lieu || null,
+      type_competition: type_competition || null,
     })
     .select("id")
     .single();
