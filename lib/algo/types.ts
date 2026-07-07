@@ -47,6 +47,7 @@ export interface CoteResult {
   cote_exact_place: number
   cote_exact_time:  number
   algo_version: string
+  format_course?: 'standard' | 'sprint_finale' | 'mass_start'
 }
 
 export type BetType =

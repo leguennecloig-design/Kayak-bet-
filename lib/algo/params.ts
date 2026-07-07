@@ -35,5 +35,8 @@ export const ALGO_PARAMS = {
   PLAFOND_TOP10: 10.0,
   PLAFOND_TOP20:  5.0,
 
+  // Décroissance exponentielle de la force selon le rang (Sprint Finale / Mass Start)
+  K_FORCE: 0.20,
+
   ALGO_VERSION: 'v3.0',
 } as const;

@@ -2,6 +2,9 @@
 
 import { useState, useCallback } from "react";
 import { ALGO_PARAMS } from "@/lib/algo/bradley-terry";
+import { parseResultFile, type ParseResult } from "@/lib/algo/result-parser";
+
+type Format = "standard" | "sprint_finale" | "mass_start";
 
 type Course = {
   id: string;
@@ -97,6 +100,60 @@ export default function CotesClient({
     return map;
   });
 
+  // Sprint Finale / Mass Start
+  const [format, setFormat] = useState<Format>("standard");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<ParseResult | null>(null);
+  const [specialState, setSpecialState] = useState<"idle" | "ready" | "loading" | "ok" | "error">("idle");
+  const [specialError, setSpecialError] = useState("");
+
+  function resetSpecialFormat() {
+    setUploadFile(null);
+    setPreview(null);
+    setSpecialState("idle");
+    setSpecialError("");
+  }
+
+  function selectFormat(f: Format) {
+    setFormat(f);
+    resetSpecialFormat();
+  }
+
+  async function handleFileSelect(file: File) {
+    setUploadFile(file);
+    setSpecialError("");
+    const content = await file.text();
+    const parsed = parseResultFile(content, file.name);
+    setPreview(parsed);
+    if (parsed.data.length === 0) {
+      setSpecialState("error");
+      setSpecialError(parsed.errors[0] ?? "Fichier invalide ou vide");
+    } else {
+      setSpecialState("ready");
+    }
+  }
+
+  async function submitSpecialFormat() {
+    if (!uploadFile || !selectedCourseId) return;
+    setSpecialState("loading");
+    setSpecialError("");
+    try {
+      const fd = new FormData();
+      fd.append("courseId", selectedCourseId);
+      fd.append("format", format);
+      fd.append("fichier", uploadFile);
+      const res = await fetch("/api/admin/recalculate", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      setSpecialState("ok");
+      await fetchCotes(selectedCourseId, selectedCat);
+      setTimeout(() => resetSpecialFormat(), 3000);
+    } catch (e) {
+      setSpecialState("error");
+      setSpecialError(e instanceof Error ? e.message : "Erreur réseau");
+    }
+  }
+
   const selectedComp = competitions.find(c => c.id === selectedCompId) ?? competitions[0];
 
   const fetchCotes = useCallback(async (courseId: string, cat = "Tous") => {
@@ -127,12 +184,16 @@ export default function CotesClient({
     setSelectedCourseId(cId);
     setSelectedCat("Tous");
     setCotes([]);
+    resetSpecialFormat();
+    setFormat("standard");
     if (cId) fetchCotes(cId, "Tous");
   }
 
   function selectCourse(courseId: string) {
     setSelectedCourseId(courseId);
     setSelectedCat("Tous");
+    resetSpecialFormat();
+    setFormat("standard");
     fetchCotes(courseId, "Tous");
   }
 
@@ -299,17 +360,128 @@ export default function CotesClient({
                       );
                     })}
 
-                    {selectedCourseId && (
-                      <button
-                        onClick={() => recalculate(selectedCourseId)}
-                        disabled={recalcState === "loading"}
-                        className="ml-auto inline-flex items-center gap-1.5 font-archivo font-semibold text-[11px] text-[#FF7A45] border border-[rgba(255,122,69,.3)] px-3 py-2 rounded-[9px] hover:bg-[rgba(255,122,69,.1)] transition-colors disabled:opacity-50"
-                      >
-                        {recalcState === "loading" ? <SpinIcon cls="w-3 h-3" /> : recalcState === "ok" ? <CheckIcon cls="w-3 h-3" /> : <RefreshIcon cls="w-3 h-3" />}
-                        Recalculer
-                      </button>
-                    )}
                   </div>
+
+                  {/* Format + calcul */}
+                  {selectedCourseId && (
+                    <div className="border border-[var(--border-2)] rounded-[14px] p-4 mb-5">
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        {([
+                          { key: "standard", label: "Standard (algo v3)" },
+                          { key: "sprint_finale", label: "Sprint Finale" },
+                          { key: "mass_start", label: "Mass Start" },
+                        ] as { key: Format; label: string }[]).map(({ key, label }) => (
+                          <button
+                            key={key}
+                            onClick={() => selectFormat(key)}
+                            className={`font-archivo font-semibold text-[11.5px] px-3.5 py-2 rounded-[8px] border transition-colors ${
+                              format === key
+                                ? "border-[rgba(40,215,230,.5)] bg-[rgba(40,215,230,.08)] text-[#28D7E6]"
+                                : "border-[var(--border-2)] text-[#7c9aaa] hover:border-[rgba(40,215,230,.3)] hover:text-white"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+
+                        {format === "standard" && (
+                          <button
+                            onClick={() => recalculate(selectedCourseId)}
+                            disabled={recalcState === "loading"}
+                            className="ml-auto inline-flex items-center gap-1.5 font-archivo font-semibold text-[11px] text-[#FF7A45] border border-[rgba(255,122,69,.3)] px-3 py-2 rounded-[9px] hover:bg-[rgba(255,122,69,.1)] transition-colors disabled:opacity-50"
+                          >
+                            {recalcState === "loading" ? <SpinIcon cls="w-3 h-3" /> : recalcState === "ok" ? <CheckIcon cls="w-3 h-3" /> : <RefreshIcon cls="w-3 h-3" />}
+                            Recalculer
+                          </button>
+                        )}
+                      </div>
+
+                      {format !== "standard" && (
+                        <div>
+                          <p className="font-archivo text-[12px] text-[#7c9aaa] mb-3">
+                            {format === "sprint_finale"
+                              ? "Fichier des résultats de qualifs (60% qualifs + 40% algo v3)."
+                              : "Fichier des résultats classique du week-end (80% classique + 20% algo v3)."}
+                            {" "}Formats acceptés : CSV, TXT, JSON.
+                          </p>
+
+                          <label className="inline-flex items-center gap-2 font-archivo font-semibold text-[12px] text-[#28D7E6] border border-[rgba(40,215,230,.35)] rounded-[9px] px-3.5 py-2 cursor-pointer hover:bg-[rgba(40,215,230,.08)] transition-colors">
+                            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                              <path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            {uploadFile ? uploadFile.name : "Choisir un fichier"}
+                            <input
+                              type="file"
+                              accept=".csv,.txt,.json"
+                              className="hidden"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+                            />
+                          </label>
+
+                          {preview && (
+                            <div className="mt-3">
+                              {preview.data.length > 0 && (
+                                <p className="font-archivo text-[12px] text-[#7c9aaa] mb-2">
+                                  ✓ {preview.data.length} ligne{preview.data.length > 1 ? "s" : ""} parsée{preview.data.length > 1 ? "s" : ""}
+                                  {" "}({preview.format_detected}) · {preview.errors.length} erreur{preview.errors.length > 1 ? "s" : ""}
+                                  {" "}· catégories : {[...new Set(preview.data.map(r => r.categorie))].join(", ")}
+                                </p>
+                              )}
+                              {preview.errors.length > 0 && (
+                                <div className="text-[11px] font-archivo text-red-400 mb-2 space-y-0.5">
+                                  {preview.errors.slice(0, 5).map((err, i) => <p key={i}>{err}</p>)}
+                                  {preview.errors.length > 5 && <p>… et {preview.errors.length - 5} autre(s)</p>}
+                                </div>
+                              )}
+                              {preview.data.length > 0 && (
+                                <div className="overflow-x-auto border border-[var(--border-2)] rounded-[10px] mb-3">
+                                  <table className="w-full font-archivo text-[11.5px]">
+                                    <thead>
+                                      <tr className="border-b border-[var(--border-2)]">
+                                        {["Rang", "Nom", "Code bateau", "Catégorie"].map(h => (
+                                          <th key={h} className="px-2.5 py-2 text-left font-grotesk font-bold text-[9px] tracking-[.08em] uppercase text-[#5c7c8c]">{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {preview.data.slice(0, 8).map((r, i) => (
+                                        <tr key={i} className="border-b border-[var(--border-2)] last:border-0">
+                                          <td className="px-2.5 py-1.5 text-[#7c9aaa]">{r.rang}</td>
+                                          <td className="px-2.5 py-1.5 text-white">{[r.nom, r.prenom].filter(Boolean).join(" ") || "—"}</td>
+                                          <td className="px-2.5 py-1.5 text-[#7c9aaa]">{r.code_bateau}</td>
+                                          <td className="px-2.5 py-1.5 text-[#7c9aaa]">{r.categorie}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  {preview.data.length > 8 && (
+                                    <p className="font-archivo text-[10.5px] text-[#5c7c8c] px-2.5 py-1.5">
+                                      … et {preview.data.length - 8} autre(s) ligne(s)
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {specialError && (
+                            <p className="font-archivo text-[12px] text-red-400 mb-3">{specialError}</p>
+                          )}
+
+                          {preview && preview.data.length > 0 && (
+                            <button
+                              onClick={submitSpecialFormat}
+                              disabled={specialState === "loading"}
+                              className="inline-flex items-center gap-1.5 font-archivo font-bold text-[12px] text-[#0A2A3D] bg-gradient-to-r from-[#28D7E6] to-[#11C2C2] px-4 py-2.5 rounded-[9px] hover:-translate-y-[1px] transition-transform disabled:opacity-50"
+                            >
+                              {specialState === "loading" ? <SpinIcon cls="w-3.5 h-3.5" /> : specialState === "ok" ? <CheckIcon cls="w-3.5 h-3.5" /> : null}
+                              {specialState === "ok" ? "Cotes calculées ✓" : "Calculer les cotes →"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Category filter */}
                   {allCats.length > 1 && (
