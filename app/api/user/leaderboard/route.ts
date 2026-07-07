@@ -15,7 +15,7 @@ export async function GET() {
   // Top 10 par solde
   const { data: top, error } = await adminSb
     .from("users")
-    .select("id, username, email, balance, avatar_url")
+    .select("id, username, email, balance, avatar_url, instagram_handle")
     .order("balance", { ascending: false })
     .limit(10);
 
@@ -44,6 +44,7 @@ export async function GET() {
       wins,
       balance:   Number(u.balance),
       avatarUrl: u.avatar_url ?? null,
+      instagram: u.instagram_handle ?? null,
       streak:    0,
       isMe:      u.id === currentUserId,
     };
@@ -60,7 +61,7 @@ export async function GET() {
 
     const { data: myRow } = await adminSb
       .from("users")
-      .select("id, username, email, balance, avatar_url")
+      .select("id, username, email, balance, avatar_url, instagram_handle")
       .eq("id", currentUserId)
       .single();
 
@@ -74,6 +75,7 @@ export async function GET() {
         wins:      winsMap.get(currentUserId) ?? 0,
         balance:   Number(myRow.balance),
         avatarUrl: myRow.avatar_url ?? null,
+        instagram: myRow.instagram_handle ?? null,
         streak:    0,
         isMe:      true,
       });

@@ -24,7 +24,7 @@ export async function GET(
 
   const { data: row } = await adminSb
     .from("users")
-    .select("id, username, email, balance, avatar_url, bio")
+    .select("id, username, email, balance, avatar_url, bio, instagram_handle")
     .eq("id", targetId)
     .maybeSingle();
 
@@ -110,6 +110,7 @@ export async function GET(
     initials:  initials(name),
     avatarUrl: row.avatar_url ?? null,
     bio:       row.bio ?? "",
+    instagram: row.instagram_handle ?? null,
     balance:   Number(row.balance),
     rank,
     wins,

@@ -371,8 +371,17 @@ export default function LoginPage() {
         <div className="lp-bg" />
         <div className="lp-glow g1" /><div className="lp-glow g2" />
         <WelcomeOverlay onDone={() => {
-          const isNew = typeof window !== "undefined" && !localStorage.getItem("kb_onboarded");
-          if (isNew) { setMode("onboarding"); } else { location.href = "/app"; }
+          (async () => {
+            try {
+              const res = await fetch("/api/user/profile");
+              const data = await res.json();
+              if (!data.onboarded) { setMode("onboarding"); return; }
+            } catch {
+              // en cas d'erreur réseau, on ne bloque pas l'utilisateur derrière
+              // l'onboarding — on le laisse simplement entrer dans l'app.
+            }
+            location.href = "/app";
+          })();
         }} />
       </>
     );
@@ -382,8 +391,18 @@ export default function LoginPage() {
   if (mode === "onboarding") {
     return (
       <OnboardingFlow onDone={() => {
-        if (typeof window !== "undefined") localStorage.setItem("kb_onboarded", "1");
-        location.href = "/app";
+        (async () => {
+          try {
+            await fetch("/api/user/profile", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ onboarded: true }),
+            });
+          } catch {
+            // pas bloquant — au pire l'onboarding réapparaîtra une fois de plus
+          }
+          location.href = "/app";
+        })();
       }} />
     );
   }

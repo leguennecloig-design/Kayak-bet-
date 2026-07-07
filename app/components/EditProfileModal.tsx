@@ -13,15 +13,17 @@ type Props = {
   username: string;
   avatarUrl: string | null;
   bio: string;
-  onSaved: (updates: { username?: string; avatarUrl?: string; bio?: string }) => void;
+  instagram: string | null;
+  onSaved: (updates: { username?: string; avatarUrl?: string; bio?: string; instagram?: string | null }) => void;
 };
 
 export default function EditProfileModal({
-  open, onClose, userId, initials, username, avatarUrl, bio, onSaved,
+  open, onClose, userId, initials, username, avatarUrl, bio, instagram, onSaved,
 }: Props) {
   const [localAvatar, setLocalAvatar] = useState(avatarUrl);
   const [localUsername, setLocalUsername] = useState(username);
   const [localBio, setLocalBio] = useState(bio);
+  const [localInstagram, setLocalInstagram] = useState(instagram ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -33,9 +35,10 @@ export default function EditProfileModal({
       setLocalAvatar(avatarUrl);
       setLocalUsername(username);
       setLocalBio(bio);
+      setLocalInstagram(instagram ?? "");
       setError("");
     }
-  }, [open, avatarUrl, username, bio]);
+  }, [open, avatarUrl, username, bio, instagram]);
 
   // Ne dépend que de `open` : le parent recrée `onClose` à chaque re-render
   // (ex: le compte à rebours qui tick toutes les secondes) — si cet effet en
@@ -63,9 +66,10 @@ export default function EditProfileModal({
     setSaving(true);
     setError("");
     try {
-      const updates: { username?: string; bio?: string } = {};
+      const updates: { username?: string; bio?: string; instagram?: string } = {};
       if (localUsername !== username) updates.username = localUsername;
       if (localBio !== bio) updates.bio = localBio;
+      if (localInstagram !== (instagram ?? "")) updates.instagram = localInstagram;
 
       for (const [key, value] of Object.entries(updates)) {
         const res = await fetch("/api/user/profile", {
@@ -79,7 +83,7 @@ export default function EditProfileModal({
         }
       }
 
-      onSaved({ username: localUsername, bio: localBio, avatarUrl: localAvatar ?? undefined });
+      onSaved({ username: localUsername, bio: localBio, avatarUrl: localAvatar ?? undefined, instagram: localInstagram || null });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur réseau");
@@ -127,6 +131,17 @@ export default function EditProfileModal({
             {!usernameValid && localUsername.length > 0 && (
               <span className="editprofile-hint">3-20 caractères, lettres/chiffres/underscore</span>
             )}
+          </label>
+
+          <label className="editprofile-field">
+            <span>Instagram</span>
+            <input
+              type="text"
+              value={localInstagram}
+              onChange={(e) => setLocalInstagram(e.target.value)}
+              placeholder="@pseudo"
+              maxLength={30}
+            />
           </label>
 
           <label className="editprofile-field">

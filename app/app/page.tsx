@@ -85,6 +85,24 @@ const ColPin    = () => <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s6.5
 const ColMedal  = () => <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 3.5 12 9l3.5-5.5" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="14.5" r="5.2" stroke="#28D7E6" strokeWidth="1.7" /><path d="M12 12.4v4.2M10 14.5h4" stroke="#28D7E6" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 const ColUsers  = () => <svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.5" r="3" stroke="#28D7E6" strokeWidth="1.7" /><path d="M3.5 19c0-3 2.5-4.6 5.5-4.6s5.5 1.6 5.5 4.6" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" /><path d="M16 5.4a3 3 0 0 1 0 6M17.5 14.6c2.4.4 4 2 4 4.4" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" /></svg>;
 
+const InstaIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.7" /><circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" /></svg>;
+
+function InstaLink({ handle, className = "insta-link" }: { handle?: string | null; className?: string }) {
+  if (!handle) return null;
+  return (
+    <a
+      href={`https://instagram.com/${handle}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={`Instagram @${handle}`}
+    >
+      <InstaIcon />
+    </a>
+  );
+}
+
 const TicketStroke = ({ c }: { c: string }) => (
   <svg viewBox="0 0 24 24" fill="none">
     <path d="M4 8.2A1.8 1.8 0 0 1 5.8 6.4h12.4A1.8 1.8 0 0 1 20 8.2a1.8 1.8 0 0 0 0 3.6 1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 11.8a1.8 1.8 0 0 0 0-3.6Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
@@ -106,7 +124,7 @@ const StarIcon  = ({ filled }: { filled?: boolean }) => (
 /* ----------------------------------------------------------------
    Types
 ---------------------------------------------------------------- */
-type View = "home" | "competitions" | "classement" | "profil" | "joueur";
+type View = "home" | "competitions" | "classement" | "profil" | "joueur" | "ligue";
 
 type Odd = {
   id: string;            // clé composite `${participantId}:${betType}`
@@ -144,6 +162,7 @@ type Player = {
   wins: number;
   balance: number;
   avatarUrl?: string | null;
+  instagram?: string | null;
   streak: number;
   isMe?: boolean;
 };
@@ -223,6 +242,40 @@ type PlayerProfileViewProps = {
   onBack: () => void;
 };
 
+type LeagueViewProps = {
+  leagueId: string;
+  onBack: () => void;
+};
+
+type LeagueSummary = {
+  id: string;
+  name: string;
+  inviteCode: string;
+  currentSeason: number;
+  isCreator: boolean;
+  memberCount: number;
+  myRank: number;
+  myGain: number;
+};
+
+type LeagueMemberRow = {
+  userId: string;
+  username: string;
+  initials: string;
+  avatarUrl: string | null;
+  gain: number;
+  rank: number;
+};
+
+type LeagueDetail = {
+  id: string;
+  name: string;
+  inviteCode: string;
+  currentSeason: number;
+  isCreator: boolean;
+  members: LeagueMemberRow[];
+};
+
 type FriendshipStatus = "none" | "pending_outgoing" | "pending_incoming" | "friends";
 
 type PublicProfile = {
@@ -231,6 +284,7 @@ type PublicProfile = {
   initials: string;
   avatarUrl: string | null;
   bio: string;
+  instagram: string | null;
   balance: number;
   rank: number;
   wins: number;
@@ -259,10 +313,12 @@ type ProfilViewProps = {
   signOut: () => Promise<void>;
   avatarUrl: string | null;
   bio: string;
+  instagram: string | null;
   onEditProfile: () => void;
   linkedAthlete: LinkedAthlete | null;
   onLinkAthlete: () => void;
   onOpenProfile: (id: string) => void;
+  onOpenLeague: (id: string) => void;
 };
 
 type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null };
@@ -538,7 +594,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
               {p!.avatarUrl ? <img src={p!.avatarUrl} alt="" /> : <span>{p!.ini}</span>}
             </div>
             <div className="pod-rank" style={{ color: rankColors[p!.rank] }}>#{p!.rank}</div>
-            <div className="pod-name">{p!.name}</div>
+            <div className="pod-name">{p!.name}<InstaLink handle={p!.instagram} /></div>
             <div className="pod-bal">{p!.balance.toLocaleString("fr-FR")} cr.</div>
           </div>
         ))}
@@ -556,7 +612,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
           >
             <span className="lb-rank">{p.rank}</span>
             <div className="lb-avatar">{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
-            <span className="lb-name">{p.name}</span>
+            <span className="lb-name">{p.name}<InstaLink handle={p.instagram} /></span>
             <span className="lb-wins">{p.wins} victoires</span>
             <span className="lb-bal">{p.balance.toLocaleString("fr-FR")} cr.</span>
             {p.streak > 0 && <span className="lb-streak"><ColFlame />{p.streak}</span>}
@@ -575,7 +631,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
             >
               <span className="lb-rank">{me.rank}</span>
               <div className="lb-avatar lb-avatar-me">{me.avatarUrl ? <img src={me.avatarUrl} alt="" /> : <span>{me.ini}</span>}</div>
-              <span className="lb-name">{me.name} <span className="me-tag">Moi</span></span>
+              <span className="lb-name">{me.name} <span className="me-tag">Moi</span><InstaLink handle={me.instagram} /></span>
               <span className="lb-wins">{me.wins} victoires</span>
               <span className="lb-bal">{me.balance.toLocaleString("fr-FR")} cr.</span>
               {me.streak > 0 && <span className="lb-streak"><ColFlame />{me.streak}</span>}
@@ -679,7 +735,7 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
                 {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : <span>{profile.initials}</span>}
               </div>
               <span className="profil-eyebrow">Profil joueur · Saison 2026</span>
-              <h1 className="profil-name">{profile.username}</h1>
+              <h1 className="profil-name">{profile.username}<InstaLink handle={profile.instagram} /></h1>
               {profile.bio && <p className="profil-bio">{profile.bio}</p>}
               <span className="profil-rank">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
@@ -768,7 +824,127 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile }: ProfilViewProps) {
+function LeagueView({ leagueId, onBack }: LeagueViewProps) {
+  const [league, setLeague] = useState<LeagueDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function load() {
+    setLoading(true);
+    setError("");
+    fetch(`/api/leagues/${leagueId}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erreur");
+        return res.json();
+      })
+      .then((data) => setLeague(data))
+      .catch(() => setError("Impossible de charger cette ligue."))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { load(); }, [leagueId]);
+
+  async function copyCode() {
+    if (!league) return;
+    try {
+      await navigator.clipboard.writeText(league.inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard indisponible, tant pis */ }
+  }
+
+  async function newSeason() {
+    if (!league || busy) return;
+    if (!confirm("Démarrer une nouvelle saison ? Les gains de tous les membres repartent à zéro.")) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/leagues/${leagueId}/new-season`, { method: "POST" });
+      if (res.ok) load(); else setError("Impossible de démarrer une nouvelle saison.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteLeague() {
+    if (!league || busy) return;
+    if (!confirm(`Supprimer définitivement la ligue "${league.name}" ?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/leagues/${leagueId}`, { method: "DELETE" });
+      if (res.ok) onBack(); else setError("Impossible de supprimer la ligue.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function leaveLeague() {
+    if (!league || busy) return;
+    if (!confirm(`Quitter la ligue "${league.name}" ?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/leagues/${leagueId}/leave`, { method: "POST" });
+      if (res.ok) onBack(); else setError("Impossible de quitter la ligue.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="player-back" onClick={onBack}>
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        Retour au profil
+      </button>
+
+      {loading && <p style={{ color: "var(--sub, #5c7c8c)", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>Chargement de la ligue…</p>}
+      {!loading && error && <p style={{ color: "#FF7A45", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>{error}</p>}
+
+      {!loading && !error && league && (
+        <>
+          <div className="view-header">
+            <h1>{league.name}</h1>
+            <p>Saison {league.currentSeason} · {league.members.length} membre{league.members.length !== 1 ? "s" : ""}</p>
+          </div>
+
+          <div className="league-invite">
+            <span>Code d&apos;invitation</span>
+            <button className="league-invite-code" onClick={copyCode}>
+              {league.inviteCode} {copied ? "· Copié !" : ""}
+            </button>
+          </div>
+
+          <div className="lb-list">
+            {league.members.map((m) => (
+              <div key={m.userId} className="lb-row">
+                <span className="lb-rank">{m.rank}</span>
+                <div className="lb-avatar">{m.avatarUrl ? <img src={m.avatarUrl} alt="" /> : <span>{m.initials}</span>}</div>
+                <span className="lb-name">{m.username}</span>
+                <span className="lb-bal" style={{ color: m.gain >= 0 ? "var(--cyan)" : "var(--coral)" }}>
+                  {m.gain >= 0 ? "+" : ""}{m.gain.toLocaleString("fr-FR")} cr.
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {league.isCreator ? (
+            <div className="profil-actions" style={{ marginTop: 20 }}>
+              <button className="profil-edit-btn" disabled={busy} onClick={newSeason}>Nouvelle saison</button>
+              <button className="profil-edit-btn" disabled={busy} onClick={deleteLeague}>Supprimer la ligue</button>
+            </div>
+          ) : (
+            <div className="profil-actions" style={{ marginTop: 20 }}>
+              <button className="profil-edit-btn" disabled={busy} onClick={leaveLeague}>Quitter la ligue</button>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
@@ -798,6 +974,44 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
     loadFriends();
   }
 
+  const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
+  const [leaguesLoaded, setLeaguesLoaded] = useState(false);
+  const [leagueForm, setLeagueForm] = useState<"none" | "create" | "join">("none");
+  const [leagueInput, setLeagueInput] = useState("");
+  const [leagueBusy, setLeagueBusy] = useState(false);
+  const [leagueError, setLeagueError] = useState("");
+
+  function loadLeagues() {
+    fetch("/api/leagues")
+      .then(res => res.json())
+      .then((data) => setLeagues(data.leagues ?? []))
+      .finally(() => setLeaguesLoaded(true));
+  }
+
+  useEffect(() => { loadLeagues(); }, []);
+
+  async function submitLeagueForm() {
+    if (!leagueInput.trim() || leagueBusy) return;
+    setLeagueBusy(true);
+    setLeagueError("");
+    try {
+      const res = await fetch(leagueForm === "create" ? "/api/leagues" : "/api/leagues/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(leagueForm === "create" ? { name: leagueInput.trim() } : { code: leagueInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setLeagueError(data.error ?? "Erreur"); return; }
+      setLeagueInput("");
+      setLeagueForm("none");
+      loadLeagues();
+    } catch {
+      setLeagueError("Erreur réseau");
+    } finally {
+      setLeagueBusy(false);
+    }
+  }
+
   return (
     <>
       <div className="profil-hero">
@@ -811,7 +1025,7 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
             {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{initials}</span>}
           </div>
           <span className="profil-eyebrow">Mon profil · Saison 2026</span>
-          <h1 className="profil-name">{name}</h1>
+          <h1 className="profil-name">{name}<InstaLink handle={instagram} /></h1>
           <p className="profil-email">{userEmail}</p>
           {bio && <p className="profil-bio">{bio}</p>}
           <span className="profil-rank">
@@ -914,6 +1128,53 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
         </div>
       </div>
 
+      <div className="profil-section">
+        <div className="profil-section-head">
+          <span>Mes ligues</span>
+          <span className="ps-count">{leagues.length} ligue{leagues.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        {leagueForm === "none" ? (
+          <div className="profil-actions" style={{ marginBottom: 14 }}>
+            <button className="profil-edit-btn" onClick={() => { setLeagueForm("create"); setLeagueError(""); }}>Créer une ligue</button>
+            <button className="profil-edit-btn" onClick={() => { setLeagueForm("join"); setLeagueError(""); }}>Rejoindre une ligue</button>
+          </div>
+        ) : (
+          <div className="league-form">
+            <input
+              type="text"
+              value={leagueInput}
+              onChange={(e) => setLeagueInput(leagueForm === "join" ? e.target.value.toUpperCase() : e.target.value)}
+              placeholder={leagueForm === "create" ? "Nom de la ligue" : "Code d'invitation"}
+              maxLength={leagueForm === "create" ? 60 : 8}
+            />
+            <div className="linkathlete-actions">
+              <button className="editprofile-save" disabled={leagueBusy || !leagueInput.trim()} onClick={submitLeagueForm}>
+                {leagueBusy ? "…" : leagueForm === "create" ? "Créer" : "Rejoindre"}
+              </button>
+              <button className="linkathlete-skip" onClick={() => { setLeagueForm("none"); setLeagueInput(""); setLeagueError(""); }}>Annuler</button>
+            </div>
+            {leagueError && <p className="catmodal-status err">{leagueError}</p>}
+          </div>
+        )}
+
+        <div className="history-list">
+          {leaguesLoaded && leagues.length === 0 ? (
+            <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
+              Pas encore de ligue. Crée la tienne ou rejoins celle de ton club !
+            </p>
+          ) : leagues.map((l) => (
+            <div key={l.id} className="home-lb-row" role="button" tabIndex={0} onClick={() => onOpenLeague(l.id)}>
+              <div className="nm">
+                {l.name}
+                <small>Saison {l.currentSeason} · {l.memberCount} membre{l.memberCount !== 1 ? "s" : ""}</small>
+              </div>
+              <span className="pts">#{l.myRank}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {["loig.le.guennec@icloud.com", "leguennec.loig@gmail.com"].includes(userEmail ?? "") && (
         <a
           href="/admin"
@@ -957,6 +1218,7 @@ export default function DashboardPage() {
   const [username,      setUsername]     = useState("");
   const [avatarUrl,     setAvatarUrl]     = useState<string | null>(null);
   const [bio,           setBio]           = useState("");
+  const [instagram,     setInstagram]     = useState<string | null>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [linkedAthlete, setLinkedAthlete] = useState<LinkedAthlete | null>(null);
   const [linkAthleteOpen, setLinkAthleteOpen] = useState(false);
@@ -964,6 +1226,7 @@ export default function DashboardPage() {
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [betModal, setBetModal] = useState<{ compId: string; compNom: string } | null>(null);
   const [viewedPlayerId, setViewedPlayerId] = useState<string | null>(null);
+  const [viewedLeagueId, setViewedLeagueId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
   });
@@ -1014,6 +1277,7 @@ export default function DashboardPage() {
           if (prof.username) { setName(prof.username); setInitials(prof.username.slice(0, 2).toUpperCase()); setUsername(prof.username); }
           setAvatarUrl(prof.avatarUrl ?? null);
           setBio(prof.bio ?? "");
+          setInstagram(prof.instagram ?? null);
           setLinkedAthlete(prof.linkedAthlete ?? null);
         }
       } catch { /* ignore */ }
@@ -1125,6 +1389,11 @@ export default function DashboardPage() {
     navigate("joueur");
   }
 
+  function openLeague(id: string) {
+    setViewedLeagueId(id);
+    navigate("ligue");
+  }
+
   async function addCredits() {
     try {
       const res = await fetch("/api/user/profile", {
@@ -1200,8 +1469,8 @@ export default function DashboardPage() {
     setView(v);
   }
 
-  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1 }[view] ?? -1;
-  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4, joueur: -1 }[view] ?? -1;
+  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1, ligue: -1 }[view] ?? -1;
+  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4, joueur: -1, ligue: -1 }[view] ?? -1;
 
   useLayoutEffect(() => {
     const nav  = navRef.current;
@@ -1303,6 +1572,9 @@ export default function DashboardPage() {
           {view === "joueur" && viewedPlayerId && (
             <PlayerProfileView playerId={viewedPlayerId} onBack={() => navigate("classement")} />
           )}
+          {view === "ligue" && viewedLeagueId && (
+            <LeagueView leagueId={viewedLeagueId} onBack={() => navigate("profil")} />
+          )}
           {view === "profil" && (
             <ProfilView
               name={name}
@@ -1314,10 +1586,12 @@ export default function DashboardPage() {
               signOut={signOut}
               avatarUrl={avatarUrl}
               bio={bio}
+              instagram={instagram}
               onEditProfile={() => setEditProfileOpen(true)}
               linkedAthlete={linkedAthlete}
               onLinkAthlete={() => setLinkAthleteOpen(true)}
               onOpenProfile={openPlayerProfile}
+              onOpenLeague={openLeague}
             />
           )}
         </div>
@@ -1402,10 +1676,12 @@ export default function DashboardPage() {
         username={username}
         avatarUrl={avatarUrl}
         bio={bio}
+        instagram={instagram}
         onSaved={(updates) => {
           if (updates.username) { setName(updates.username); setInitials(updates.username.slice(0, 2).toUpperCase()); setUsername(updates.username); }
           if (updates.bio != null) setBio(updates.bio);
           if (updates.avatarUrl) setAvatarUrl(updates.avatarUrl);
+          if (updates.instagram !== undefined) setInstagram(updates.instagram);
         }}
       />
 

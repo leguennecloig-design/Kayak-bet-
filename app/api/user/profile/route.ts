@@ -16,14 +16,14 @@ export async function GET() {
   const { data: profile, error } = await adminSb
     .from("users")
     .upsert({ id: user.id, email: user.email }, { onConflict: "id", ignoreDuplicates: true })
-    .select("id, username, email, balance, avatar_url, bio, created_at")
+    .select("id, username, email, balance, avatar_url, bio, instagram_handle, onboarded_at, created_at")
     .eq("id", user.id)
     .single();
 
   // Si upsert ne retourne rien (ignoreDuplicates), re-fetch
   const row = profile ?? (await adminSb
     .from("users")
-    .select("id, username, email, balance, avatar_url, bio, created_at")
+    .select("id, username, email, balance, avatar_url, bio, instagram_handle, onboarded_at, created_at")
     .eq("id", user.id)
     .single()
   ).data;
@@ -57,6 +57,8 @@ export async function GET() {
     balance:    row?.balance ?? 1000,
     avatarUrl:  row?.avatar_url ?? null,
     bio:        row?.bio ?? "",
+    instagram:  row?.instagram_handle ?? null,
+    onboarded:  row?.onboarded_at != null,
     linkedAthlete: linkedAthleteRow ?? null,
     created_at: row?.created_at,
     stats: {
@@ -132,6 +134,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "URL d'avatar invalide" }, { status: 400 });
     }
     const { error } = await adminSb.from("users").update({ avatar_url: avatarUrl }).eq("id", user.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.instagram != null) {
+    // Accepte "@pseudo", une URL instagram.com/pseudo, ou juste "pseudo"
+    let handle = String(body.instagram).trim();
+    handle = handle.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/^@/, "").replace(/\/.*$/, "");
+    if (handle && !/^[a-zA-Z0-9._]{1,30}$/.test(handle)) {
+      return NextResponse.json({ error: "Pseudo Instagram invalide" }, { status: 400 });
+    }
+    const { error } = await adminSb.from("users").update({ instagram_handle: handle || null }).eq("id", user.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.onboarded === true) {
+    const { error } = await adminSb.from("users").update({ onboarded_at: new Date().toISOString() }).eq("id", user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
