@@ -145,6 +145,11 @@ export default function CotesClient({
       const res = await fetch("/api/admin/recalculate", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur");
+      if (Array.isArray(json.engineErrors) && json.engineErrors.length > 0) {
+        setSpecialState("error");
+        setSpecialError(json.engineErrors.join(" · "));
+        return;
+      }
       setSpecialState("ok");
       await fetchCotes(selectedCourseId, selectedCat);
       setTimeout(() => resetSpecialFormat(), 3000);
@@ -199,6 +204,7 @@ export default function CotesClient({
 
   async function recalculate(courseId: string) {
     setRecalcState("loading");
+    setSpecialError("");
     try {
       const res = await fetch("/api/admin/recalculate", {
         method: "POST",
@@ -207,9 +213,15 @@ export default function CotesClient({
       });
       if (!res.ok) throw new Error();
       const json = await res.json();
-      const total = json.results?.[courseId]?.total ?? 0;
+      const result = json.results?.[courseId];
+      const total = result?.total ?? 0;
       setCourseCotesCounts(prev => ({ ...prev, [courseId]: total }));
-      setRecalcState("ok");
+      if (result?.error) {
+        setRecalcState("error");
+        setSpecialError(result.error);
+      } else {
+        setRecalcState("ok");
+      }
       await fetchCotes(courseId, selectedCat);
       setTimeout(() => setRecalcState("idle"), 3000);
     } catch {
@@ -396,6 +408,10 @@ export default function CotesClient({
                         )}
                       </div>
 
+                      {specialError && (
+                        <p className="font-archivo text-[12px] text-red-400 mb-3">{specialError}</p>
+                      )}
+
                       {format !== "standard" && (
                         <div>
                           <p className="font-archivo text-[12px] text-[#7c9aaa] mb-3">
@@ -462,10 +478,6 @@ export default function CotesClient({
                                 </div>
                               )}
                             </div>
-                          )}
-
-                          {specialError && (
-                            <p className="font-archivo text-[12px] text-red-400 mb-3">{specialError}</p>
                           )}
 
                           {preview && preview.data.length > 0 && (

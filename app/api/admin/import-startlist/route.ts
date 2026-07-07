@@ -7,6 +7,7 @@ import { frDateToISO } from "@/lib/startlist/parse";
 import {
   calculateCotesFromStartlist,
   saveCotes,
+  saveCotesForCompetition,
 } from "@/lib/algo/cotes-engine";
 
 type ImportedAthlete = {
@@ -214,39 +215,79 @@ export async function POST(req: NextRequest) {
     bettingCompId = newBetting.id;
   }
 
-  // Index nom → {prenom, club} par catégorie pour enrichir les participants
-  const catNomLookup = new Map<string, Map<string, { prenom: string; club: string }>>();
+  // Index code_bateau → club par catégorie, pour enrichir les participants.
+  // Clé par code_bateau (pas par nom) : `CoteResult.nom` est déjà "NOM Prénom"
+  // complet (construit par calculateCotesFromStartlist), donc chercher par
+  // nom de famille seul ne matchait jamais — le club n'était donc jamais
+  // retrouvé. code_bateau est fiable et présent des deux côtés.
+  const catClubLookup = new Map<string, Map<string, string>>();
   for (const cat of body.categories) {
-    const m = new Map<string, { prenom: string; club: string }>();
-    for (const ath of cat.athletes) m.set(ath.nom, { prenom: ath.prenom, club: ath.club });
-    catNomLookup.set(cat.code, m);
+    const m = new Map<string, string>();
+    for (const ath of cat.athletes) {
+      const key = ath.code_bateau ?? `${cat.code}-${ath.dossard}`;
+      m.set(key, ath.club);
+    }
+    catClubLookup.set(cat.code, m);
   }
 
   // 5. Calculer les cotes pour toutes les catégories (mono + C2 biplace)
+  // Sauvegardées sous les deux clés : course_id (pour /admin/cotes, système
+  // FFCK officiel) ET competition_id (pour l'app publique — CategoryBetModal
+  // lit /api/competitions/[id]/cotes par competition_id, pas par course_id).
+  // Sans ce deuxième saveCotesForCompetition, seul le pari "Vainqueur" (cote
+  // brute sur participants.cote) était disponible : aucune cote avancée
+  // (Top3/5/10/20, place exacte, temps exact) n'était jamais trouvée pour
+  // une compétition importée par ce flux PDF.
   const cotesResults: Record<string, number> = {};
-  type ParticipantRow = { competition_id: string; nom: string; pays: string; cote: number };
+  type ParticipantRow = {
+    competition_id: string;
+    nom: string;
+    pays: string | null;
+    cote: number;
+    categorie: string;
+    code_bateau: string | null;
+  };
   const allParticipants: ParticipantRow[] = [];
 
   for (const cat of body.categories.map((c) => c.code)) {
+    let cotes: Awaited<ReturnType<typeof calculateCotesFromStartlist>> = [];
     try {
-      const cotes = await calculateCotesFromStartlist(courseId, cat, supabase);
-      if (cotes.length > 0) {
-        await saveCotes(courseId, cotes, supabase);
-        cotesResults[cat] = cotes.length;
-        if (bettingCompId) {
-          for (const c of cotes) {
-            const info = catNomLookup.get(cat)?.get(c.nom);
-            allParticipants.push({
-              competition_id: bettingCompId,
-              nom: [info?.prenom ?? "", c.nom].filter(Boolean).join(" ").trim() || c.nom,
-              pays: cat,
-              cote: c.cote_top1,
-            });
-          }
-        }
-      }
+      cotes = await calculateCotesFromStartlist(courseId, cat, supabase);
     } catch (e) {
-      console.error(`[import-startlist] cotes ${cat}:`, e);
+      console.error(`[import-startlist] calcul cotes ${cat}:`, e);
+      continue;
+    }
+    if (cotes.length === 0) continue;
+
+    // Chaque sauvegarde est indépendante : un échec de l'une (ex: le système
+    // course_id, réservé à l'admin FFCK) ne doit jamais empêcher l'autre ni
+    // la création des participants, qui est ce qui compte réellement pour
+    // que la compétition soit pariable côté utilisateur.
+    try {
+      await saveCotes(courseId, cotes, supabase);
+    } catch (e) {
+      console.error(`[import-startlist] saveCotes (course_id) ${cat}:`, e);
+    }
+    if (bettingCompId) {
+      try {
+        await saveCotesForCompetition(bettingCompId, cotes, supabase);
+      } catch (e) {
+        console.error(`[import-startlist] saveCotesForCompetition ${cat}:`, e);
+      }
+    }
+
+    cotesResults[cat] = cotes.length;
+    if (bettingCompId) {
+      for (const c of cotes) {
+        allParticipants.push({
+          competition_id: bettingCompId,
+          nom: c.nom,
+          pays: catClubLookup.get(cat)?.get(c.code_bateau) ?? null,
+          cote: c.cote_top1,
+          categorie: cat,
+          code_bateau: c.code_bateau,
+        });
+      }
     }
   }
 
@@ -255,7 +296,7 @@ export async function POST(req: NextRequest) {
   if (bettingCompId && allParticipants.length > 0) {
     await supabase.from("participants").delete().eq("competition_id", bettingCompId);
     allParticipants.sort((a, b) =>
-      a.pays.localeCompare(b.pays) || a.cote - b.cote
+      a.categorie.localeCompare(b.categorie) || a.cote - b.cote
     );
     const { error: participantsErr } = await supabase.from("participants").insert(allParticipants);
     if (participantsErr) {
