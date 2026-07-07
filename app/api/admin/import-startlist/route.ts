@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
   if (existingBetting?.id) {
     bettingCompId = existingBetting.id;
   } else {
-    const { data: newBetting } = await supabase
+    const { data: newBetting, error: bettingErr } = await supabase
       .from("competitions")
       .insert({
         nom: body.nom_competition,
@@ -192,7 +192,19 @@ export async function POST(req: NextRequest) {
       })
       .select("id")
       .single();
-    bettingCompId = newBetting?.id ?? null;
+    if (bettingErr || !newBetting) {
+      // Les données FFCK (ffck_competitions/ffck_courses/startlist_entries)
+      // sont déjà enregistrées à ce stade — un ré-import est sûr (idempotent
+      // par nom+date) et reprendra directement à cette étape.
+      return NextResponse.json(
+        {
+          error: `Compétition de paris non créée : ${bettingErr?.message ?? "erreur inconnue"}. ` +
+            "Les données FFCK ont bien été importées — réessaie l'import, il reprendra ici sans dupliquer le reste.",
+        },
+        { status: 500 }
+      );
+    }
+    bettingCompId = newBetting.id;
   }
 
   // Index nom → {prenom, club} par catégorie pour enrichir les participants
@@ -232,12 +244,17 @@ export async function POST(req: NextRequest) {
   }
 
   // 6. Insérer tous les participants (1 par athlète, triés par catégorie puis cote)
+  let participantsWarning: string | undefined;
   if (bettingCompId && allParticipants.length > 0) {
     await supabase.from("participants").delete().eq("competition_id", bettingCompId);
     allParticipants.sort((a, b) =>
       a.pays.localeCompare(b.pays) || a.cote - b.cote
     );
-    await supabase.from("participants").insert(allParticipants);
+    const { error: participantsErr } = await supabase.from("participants").insert(allParticipants);
+    if (participantsErr) {
+      console.error("[import-startlist] participants:", participantsErr);
+      participantsWarning = `Compétition créée mais les participants n'ont pas pu être enregistrés : ${participantsErr.message}. Relance le calcul des cotes depuis la page de la compétition.`;
+    }
   }
 
   return NextResponse.json({
@@ -245,6 +262,7 @@ export async function POST(req: NextRequest) {
     competition_id: compId,
     betting_competition_id: bettingCompId,
     course_id: courseId,
+    ...(participantsWarning ? { warning: participantsWarning } : {}),
     entries: entries.length,
     cotes: cotesResults,
     participants_added: allParticipants.length,

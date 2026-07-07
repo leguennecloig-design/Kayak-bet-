@@ -88,6 +88,7 @@ export default function NouvelleCompetition() {
         throw new Error(j.error ?? "Erreur import");
       }
       const json = await res.json();
+      if (json.warning) alert(json.warning);
       const dest = json.betting_competition_id
         ? `/admin/competitions/${json.betting_competition_id}`
         : "/admin";
