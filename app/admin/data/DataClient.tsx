@@ -64,9 +64,10 @@ export default function DataClient({
       const res = await fetch("/api/admin/sync/classement", { method: "POST" });
       const json = await res.json();
       if (res.ok) {
+        const skippedSuffix = json.skipped > 0 ? ` (${json.skipped} ignoré(s) sans catégorie)` : "";
         setClassementState({
           loading: false,
-          msg: `✅ ${json.count} athlètes importés en ${(json.duration / 1000).toFixed(1)}s`,
+          msg: `✅ ${json.count} athlètes importés en ${(json.duration / 1000).toFixed(1)}s${skippedSuffix}`,
           ok: true,
         });
         setStats((s) => ({ ...s, athletes: json.count }));
@@ -251,11 +252,11 @@ export default function DataClient({
                   Classement numérique 2026
                 </div>
                 <div className="font-archivo text-[13px] text-[#7c9aaa] mt-1">
-                  Importe les 1 740 athlètes depuis{" "}
+                  Synchronise en direct depuis{" "}
                   <code className="text-[#28D7E6] font-mono text-[12px]">
-                    data/classement_2026.json
+                    api.classements-descente
                   </code>{" "}
-                  → Supabase
+                  (rang, points, nb courses) → Supabase
                 </div>
               </div>
               <button

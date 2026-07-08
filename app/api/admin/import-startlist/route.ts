@@ -37,6 +37,7 @@ type ImportBody = {
   type_epreuve: string;
   categories: ImportedCategory[];
   type_competition?: string | null;
+  force?: boolean;
 };
 
 export async function POST(req: NextRequest) {
@@ -172,21 +173,46 @@ export async function POST(req: NextRequest) {
 
   // 4. Créer (ou retrouver) une entrée dans la table "competitions" (paris)
   // pour que la compétition apparaisse dans le panneau admin.
-  // Matché par nom + date (comme ffck_competitions plus haut) — un match par
-  // nom seul faisait réutiliser une compétition existante sans rapport dès
-  // qu'une autre compétition portait le même nom à une date différente
-  // (ex : édition précédente du même événement).
+  // Matché par nom + date + épreuve (comme ffck_courses le fait déjà via sa
+  // colonne libelle) — un match par nom+date seul fusionnait à tort deux
+  // épreuves distinctes du même jour/nom (ex: "Manche 1" et "Finale"), et
+  // chaque nouvel import écrasait alors les participants de la précédente.
   let bettingCompId: string | null = null;
   const bettingBaseQ = supabase
     .from("competitions")
-    .select("id")
-    .eq("nom", body.nom_competition);
+    .select("id, status")
+    .eq("nom", body.nom_competition)
+    .eq("type_epreuve", body.type_epreuve);
   const { data: existingBetting } = await (dateDebut
     ? bettingBaseQ.eq("date", dateDebut)
     : bettingBaseQ.is("date", null)
   ).maybeSingle();
 
   if (existingBetting?.id) {
+    // Ré-importer une startlist remplace intégralement les participants et
+    // cotes (delete + réinsert plus bas) — sur une compétition déjà publiée,
+    // ça change silencieusement les cotes/participants vus par des parieurs
+    // qui ont peut-être déjà misé dessus. On bloque une première fois et on
+    // ne procède que si le client renvoie explicitement force: true.
+    if (existingBetting.status === "published" && !body.force) {
+      const { count: existingParticipantsCount } = await supabase
+        .from("participants")
+        .select("id", { count: "exact", head: true })
+        .eq("competition_id", existingBetting.id);
+
+      if ((existingParticipantsCount ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            needsConfirmation: true,
+            error:
+              `Cette compétition ("${body.nom_competition}" · ${body.type_epreuve}) est déjà publiée ` +
+              `avec ${existingParticipantsCount} participant(s). Ré-importer va remplacer entièrement ` +
+              "ses participants et cotes actuels. Continuer ?",
+          },
+          { status: 409 }
+        );
+      }
+    }
     bettingCompId = existingBetting.id;
   } else {
     const { data: newBetting, error: bettingErr } = await supabase
@@ -197,6 +223,7 @@ export async function POST(req: NextRequest) {
         lieu: body.lieu,
         discipline: null,
         type_competition: body.type_competition ?? null,
+        type_epreuve: body.type_epreuve || null,
       })
       .select("id")
       .single();

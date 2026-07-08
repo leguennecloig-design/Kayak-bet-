@@ -43,6 +43,15 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
   const [error, setError] = useState<string | null>(null);
   const [typeCompetition, setTypeCompetition] = useState("");
 
+  // Champs extraits du PDF, modifiables avant création — le parsing peut se
+  // tromper (nom/date mal détectés) et deux épreuves distinctes peuvent
+  // partager le même nom/date, d'où le besoin de pouvoir les corriger ici.
+  const [editNom,         setEditNom]         = useState("");
+  const [editLieu,        setEditLieu]        = useState("");
+  const [editDateDebut,   setEditDateDebut]   = useState("");
+  const [editDateFin,     setEditDateFin]     = useState("");
+  const [editTypeEpreuve, setEditTypeEpreuve] = useState("");
+
   function isAccepted(file: File): boolean {
     const n = file.name.toLowerCase();
     return n.endsWith(".pdf") || n.endsWith(".txt") || n.endsWith(".md");
@@ -65,7 +74,13 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
         const j = await res.json();
         throw new Error(j.error ?? "Erreur serveur");
       }
-      setResult(await res.json());
+      const json: ParseResult = await res.json();
+      setResult(json);
+      setEditNom(json.nom_competition);
+      setEditLieu(json.lieu);
+      setEditDateDebut(json.date_debut ?? "");
+      setEditDateFin(json.date_fin ?? "");
+      setEditTypeEpreuve(json.type_epreuve);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -73,7 +88,7 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
     }
   }
 
-  async function handleImport() {
+  async function handleImport(force = false) {
     if (!result) return;
     setImporting(true);
     setError(null);
@@ -81,10 +96,22 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
       const res = await fetch("/api/admin/import-startlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...result, type_competition: typeCompetition || null }),
+        body: JSON.stringify({
+          ...result,
+          nom_competition: editNom.trim() || result.nom_competition,
+          lieu: editLieu.trim() || result.lieu,
+          date_debut: editDateDebut.trim() || null,
+          date_fin: editDateFin.trim() || null,
+          type_epreuve: editTypeEpreuve.trim() || result.type_epreuve,
+          type_competition: typeCompetition || null,
+          force,
+        }),
       });
       if (!res.ok) {
         const j = await res.json();
+        if (j.needsConfirmation && confirm(j.error)) {
+          return handleImport(true);
+        }
         throw new Error(j.error ?? "Erreur import");
       }
       const json = await res.json();
@@ -188,33 +215,53 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
       {/* Étape 2 — Preview + Import */}
       {result && (
         <div className="space-y-5">
-          {/* Infos compétition extraites */}
-          <div className="bg-[rgba(7,31,45,.6)] border border-[var(--border)] rounded-xl p-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
+          {/* Infos compétition extraites — modifiables : le parsing du PDF peut se
+              tromper, et deux épreuves distinctes (ex: Manche 1 / Finale) peuvent
+              partager le même nom+date, d'où le besoin de pouvoir corriger avant création. */}
+          <div className="bg-[rgba(7,31,45,.6)] border border-[var(--border)] rounded-xl p-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
               <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Compétition</p>
-              <p className="font-grotesk font-semibold text-white text-[13px] leading-snug">
-                {result.nom_competition || "—"}
-              </p>
+              <input
+                value={editNom}
+                onChange={(e) => setEditNom(e.target.value)}
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none w-full"
+              />
             </div>
             <div>
               <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Lieu</p>
-              <p className="font-grotesk font-semibold text-white text-[13px]">
-                {result.lieu || "—"}
-              </p>
+              <input
+                value={editLieu}
+                onChange={(e) => setEditLieu(e.target.value)}
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none w-full"
+              />
             </div>
             <div>
-              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Dates</p>
-              <p className="font-grotesk font-semibold text-white text-[13px]">
-                {result.date_debut && result.date_fin
-                  ? `${result.date_debut} → ${result.date_fin}`
-                  : result.date_debut ?? "—"}
-              </p>
+              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Date début</p>
+              <input
+                value={editDateDebut}
+                onChange={(e) => setEditDateDebut(e.target.value)}
+                placeholder="JJ/MM/AAAA"
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none w-full"
+              />
             </div>
             <div>
-              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Épreuve</p>
-              <p className="font-grotesk font-semibold text-white text-[13px]">
-                {result.type_epreuve}
+              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Date fin</p>
+              <input
+                value={editDateFin}
+                onChange={(e) => setEditDateFin(e.target.value)}
+                placeholder="JJ/MM/AAAA"
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none w-full"
+              />
+            </div>
+            <div>
+              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">
+                Épreuve <span className="normal-case text-[#5c7c8c]">(distingue deux imports du même jour)</span>
               </p>
+              <input
+                value={editTypeEpreuve}
+                onChange={(e) => setEditTypeEpreuve(e.target.value)}
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none w-full"
+              />
             </div>
             <div>
               <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Type</p>
@@ -306,7 +353,7 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
               ← Autre PDF
             </button>
             <button
-              onClick={handleImport}
+              onClick={() => handleImport()}
               disabled={importing}
               className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#28D7E6] to-[#1F73FF] font-archivo font-bold text-[14px] text-[#0A2A3D] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:-translate-y-[1px] transition-transform"
             >

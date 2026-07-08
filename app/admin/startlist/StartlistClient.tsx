@@ -74,7 +74,7 @@ export default function StartlistClient() {
     }
   }
 
-  async function handleImport() {
+  async function handleImport(force = false) {
     if (!result) return;
     setImporting(true);
     setError(null);
@@ -82,10 +82,13 @@ export default function StartlistClient() {
       const res = await fetch("/api/admin/import-startlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
+        body: JSON.stringify({ ...result, force }),
       });
       if (!res.ok) {
         const j = await res.json();
+        if (j.needsConfirmation && confirm(j.error)) {
+          return handleImport(true);
+        }
         throw new Error(j.error ?? "Erreur import");
       }
       router.push("/admin/cotes");
@@ -319,7 +322,7 @@ export default function StartlistClient() {
               Annuler
             </button>
             <button
-              onClick={handleImport}
+              onClick={() => handleImport()}
               disabled={importing}
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan to-blue font-archivo font-bold text-[13px] text-deep disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >

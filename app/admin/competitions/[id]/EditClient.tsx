@@ -14,6 +14,7 @@ type Competition = {
   ffck_inscription_code: number | null;
   ffck_match_status: string;
   type_competition: string | null;
+  type_epreuve: string | null;
 };
 
 type InscriptionRow = {
@@ -325,6 +326,11 @@ export default function EditClient({
             <span className={`font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase border rounded-[5px] px-[7px] py-[3px] ${STATUS_STYLE[status] ?? STATUS_STYLE.draft}`}>
               {STATUS_LABEL[status] ?? status}
             </span>
+            {competition.type_epreuve && (
+              <span className="font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase border rounded-[5px] px-[7px] py-[3px] text-[#b39ddb] bg-[rgba(179,157,219,.12)] border-[rgba(179,157,219,.3)]">
+                {competition.type_epreuve}
+              </span>
+            )}
           </div>
           <h1 className="font-anton italic uppercase text-white text-[32px] leading-[0.9]">
             {competition.nom}
