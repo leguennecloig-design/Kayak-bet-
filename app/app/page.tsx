@@ -7,6 +7,7 @@ import type { BetType } from "@/lib/algo/types";
 import CategoryBetModal from "@/app/components/CategoryBetModal";
 import EditProfileModal from "@/app/components/EditProfileModal";
 import LinkAthleteModal from "@/app/components/LinkAthleteModal";
+import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
 
 const BET_LABELS: Record<BetType, string> = {
@@ -962,13 +963,6 @@ function LeagueView({ leagueId, onBack }: LeagueViewProps) {
   );
 }
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
-}
-
 function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
@@ -1037,72 +1031,7 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
     }
   }
 
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushBusy, setPushBusy] = useState(false);
-  const [pushError, setPushError] = useState("");
-
-  useEffect(() => {
-    const supported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
-    setPushSupported(supported);
-    if (!supported) return;
-    navigator.serviceWorker.ready
-      .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setPushSubscribed(!!sub))
-      .catch(() => {});
-  }, []);
-
-  async function enablePush() {
-    setPushBusy(true);
-    setPushError("");
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setPushError("Permission refusée — active les notifications dans les réglages du navigateur.");
-        return;
-      }
-      const reg = await navigator.serviceWorker.ready;
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) { setPushError("Configuration manquante."); return; }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      });
-      const res = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sub.toJSON()),
-      });
-      if (!res.ok) throw new Error("Échec de l'enregistrement");
-      setPushSubscribed(true);
-    } catch {
-      setPushError("Impossible d'activer les notifications.");
-    } finally {
-      setPushBusy(false);
-    }
-  }
-
-  async function disablePush() {
-    setPushBusy(true);
-    setPushError("");
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await fetch("/api/push/subscribe", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        });
-        await sub.unsubscribe();
-      }
-      setPushSubscribed(false);
-    } catch {
-      setPushError("Impossible de désactiver les notifications.");
-    } finally {
-      setPushBusy(false);
-    }
-  }
+  const push = usePushNotifications();
 
   return (
     <>
@@ -1271,14 +1200,14 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
         <div className="profil-section-head">
           <span>Notifications push</span>
         </div>
-        {pushSupported ? (
+        {push.supported ? (
           <div className="profil-actions" style={{ marginBottom: 6 }}>
             <button
               className="profil-edit-btn"
-              disabled={pushBusy}
-              onClick={pushSubscribed ? disablePush : enablePush}
+              disabled={push.busy}
+              onClick={push.subscribed ? push.unsubscribe : push.subscribe}
             >
-              {pushBusy ? "…" : pushSubscribed ? "Désactiver les notifications" : "Activer les notifications"}
+              {push.busy ? "…" : push.subscribed ? "Désactiver les notifications" : "Activer les notifications"}
             </button>
           </div>
         ) : (
@@ -1286,7 +1215,7 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
             Non disponible sur cet appareil/navigateur. Sur iPhone/iPad, ajoute d&apos;abord Kayakbet à l&apos;écran d&apos;accueil depuis Safari, puis réessaie depuis l&apos;app installée.
           </p>
         )}
-        {pushError && <p className="catmodal-status err">{pushError}</p>}
+        {push.error && <p className="catmodal-status err">{push.error}</p>}
       </div>
 
       {["loig.le.guennec@icloud.com", "leguennec.loig@gmail.com"].includes(userEmail ?? "") && (

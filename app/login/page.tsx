@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./login.css";
 
-type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding";
-type OnbStep = "profile" | "athlete" | "source";
+type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding" | "push-prompt";
+
+const PUSH_PROMPT_DISMISSED_KEY = "kb_push_prompt_dismissed";
+type OnbStep = "profile" | "athlete" | "source" | "push";
 
 type AthleteResult = {
   id: string;
@@ -86,7 +89,8 @@ function WelcomeOverlay({ onDone }: { onDone: () => void }) {
 ================================================================ */
 function OnboardingFlow({ onDone }: { onDone: () => void }) {
   const supabase = createClient();
-  const [steps, setSteps] = useState<OnbStep[]>(["profile", "source"]);
+  const [steps, setSteps] = useState<OnbStep[]>(["profile", "source", "push"]);
+  const push = usePushNotifications();
   const [stepIdx, setStepIdx] = useState(0);
   const [profile, setProfile] = useState<"athlete" | "bettor" | null>(null);
   const [source, setSource] = useState<string | null>(null);
@@ -103,9 +107,9 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
   function selectProfile(p: "athlete" | "bettor") {
     setProfile(p);
     if (p === "athlete" && !steps.includes("athlete")) {
-      setSteps(["profile", "athlete", "source"]);
+      setSteps(["profile", "athlete", "source", "push"]);
     } else if (p === "bettor" && steps.includes("athlete")) {
-      setSteps(["profile", "source"]);
+      setSteps(["profile", "source", "push"]);
     }
   }
 
@@ -278,7 +282,34 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
                   </button>
                 ))}
               </div>
-              <button className="lp-btn-primary" disabled={!source} onClick={goNext}>Terminer</button>
+              <button className="lp-btn-primary" disabled={!source} onClick={goNext}>Continuer</button>
+            </div>
+          )}
+
+          {/* Step 4 — push notifications opt-in */}
+          {currentStep === "push" && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Reste informé</h2>
+              <p className="lp-onb-sub">
+                Active les notifications pour savoir dès qu'un pari est réglé ou qu'une nouvelle compétition ouvre.
+              </p>
+              {push.supported ? (
+                <>
+                  <button
+                    className="lp-btn-primary"
+                    disabled={push.busy || push.subscribed}
+                    onClick={async () => { const ok = await push.subscribe(); if (ok) goNext(); }}
+                  >
+                    {push.busy ? "…" : push.subscribed ? "Activées ✓" : "Activer les notifications"}
+                  </button>
+                  {push.error && <p className="lp-onb-sub" style={{ color: "#ff7a7a" }}>{push.error}</p>}
+                </>
+              ) : (
+                <p className="lp-onb-sub">Non disponible sur cet appareil — tu pourras l&apos;activer plus tard depuis ton profil.</p>
+              )}
+              <button className="lp-btn-skip" onClick={goNext}>
+                {push.subscribed ? "Terminer" : "Plus tard"}
+              </button>
             </div>
           )}
 
@@ -303,6 +334,20 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
+  const push = usePushNotifications();
+
+  // Rien à proposer (déjà abonné, ou pas supporté sur cet appareil) — on
+  // n'affiche pas cet écran pour rien, direct dans l'app.
+  useEffect(() => {
+    if (mode === "push-prompt" && push.checked && (!push.supported || push.subscribed)) {
+      location.href = "/app";
+    }
+  }, [mode, push.checked, push.supported, push.subscribed]);
+
+  function dismissPushPrompt() {
+    if (typeof window !== "undefined") localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+    location.href = "/app";
+  }
 
   const supabase = createClient();
 
@@ -380,6 +425,12 @@ export default function LoginPage() {
               // en cas d'erreur réseau, on ne bloque pas l'utilisateur derrière
               // l'onboarding — on le laisse simplement entrer dans l'app.
             }
+            // Compte existant : proposer les notifs une fois, sauf si déjà
+            // refusé/ignoré précédemment (pas de relance à chaque connexion).
+            if (typeof window !== "undefined" && !localStorage.getItem(PUSH_PROMPT_DISMISSED_KEY)) {
+              setMode("push-prompt");
+              return;
+            }
             location.href = "/app";
           })();
         }} />
@@ -404,6 +455,35 @@ export default function LoginPage() {
           location.href = "/app";
         })();
       }} />
+    );
+  }
+
+  /* ---- Push prompt (comptes existants, une fois par compte) ---- */
+  if (mode === "push-prompt") {
+    return (
+      <div className="lp-onb">
+        <div className="lp-bg" />
+        <div className="lp-glow g1" /><div className="lp-glow g2" />
+        <div className="lp-onb-card">
+          <div className="lp-onb-inner">
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Reste informé</h2>
+              <p className="lp-onb-sub">
+                Active les notifications pour savoir dès qu'un pari est réglé ou qu'une nouvelle compétition ouvre.
+              </p>
+              <button
+                className="lp-btn-primary"
+                disabled={push.busy}
+                onClick={async () => { const ok = await push.subscribe(); if (ok) location.href = "/app"; }}
+              >
+                {push.busy ? "…" : "Activer les notifications"}
+              </button>
+              {push.error && <p className="lp-onb-sub" style={{ color: "#ff7a7a" }}>{push.error}</p>}
+              <button className="lp-btn-skip" onClick={dismissPushPrompt}>Plus tard</button>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
