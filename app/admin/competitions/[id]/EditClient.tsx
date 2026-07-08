@@ -60,8 +60,10 @@ const STATUS_STYLE: Record<string, string> = {
   closed:    "bg-[rgba(255,255,255,.06)] text-[#7c9aaa] border-[rgba(255,255,255,.1)]",
 };
 const STATUS_LABEL: Record<string, string> = {
-  draft: "Brouillon", published: "Publié", closed: "Terminé",
+  draft: "Brouillon", published: "Active", closed: "Terminé",
 };
+
+const RACE_TYPES_WITH_FILE = new Set(["mass_start", "sprint_finale"]);
 
 export default function EditClient({
   competition,
@@ -220,6 +222,7 @@ export default function EditClient({
   // Calcul des cotes
   const [cotesState, setCotesState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [cotesMsg,   setCotesMsg]   = useState<string>("");
+  const [priorRoundFile, setPriorRoundFile] = useState<File | null>(null);
 
   // Clôture
   const [closeState, setCloseState] = useState<"idle" | "loading" | "ok" | "error">(
@@ -251,10 +254,23 @@ export default function EditClient({
   }
 
   async function calculateCotes() {
+    const needsFile = RACE_TYPES_WITH_FILE.has(typeCompetition);
+    if (needsFile && !priorRoundFile) {
+      setCotesState("error");
+      setCotesMsg(
+        typeCompetition === "mass_start"
+          ? "Joins les résultats de la classique pour calculer les cotes mass start."
+          : "Joins les résultats du sprint normal pour calculer les cotes sprint finale."
+      );
+      return;
+    }
     setCotesState("loading");
     setCotesMsg("");
     try {
-      const res  = await fetch(`/api/admin/competitions/${compId}/calculate-cotes`, { method: "POST" });
+      const fd = new FormData();
+      fd.append("race_type", typeCompetition || "standard");
+      if (needsFile && priorRoundFile) fd.append("file", priorRoundFile);
+      const res  = await fetch(`/api/admin/competitions/${compId}/calculate-cotes`, { method: "POST", body: fd });
       const text = await res.text();
       let json: Record<string, unknown> = {};
       try { json = JSON.parse(text); } catch { throw new Error(`Réponse invalide du serveur (${res.status})`); }
@@ -378,8 +394,10 @@ export default function EditClient({
             <select value={typeCompetition} onChange={(e) => setTypeCompetition(e.target.value)}
               className={`${inputCls} appearance-none`}>
               <option value="" className="bg-[#0a2a3d]">— Choisir —</option>
-              <option value="sprint" className="bg-[#0a2a3d]">Sprint</option>
+              <option value="sprint" className="bg-[#0a2a3d]">Sprint normal</option>
               <option value="classique" className="bg-[#0a2a3d]">Classique</option>
+              <option value="mass_start" className="bg-[#0a2a3d]">Mass start</option>
+              <option value="sprint_finale" className="bg-[#0a2a3d]">Sprint finale</option>
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -732,6 +750,28 @@ export default function EditClient({
               </button>
             )}
           </div>
+
+          {/* Fichier de résultats de la manche précédente (mass start / sprint finale) */}
+          {inscriptions.length > 0 && RACE_TYPES_WITH_FILE.has(typeCompetition) && (
+            <div className="mb-4 bg-[rgba(40,215,230,.04)] border border-[rgba(40,215,230,.2)] rounded-[12px] p-4">
+              <p className="font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#28D7E6] mb-2">
+                {typeCompetition === "mass_start" ? "Résultats de la classique" : "Résultats du sprint normal"}
+              </p>
+              <p className="font-archivo text-[12px] text-[#7c9aaa] mb-3">
+                Fichier PDF ou TXT (même format que l&apos;import de résultats) — requis pour calculer les
+                cotes {typeCompetition === "mass_start" ? "mass start" : "sprint finale"}.
+              </p>
+              <input
+                type="file"
+                accept=".pdf,.txt"
+                onChange={(e) => setPriorRoundFile(e.target.files?.[0] ?? null)}
+                className="font-archivo text-[12.5px] text-[#9fbac6] file:mr-3 file:py-1.5 file:px-3 file:rounded-[8px] file:border-0 file:bg-[rgba(40,215,230,.15)] file:text-[#28D7E6] file:font-bold file:text-[12px]"
+              />
+              {priorRoundFile && (
+                <span className="ml-3 font-archivo text-[12px] text-[#a0f0a0]">{priorRoundFile.name}</span>
+              )}
+            </div>
+          )}
 
           {/* Bouton Calculer les cotes */}
           {inscriptions.length > 0 && (

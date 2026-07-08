@@ -31,6 +31,16 @@ export async function calculateMassStartCotes(
   const cotesV3 = await calculateCotesForCourse(courseId, categorie, supabase);
   if (cotesV3.length === 0) return [];
 
+  return combineMassStart(cotesV3, classiqueResults, categorie);
+}
+
+// Combine des cotes v3 déjà calculées (peu importe leur origine — course_id ou
+// competition_id) avec les résultats de la classique uploadés par l'admin.
+export function combineMassStart(
+  cotesV3: CoteResult[],
+  classiqueResults: ParsedResult[],
+  categorie: string
+): CoteResult[] {
   const scoresV3 = new Map(cotesV3.map((c) => [c.code_bateau, c.score_final]));
 
   // ── 2. Forces classique du WE (80%) ────────────────────────────────────────

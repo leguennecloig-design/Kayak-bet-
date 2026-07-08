@@ -5,6 +5,11 @@ import {
   calculateCotesFromInscriptions,
   saveCotesForCompetition,
 } from "@/lib/algo/cotes-engine";
+import { parseResultatsPDF } from "@/lib/parsers/resultats-pdf";
+import { matchPriorRoundToCodeBateau } from "@/lib/algo/match-prior-round";
+import { combineSprintFinale } from "@/lib/algo/sprint-finale-engine";
+import { combineMassStart } from "@/lib/algo/mass-start-engine";
+// pdf-parse is a CommonJS module — must import with require at call site
 
 type InscriptionRow = {
   code_bateau: string;
@@ -14,11 +19,17 @@ type InscriptionRow = {
   club: string | null;
 };
 
+const SPECIAL_FORMATS = new Set(["mass_start", "sprint_finale"]);
+
 // POST /api/admin/competitions/[id]/calculate-cotes
 // Groupe les inscriptions par epreuve en mémoire (pas de re-query),
 // lance Bradley-Terry v3 par catégorie, sauvegarde cotes + participants.
+// Pour mass_start / sprint_finale : accepte en plus un fichier de résultats
+// (PDF/TXT, même format que l'import de résultats) de la manche précédente
+// (classique pour mass_start, sprint normal pour sprint_finale), qui vient
+// pondérer le score v3 (cf. lib/algo/{mass-start,sprint-finale}-engine.ts).
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   if (!(await isAdmin())) {
@@ -27,6 +38,43 @@ export async function POST(
 
   const competitionId = params.id;
   const supabase = createAdminSupabase();
+
+  // ── Format demandé + fichier de résultats éventuel ──────────────────────
+  let raceType = "standard";
+  let priorRoundResults: ReturnType<typeof parseResultatsPDF> = [];
+
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await req.formData();
+    raceType = (formData.get("race_type") as string | null) ?? "standard";
+    const file = formData.get("file") as File | null;
+
+    if (file) {
+      const fileName = file.name.toLowerCase();
+      let rawText = "";
+      if (fileName.endsWith(".txt")) {
+        rawText = await file.text();
+      } else {
+        try {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const pdfParse = require("pdf-parse");
+          const pdfData = await pdfParse(buffer);
+          rawText = pdfData.text as string;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return NextResponse.json({ error: `Erreur lecture PDF : ${msg}` }, { status: 422 });
+        }
+      }
+      priorRoundResults = parseResultatsPDF(rawText);
+      if (priorRoundResults.length === 0) {
+        return NextResponse.json(
+          { error: "Aucun résultat détecté dans le fichier de la manche précédente." },
+          { status: 422 }
+        );
+      }
+    }
+  }
 
   // Discipline (sprint vs descente pour l'historique)
   const { data: comp } = await supabase
@@ -81,23 +129,33 @@ export async function POST(
   const allCotes: Awaited<ReturnType<typeof calculateCotesFromInscriptions>> = [];
   const summary:  Record<string, number> = {};
   const errors:   string[] = [];
+  const formatToSave: "standard" | "sprint_finale" | "mass_start" =
+    raceType === "sprint_finale" || raceType === "mass_start" ? raceType : "standard";
 
   for (const [epreuve, entries] of byEpreuve) {
     if (epreuve === "INCONNU") continue;
     if (entries.length < 2) continue; // pas assez d'athlètes pour une cote relative
 
     try {
-      const cotes = await calculateCotesFromInscriptions(
+      let cotes = await calculateCotesFromInscriptions(
         entries.map(e => ({ code_bateau: e.code_bateau, nom: e.nom, athlete_id: e.athlete_id })),
         epreuve,
         disciplineEstSprint,
         supabase
       );
 
+      if (cotes.length > 0 && SPECIAL_FORMATS.has(raceType) && priorRoundResults.length > 0) {
+        const synthetic = matchPriorRoundToCodeBateau(cotes, priorRoundResults);
+        cotes = raceType === "sprint_finale"
+          ? combineSprintFinale(cotes, synthetic, epreuve)
+          : combineMassStart(cotes, synthetic, epreuve);
+      }
+
       if (cotes.length > 0) {
-        await saveCotesForCompetition(competitionId, cotes, supabase);
-        allCotes.push(...cotes);
-        summary[epreuve] = cotes.length;
+        const stamped = cotes.map(c => ({ ...c, format_course: formatToSave }));
+        await saveCotesForCompetition(competitionId, stamped, supabase);
+        allCotes.push(...stamped);
+        summary[epreuve] = stamped.length;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -146,6 +204,7 @@ export async function POST(
     total_cotes:          allCotes.length,
     participants_created: participantRows.length,
     categories:           summary,
+    format_course:        formatToSave,
     ...(errors.length > 0 ? { warnings: errors } : {}),
   });
 }

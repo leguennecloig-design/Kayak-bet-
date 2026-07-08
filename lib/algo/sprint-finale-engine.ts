@@ -32,6 +32,16 @@ export async function calculateSprintFinaleCotes(
   const cotesV3 = await calculateCotesForCourse(courseId, categorie, supabase);
   if (cotesV3.length === 0) return [];
 
+  return combineSprintFinale(cotesV3, qualifResults, categorie);
+}
+
+// Combine des cotes v3 déjà calculées (peu importe leur origine — course_id ou
+// competition_id) avec les résultats de qualifs uploadés par l'admin.
+export function combineSprintFinale(
+  cotesV3: CoteResult[],
+  qualifResults: ParsedResult[],
+  categorie: string
+): CoteResult[] {
   const scoresV3 = new Map(cotesV3.map((c) => [c.code_bateau, c.score_final]));
 
   // ── 2. Forces qualifs (60%) ────────────────────────────────────────────────

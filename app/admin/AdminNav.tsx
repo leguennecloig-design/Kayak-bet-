@@ -10,15 +10,12 @@ const GROUPS: NavGroup[] = [
     label: "Compétitions",
     links: [
       { href: "/admin", label: "Vue d'ensemble" },
-      { href: "/admin/competitions/nouvelle", label: "Nouvelle compétition" },
-      { href: "/admin/startlist", label: "Import startlist" },
-      { href: "/admin/inscriptions", label: "Inscriptions FFCK" },
+      { href: "/admin/competitions/nouvelle", label: "Création compétition" },
     ],
   },
   {
     label: "Cotes & données",
     links: [
-      { href: "/admin/cotes", label: "Cotes" },
       { href: "/admin/data", label: "Données FFCK" },
     ],
   },
