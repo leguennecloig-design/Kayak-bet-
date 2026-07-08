@@ -9,17 +9,59 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
-// Le SW next-pwa peut mettre un instant à s'activer après un chargement à
-// froid — sans timeout, `serviceWorker.ready` peut rester en attente
-// indéfiniment si l'enregistrement échoue silencieusement, ce qui donnait
-// l'impression que le bouton "Activer" ne faisait rien.
-function serviceWorkerReady(timeoutMs = 8000): Promise<ServiceWorkerRegistration> {
-  return Promise.race([
-    navigator.serviceWorker.ready,
-    new Promise<ServiceWorkerRegistration>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), timeoutMs)
-    ),
-  ]);
+// next-pwa enregistre le service worker automatiquement au chargement de la
+// page (register: true), mais rien ne garantit qu'il ait fini de le faire au
+// moment où l'utilisateur clique sur "Activer" — se contenter d'attendre
+// `serviceWorker.ready` pouvait rester bloqué indéfiniment sans retour si
+// l'enregistrement automatique n'avait pas eu lieu ou avait échoué
+// silencieusement (symptôme : le bouton ne fait rien). On enregistre donc
+// nous-mêmes explicitement (idempotent si déjà fait par next-pwa) pour
+// obtenir la vraie erreur du navigateur en cas d'échec, et on attend le
+// passage à l'état "activated" avec un timeout clair plutôt qu'indéfini.
+async function getReadyRegistration(timeoutMs = 15000): Promise<ServiceWorkerRegistration> {
+  let reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) {
+    try {
+      reg = await navigator.serviceWorker.register("/sw.js");
+    } catch (e) {
+      throw new Error(
+        `échec de l'enregistrement du service worker (${e instanceof Error ? e.message : "erreur inconnue"})`
+      );
+    }
+  }
+
+  if (reg.active) return reg;
+
+  const pendingWorker = reg.installing ?? reg.waiting;
+  if (!pendingWorker) {
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<ServiceWorkerRegistration>((_, reject) =>
+        setTimeout(() => reject(new Error("le service worker n'a pas démarré à temps")), timeoutMs)
+      ),
+    ]);
+  }
+
+  const worker = pendingWorker;
+  const readyReg = reg;
+  return new Promise<ServiceWorkerRegistration>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      worker.removeEventListener("statechange", onStateChange);
+      reject(new Error("le service worker n'a pas démarré à temps"));
+    }, timeoutMs);
+    function onStateChange() {
+      if (worker.state === "activated") {
+        clearTimeout(timer);
+        worker.removeEventListener("statechange", onStateChange);
+        resolve(readyReg);
+      } else if (worker.state === "redundant") {
+        clearTimeout(timer);
+        worker.removeEventListener("statechange", onStateChange);
+        reject(new Error("le service worker a échoué à s'installer"));
+      }
+    }
+    worker.addEventListener("statechange", onStateChange);
+  });
 }
 
 export function usePushNotifications() {
@@ -34,7 +76,7 @@ export function usePushNotifications() {
       typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
     setSupported(isSupported);
     if (!isSupported) { setChecked(true); return; }
-    serviceWorkerReady()
+    getReadyRegistration()
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => setSubscribed(!!sub))
       .catch(() => {})
@@ -61,7 +103,7 @@ export function usePushNotifications() {
         return false;
       }
 
-      const reg = await serviceWorkerReady();
+      const reg = await getReadyRegistration();
 
       let sub: PushSubscription;
       try {
@@ -95,11 +137,7 @@ export function usePushNotifications() {
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
-      setError(
-        msg === "timeout"
-          ? "Le service worker n'a pas répondu — recharge la page et réessaie."
-          : `Impossible d'activer les notifications${msg ? ` (${msg})` : ""}.`
-      );
+      setError(`Impossible d'activer les notifications${msg ? ` (${msg})` : ""}.`);
       return false;
     } finally {
       setBusy(false);
@@ -110,7 +148,7 @@ export function usePushNotifications() {
     setBusy(true);
     setError("");
     try {
-      const reg = await serviceWorkerReady();
+      const reg = await getReadyRegistration();
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
         await fetch("/api/push/subscribe", {
