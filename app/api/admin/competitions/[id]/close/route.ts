@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import { sendPushToUser } from "@/lib/push/send";
 
 type Selection = {
   participantId:  string;
@@ -117,10 +118,12 @@ export async function POST(
     let allWon  = true;
     let anyLost = false;
     let hasSelFromThisComp = false;
+    let competitionNom = "";
 
     for (const sel of bet.selections) {
       if (sel.competitionId !== competitionId) continue;
       hasSelFromThisComp = true;
+      competitionNom = sel.competitionNom;
 
       const winner = winnerMap.get(sel.categorie);
       if (!winner) {
@@ -141,6 +144,15 @@ export async function POST(
         .update({ status: "lost", settled_at: now })
         .eq("id", bet.id);
       lost++;
+      try {
+        await sendPushToUser(supabase, bet.user_id, {
+          title: "Pari perdu",
+          body: `${competitionNom} — dommage, ce sera pour la prochaine !`,
+          url: "/app",
+        });
+      } catch (e) {
+        console.error(`[close] push (perdu) échoué pour le pari ${bet.id}:`, e);
+      }
     } else if (allWon) {
       // ── Toutes les sélections ont gagné ──────────────────────────
       // Créditer le gain — si le RPC échoue, on ne marque PAS le pari
@@ -172,6 +184,15 @@ export async function POST(
 
       won++;
       totalPaid[bet.user_id] = (totalPaid[bet.user_id] ?? 0) + bet.gain_potentiel;
+      try {
+        await sendPushToUser(supabase, bet.user_id, {
+          title: "Pari gagné 🎉",
+          body: `${competitionNom} — tu remportes ${Math.round(bet.gain_potentiel).toLocaleString("fr-FR")} crédits !`,
+          url: "/app",
+        });
+      } catch (e) {
+        console.error(`[close] push (gagné) échoué pour le pari ${bet.id}:`, e);
+      }
     }
   }
 

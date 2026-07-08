@@ -23,6 +23,10 @@ const GROUPS: NavGroup[] = [
     label: "Athlètes",
     links: [{ href: "/admin/athletes", label: "Athlètes" }],
   },
+  {
+    label: "Notifications",
+    links: [{ href: "/admin/notifications", label: "Diffusion push" }],
+  },
 ];
 
 function isActive(pathname: string, href: string): boolean {

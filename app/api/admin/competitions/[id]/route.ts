@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import { sendPushToAll } from "@/lib/push/send";
 
 // PATCH /api/admin/competitions/[id] — met à jour les infos ou le statut
 export async function PATCH(
@@ -23,12 +24,39 @@ export async function PATCH(
   if (body.type_competition !== undefined) allowed.type_competition = body.type_competition || null;
 
   const supabase = createAdminSupabase();
+
+  // Détecter la transition vers "published" pour notifier les joueurs —
+  // seulement au moment où elle devient pariable, pas à chaque sauvegarde.
+  let justPublished = false;
+  let nom = "";
+  if (allowed.status === "published") {
+    const { data: before } = await supabase
+      .from("competitions")
+      .select("status, nom")
+      .eq("id", params.id)
+      .single();
+    justPublished = !!before && before.status !== "published";
+    nom = before?.nom ?? "";
+  }
+
   const { error } = await supabase
     .from("competitions")
     .update(allowed)
     .eq("id", params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (justPublished) {
+    try {
+      await sendPushToAll(supabase, {
+        title: "Nouvelle compétition disponible",
+        body: `${nom} est ouverte aux paris !`,
+        url: "/app",
+      });
+    } catch (e) {
+      console.error("[competitions PATCH] push publication échoué:", e);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
