@@ -45,6 +45,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Déjà connecté : on saute la landing page, direct dans l'app
+  if (user && pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/app";
+    return NextResponse.redirect(url);
+  }
+
   return response;
 }
 
