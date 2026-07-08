@@ -84,8 +84,20 @@ export default function CotesClient({
 }: {
   competitions: Competition[];
 }) {
-  const [selectedCompId, setSelectedCompId]   = useState<string>(competitions[0]?.id ?? "");
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(competitions[0]?.courses[0]?.id ?? "");
+  const [selectedCompId, setSelectedCompId]   = useState<string>(() => {
+    const fromUrl = typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("comp")
+      : null;
+    if (fromUrl && competitions.some(c => c.id === fromUrl)) return fromUrl;
+    return competitions[0]?.id ?? "";
+  });
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(() => {
+    const fromUrl = typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("comp")
+      : null;
+    const comp = (fromUrl && competitions.find(c => c.id === fromUrl)) || competitions[0];
+    return comp?.courses[0]?.id ?? "";
+  });
   const [selectedCat, setSelectedCat]         = useState<string>("Tous");
   const [cotes, setCotes]                     = useState<CoteRow[]>([]);
   const [loadingCotes, setLoadingCotes]       = useState(false);
@@ -348,6 +360,12 @@ export default function CotesClient({
                   </span>
                   <h2 className="font-archivo font-extrabold text-[18px] text-white">{selectedComp.nom}</h2>
                 </div>
+                <a
+                  href={`/admin/data/competitions/${selectedComp.id}`}
+                  className="font-archivo font-semibold text-[12px] text-[#28D7E6] hover:text-white transition-colors inline-flex items-center gap-1"
+                >
+                  Voir les données FFCK →
+                </a>
               </div>
 
               {selectedComp.courses.length > 0 ? (

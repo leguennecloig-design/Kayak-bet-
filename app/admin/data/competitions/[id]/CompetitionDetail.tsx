@@ -91,30 +91,38 @@ export default function CompetitionDetail({ competition }: { competition: Compet
       </a>
 
       {/* Header */}
-      <div className="mt-5 mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          {(() => { const badge = competition.code_type ?? competition.code_niveau; return (
-            <span className={`font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase border rounded-[5px] px-[7px] py-[3px] ${NIVEAU_STYLE[badge] ?? NIVEAU_STYLE.INR}`}>
-              {badge}
+      <div className="mt-5 mb-8 flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            {(() => { const badge = competition.code_type ?? competition.code_niveau; return (
+              <span className={`font-grotesk font-bold text-[9.5px] tracking-[.1em] uppercase border rounded-[5px] px-[7px] py-[3px] ${NIVEAU_STYLE[badge] ?? NIVEAU_STYLE.INR}`}>
+                {badge}
+              </span>
+            ); })()}
+            {competition.code_ffck && (
+              <span className="font-mono text-[11px] text-[#5c7c8c]">{competition.code_ffck}</span>
+            )}
+          </div>
+          <h1 className="font-anton italic uppercase text-white text-[28px] leading-[0.95]">
+            {competition.nom}
+          </h1>
+          <p className="font-archivo text-[13.5px] text-[#7c9aaa] mt-2 flex items-center gap-3 flex-wrap">
+            {competition.ville && <span>{competition.ville}</span>}
+            {competition.riviere && <span>· {competition.riviere}</span>}
+            <span>·</span>
+            <span>
+              {new Date(competition.date_debut).toLocaleDateString("fr-FR", {
+                day: "numeric", month: "long", year: "numeric",
+              })}
             </span>
-          ); })()}
-          {competition.code_ffck && (
-            <span className="font-mono text-[11px] text-[#5c7c8c]">{competition.code_ffck}</span>
-          )}
+          </p>
         </div>
-        <h1 className="font-anton italic uppercase text-white text-[28px] leading-[0.95]">
-          {competition.nom}
-        </h1>
-        <p className="font-archivo text-[13.5px] text-[#7c9aaa] mt-2 flex items-center gap-3 flex-wrap">
-          {competition.ville && <span>{competition.ville}</span>}
-          {competition.riviere && <span>· {competition.riviere}</span>}
-          <span>·</span>
-          <span>
-            {new Date(competition.date_debut).toLocaleDateString("fr-FR", {
-              day: "numeric", month: "long", year: "numeric",
-            })}
-          </span>
-        </p>
+        <a
+          href={`/admin/cotes?comp=${competition.id}`}
+          className="font-archivo font-semibold text-[12px] text-[#28D7E6] hover:text-white transition-colors inline-flex items-center gap-1 flex-none mt-1"
+        >
+          Voir/recalculer les cotes →
+        </a>
       </div>
 
       {/* Tabs courses */}

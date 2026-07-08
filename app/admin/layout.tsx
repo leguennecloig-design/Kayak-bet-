@@ -3,14 +3,15 @@
 // (layout.tsx ne peut pas utiliser redirect() de façon fiable dans Next.js 14)
 
 import { ToastProvider } from "@/app/components/Toast";
+import AdminNav from "./AdminNav";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
     <div className="min-h-screen bg-deep text-white">
       <div className="border-b border-[var(--border)] bg-[rgba(7,31,45,0.9)] backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-6 py-2.5 flex items-center justify-between gap-6">
+          <div className="flex items-center gap-3 flex-none">
             {/* Logo drop */}
             <svg viewBox="0 0 34 38" fill="none" className="w-6 h-7">
               <path d="M17 2C10 12 4 18.5 4 25a13 13 0 0 0 26 0C30 18.5 24 12 17 2Z" fill="url(#adh)" />
@@ -28,44 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               Admin
             </span>
           </div>
-          <nav className="flex items-center gap-1">
-            <a
-              href="/admin"
-              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              Compétitions
-            </a>
-            <a
-              href="/admin/athletes"
-              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              Athlètes
-            </a>
-            <a
-              href="/admin/data"
-              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              Données FFCK
-            </a>
-            <a
-              href="/admin/cotes"
-              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              Cotes
-            </a>
-            <a
-              href="/admin/inscriptions"
-              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              Inscriptions
-            </a>
-            <a
-              href="/app"
-              className="font-archivo font-semibold text-[13px] text-[#9fbac6] hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              ← App
-            </a>
-          </nav>
+          <AdminNav />
         </div>
       </div>
       <main className="max-w-5xl mx-auto px-6 py-10">{children}</main>

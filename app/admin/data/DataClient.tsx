@@ -89,10 +89,13 @@ export default function DataClient({
       });
       const json = await res.json();
       if (res.ok) {
+        const errSuffix = Array.isArray(json.errors) && json.errors.length > 0
+          ? ` · ⚠ ${json.errors.length} erreur(s) : ${json.errors.slice(0, 3).join(" ; ")}`
+          : "";
         setCompState({
           loading: false,
-          msg: `✅ ${json.synced_competitions} compétitions, ${json.synced_courses} courses (${annee}) — ${(json.duration / 1000).toFixed(1)}s`,
-          ok: true,
+          msg: `✅ ${json.synced_competitions} compétitions, ${json.synced_courses} courses (${annee}) — ${(json.duration / 1000).toFixed(1)}s${errSuffix}`,
+          ok: errSuffix ? false : true,
         });
         setStats((s) => ({
           ...s,
@@ -122,10 +125,13 @@ export default function DataClient({
       });
       const json = await res.json();
       if (res.ok) {
+        const errSuffix = Array.isArray(json.errors) && json.errors.length > 0
+          ? ` · ⚠ ${json.errors.length} erreur(s) : ${json.errors.slice(0, 3).join(" ; ")}`
+          : "";
         setResultatsState({
           loading: false,
-          msg: `✅ ${json.resultats} résultats (${json.courses} courses) — ${json.pending} restantes`,
-          ok: true,
+          msg: `✅ ${json.resultats} résultats (${json.courses} courses) — ${json.pending} restantes${errSuffix}`,
+          ok: errSuffix ? false : true,
         });
         setStats((s) => ({
           ...s,
@@ -149,11 +155,12 @@ export default function DataClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target: "competitions" }),
       });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
         setResetState({ loading: false, msg: "✅ Données réinitialisées", ok: true });
         setStats((s) => ({ ...s, competitions: 0, courses: 0, resultats: 0, courses_pending: 0 }));
       } else {
-        setResetState({ loading: false, msg: "❌ Erreur lors du reset", ok: false });
+        setResetState({ loading: false, msg: `❌ ${json.error ?? "Erreur lors du reset"}`, ok: false });
       }
     } catch {
       setResetState({ loading: false, msg: "❌ Erreur réseau", ok: false });

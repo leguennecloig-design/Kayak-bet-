@@ -237,8 +237,12 @@ export default function EditClient({
       let json: Record<string, unknown> = {};
       try { json = JSON.parse(text); } catch { throw new Error(`Réponse invalide (${res.status})`); }
       if (!res.ok) throw new Error((json.error as string) ?? "Erreur serveur");
-      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés`);
-      setCloseState("ok");
+      const failed = json.failedSettlements as { betId: string }[] | undefined;
+      const failedMsg = failed && failed.length > 0
+        ? ` · ⚠ ${failed.length} pari(s) gagnant(s) non réglé(s) (échec du crédit) — à traiter manuellement`
+        : "";
+      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés${failedMsg}`);
+      setCloseState(failed && failed.length > 0 ? "error" : "ok");
       setStatus("closed");
     } catch (e) {
       setCloseMsg(e instanceof Error ? e.message : "Erreur inconnue");
@@ -315,8 +319,14 @@ export default function EditClient({
           {status !== "published" ? (
             <button
               onClick={togglePublish}
-              disabled={participants.length === 0}
-              title={participants.length === 0 ? "Ajoute au moins un participant avant de publier" : ""}
+              disabled={participants.length === 0 || participants.some(p => !p.cote || p.cote <= 0)}
+              title={
+                participants.length === 0
+                  ? "Ajoute au moins un participant avant de publier"
+                  : participants.some(p => !p.cote || p.cote <= 0)
+                    ? "Certains participants n'ont pas de cote — recalcule les cotes ou complète-les manuellement"
+                    : ""
+              }
               className="inline-flex items-center gap-2 bg-gradient-to-r from-[#28D7E6] to-[#11C2C2] text-[#0A2A3D] font-archivo font-bold text-[13px] px-5 py-2.5 rounded-[10px] hover:-translate-y-[1px] transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
             >
               <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">

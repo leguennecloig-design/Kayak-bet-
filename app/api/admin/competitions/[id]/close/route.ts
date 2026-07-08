@@ -40,10 +40,17 @@ export async function POST(
   const supabase = createAdminSupabase();
 
   // ── 1. Vérifier que des résultats existent ──────────────────────
-  const { count: resultCount } = await supabase
+  const { count: resultCount, error: resultCountErr } = await supabase
     .from("resultats")
     .select("id", { count: "exact", head: true })
     .eq("competition_id", competitionId);
+
+  if (resultCountErr) {
+    return NextResponse.json(
+      { error: `Erreur lors de la vérification des résultats : ${resultCountErr.message}` },
+      { status: 500 }
+    );
+  }
 
   if (!resultCount || resultCount === 0) {
     return NextResponse.json(
@@ -53,11 +60,18 @@ export async function POST(
   }
 
   // ── 2. Récupérer les gagnants par catégorie (rang = 1) ──────────
-  const { data: winners } = await supabase
+  const { data: winners, error: winnersErr } = await supabase
     .from("resultats")
     .select("categorie, nom, rang")
     .eq("competition_id", competitionId)
     .eq("rang", 1);
+
+  if (winnersErr) {
+    return NextResponse.json(
+      { error: `Erreur lors de la récupération des vainqueurs : ${winnersErr.message}` },
+      { status: 500 }
+    );
+  }
 
   // Map : categorie → nom normalisé du gagnant
   const winnerMap = new Map<string, string>();
@@ -73,11 +87,18 @@ export async function POST(
   }
 
   // ── 3. Récupérer les paris en attente sur cette compétition ─────
-  const { data: pendingBets } = await supabase
+  const { data: pendingBets, error: pendingBetsErr } = await supabase
     .from("bets")
     .select("id, user_id, competition_id, selections, stake, gain_potentiel")
     .eq("competition_id", competitionId)
     .eq("status", "pending");
+
+  if (pendingBetsErr) {
+    return NextResponse.json(
+      { error: `Erreur lors de la récupération des paris : ${pendingBetsErr.message}` },
+      { status: 500 }
+    );
+  }
 
   const bets: BetRow[] = (pendingBets ?? []).map(b => ({
     ...b,
@@ -89,6 +110,7 @@ export async function POST(
   const now = new Date().toISOString();
   let won = 0, lost = 0;
   const totalPaid: Record<string, number> = {};
+  const failedSettlements: { betId: string; userId: string; error: string }[] = [];
 
   for (const bet of bets) {
     // Évaluer chaque sélection de cette compétition
@@ -121,11 +143,19 @@ export async function POST(
       lost++;
     } else if (allWon) {
       // ── Toutes les sélections ont gagné ──────────────────────────
-      // Créditer le gain
-      const { data: newBal } = await supabase.rpc("increment_user_balance", {
+      // Créditer le gain — si le RPC échoue, on ne marque PAS le pari
+      // gagné ni n'insère de transaction : mieux vaut le laisser en
+      // attente (traitable manuellement) qu'afficher un gain jamais crédité.
+      const { error: balErr } = await supabase.rpc("increment_user_balance", {
         user_uuid: bet.user_id,
         delta:     bet.gain_potentiel,
       });
+
+      if (balErr) {
+        console.error(`[close] increment_user_balance échoué pour le pari ${bet.id}:`, balErr);
+        failedSettlements.push({ betId: bet.id, userId: bet.user_id, error: balErr.message });
+        continue;
+      }
 
       await supabase
         .from("bets")
@@ -142,7 +172,6 @@ export async function POST(
 
       won++;
       totalPaid[bet.user_id] = (totalPaid[bet.user_id] ?? 0) + bet.gain_potentiel;
-      void newBal; // used atomically
     }
   }
 
@@ -159,5 +188,6 @@ export async function POST(
     lost,
     categories:   winnerMap.size,
     totalPaid:    Object.values(totalPaid).reduce((a, b) => a + b, 0),
+    ...(failedSettlements.length > 0 ? { failedSettlements } : {}),
   });
 }

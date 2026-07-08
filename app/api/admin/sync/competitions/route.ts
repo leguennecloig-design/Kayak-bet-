@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
   const list = data.slice(0, limit);
   let totalComps = 0;
   let totalCourses = 0;
+  const errors: string[] = [];
 
   for (const comp of list) {
     const { data: row, error } = await supabase
@@ -81,7 +82,10 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
 
-    if (error || !row) continue;
+    if (error || !row) {
+      errors.push(`${comp.nom} (${comp.code}) : ${error?.message ?? "upsert sans résultat"}`);
+      continue;
+    }
     totalComps++;
     await sleep(150);
 
@@ -101,7 +105,11 @@ export async function POST(req: NextRequest) {
           nb_participants: race.nb_participants ?? 0,
           nb_categories: race.nb_categories ?? 0,
         }, { onConflict: "competition_id,code_course" });
-      if (!raceErr) totalCourses++;
+      if (raceErr) {
+        errors.push(`${comp.nom} · course ${race.code_course} : ${raceErr.message}`);
+      } else {
+        totalCourses++;
+      }
     }
   }
 
@@ -112,5 +120,6 @@ export async function POST(req: NextRequest) {
     synced_competitions: totalComps,
     synced_courses: totalCourses,
     duration: Date.now() - start,
+    ...(errors.length > 0 ? { errors } : {}),
   });
 }

@@ -55,7 +55,13 @@ export async function POST(req: NextRequest) {
 
   // Si force: reset synced_at sur toutes les courses
   if (force) {
-    await supabase.from("ffck_courses").update({ synced_at: null }).neq("id", "00000000-0000-0000-0000-000000000000");
+    const { error: resetErr } = await supabase
+      .from("ffck_courses")
+      .update({ synced_at: null })
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+    if (resetErr) {
+      return NextResponse.json({ error: `Échec du reset synced_at : ${resetErr.message}` }, { status: 500 });
+    }
   }
 
   // Cache athletes en mémoire
@@ -74,6 +80,7 @@ export async function POST(req: NextRequest) {
 
   let totalResultats = 0;
   let coursesDone = 0;
+  const errors: string[] = [];
 
   for (const course of courses) {
     const comp = course.ffck_competitions as unknown as { code_ffck: number; nom: string } | null;
@@ -87,7 +94,11 @@ export async function POST(req: NextRequest) {
     await sleep(150);
 
     if (!resultats.length) {
-      await supabase.from("ffck_courses").update({ synced_at: new Date().toISOString() }).eq("id", course.id);
+      const { error: markErr } = await supabase
+        .from("ffck_courses")
+        .update({ synced_at: new Date().toISOString() })
+        .eq("id", course.id);
+      if (markErr) errors.push(`${comp.nom} · course ${course.code_course} (marquage synced_at) : ${markErr.message}`);
       coursesDone++;
       continue;
     }
@@ -113,9 +124,15 @@ export async function POST(req: NextRequest) {
       .from("ffck_resultats")
       .upsert(rows, { onConflict: "course_id,code_bateau,categorie" });
 
-    if (!insertErr) {
+    if (insertErr) {
+      errors.push(`${comp.nom} · course ${course.code_course} : ${insertErr.message}`);
+    } else {
       totalResultats += rows.length;
-      await supabase.from("ffck_courses").update({ synced_at: new Date().toISOString() }).eq("id", course.id);
+      const { error: markErr } = await supabase
+        .from("ffck_courses")
+        .update({ synced_at: new Date().toISOString() })
+        .eq("id", course.id);
+      if (markErr) errors.push(`${comp.nom} · course ${course.code_course} (marquage synced_at) : ${markErr.message}`);
     }
     coursesDone++;
   }
@@ -132,5 +149,6 @@ export async function POST(req: NextRequest) {
     courses: coursesDone,
     pending: pending ?? 0,
     duration: Date.now() - start,
+    ...(errors.length > 0 ? { errors } : {}),
   });
 }

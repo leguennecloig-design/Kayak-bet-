@@ -15,13 +15,19 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Supprimer dans l'ordre des FK
-  await supabase.from("ffck_resultats").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await supabase.from("ffck_courses").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await supabase.from("ffck_competitions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  // Supprimer dans l'ordre des FK — on s'arrête au premier échec pour ne
+  // pas continuer sur un état partiellement supprimé sans le signaler.
+  const tables = ["ffck_resultats", "ffck_courses", "ffck_competitions"];
+  if (target === "all") tables.push("athletes");
 
-  if (target === "all") {
-    await supabase.from("athletes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  for (const table of tables) {
+    const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: `Échec de la suppression de "${table}" : ${error.message}` },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({ success: true, target });
