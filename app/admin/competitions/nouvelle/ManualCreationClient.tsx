@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { parseResultFile, type ParseResult as SpecialParseResult } from "@/lib/algo/result-parser";
 
 type MatchedAthlete = {
   dossard: number;
@@ -51,6 +52,22 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
   const [editDateDebut,   setEditDateDebut]   = useState("");
   const [editDateFin,     setEditDateFin]     = useState("");
   const [editTypeEpreuve, setEditTypeEpreuve] = useState("");
+
+  // Sprint Finale / Mass Start : fichier optionnel des résultats qualifs /
+  // classique du week-end, uploadé au moment même de la création plutôt que
+  // dans un second temps sur /admin/cotes.
+  const specialFileRef = useRef<HTMLInputElement>(null);
+  const [specialFile,    setSpecialFile]    = useState<File | null>(null);
+  const [specialPreview, setSpecialPreview] = useState<SpecialParseResult | null>(null);
+  const [specialError,   setSpecialError]   = useState("");
+
+  async function handleSpecialFile(file: File) {
+    setSpecialFile(file);
+    setSpecialError("");
+    const content = await file.text();
+    const parsed = parseResultFile(content, file.name);
+    setSpecialPreview(parsed);
+  }
 
   function isAccepted(file: File): boolean {
     const n = file.name.toLowerCase();
@@ -104,6 +121,7 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
           date_fin: editDateFin.trim() || null,
           type_epreuve: editTypeEpreuve.trim() || result.type_epreuve,
           type_competition: typeCompetition || null,
+          special_results: specialPreview?.data ?? null,
           force,
         }),
       });
@@ -278,6 +296,56 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
               </select>
             </div>
           </div>
+
+          {/* Sprint Finale / Mass Start — résultats qualifs / classique, optionnels à la création */}
+          {(typeCompetition === "sprint_finale" || typeCompetition === "mass_start") && (
+            <div className="bg-[rgba(179,157,219,.05)] border border-[rgba(179,157,219,.2)] rounded-xl p-5">
+              <p className="font-grotesk font-bold text-[11px] uppercase tracking-[.1em] text-[#b39ddb] mb-2">
+                {typeCompetition === "sprint_finale"
+                  ? "Résultats des qualifs (optionnel)"
+                  : "Résultats de la classique du week-end (optionnel)"}
+              </p>
+              <p className="font-archivo text-[12px] text-[#7c9aaa] mb-3">
+                {typeCompetition === "sprint_finale"
+                  ? "60% qualifs + 40% algo v3. Sans fichier, les cotes restent 100% algo v3 (comme un format standard)."
+                  : "80% classique + 20% algo v3. Sans fichier, les cotes restent 100% algo v3 (comme un format standard)."}
+                {" "}Formats acceptés : CSV, TXT, JSON.
+              </p>
+              <label className="inline-flex items-center gap-2 font-archivo font-semibold text-[12px] text-[#b39ddb] border border-[rgba(179,157,219,.35)] rounded-[9px] px-3.5 py-2 cursor-pointer hover:bg-[rgba(179,157,219,.08)] transition-colors">
+                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                  <path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {specialFile ? specialFile.name : "Choisir un fichier"}
+                <input
+                  ref={specialFileRef}
+                  type="file"
+                  accept=".csv,.txt,.json"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleSpecialFile(f); }}
+                />
+              </label>
+
+              {specialPreview && (
+                <div className="mt-3">
+                  {specialPreview.data.length > 0 && (
+                    <p className="font-archivo text-[12px] text-[#7c9aaa]">
+                      ✓ {specialPreview.data.length} ligne{specialPreview.data.length > 1 ? "s" : ""} parsée{specialPreview.data.length > 1 ? "s" : ""}
+                      {" "}({specialPreview.format_detected}) · {[...new Set(specialPreview.data.map(r => r.categorie))].length} catégorie(s)
+                    </p>
+                  )}
+                  {specialPreview.errors.length > 0 && (
+                    <div className="text-[11px] font-archivo text-red-400 mt-1 space-y-0.5">
+                      {specialPreview.errors.slice(0, 5).map((err, i) => <p key={i}>{err}</p>)}
+                      {specialPreview.errors.length > 5 && <p>… et {specialPreview.errors.length - 5} autre(s)</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+              {specialError && (
+                <p className="font-archivo text-[12px] text-red-400 mt-2">{specialError}</p>
+              )}
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-3">

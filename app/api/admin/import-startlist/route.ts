@@ -9,6 +9,9 @@ import {
   saveCotes,
   saveCotesForCompetition,
 } from "@/lib/algo/cotes-engine";
+import { combineSprintFinale } from "@/lib/algo/sprint-finale-engine";
+import { combineMassStart } from "@/lib/algo/mass-start-engine";
+import type { ParsedResult } from "@/lib/algo/result-parser";
 
 type ImportedAthlete = {
   dossard: number;
@@ -38,6 +41,7 @@ type ImportBody = {
   categories: ImportedCategory[];
   type_competition?: string | null;
   force?: boolean;
+  special_results?: ParsedResult[] | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -285,6 +289,24 @@ export async function POST(req: NextRequest) {
       continue;
     }
     if (cotes.length === 0) continue;
+
+    // Sprint Finale / Mass Start : à la création, la course n'a que sa
+    // startlist (pas encore de ffck_resultats, la course n'a pas encore eu
+    // lieu) — on combine donc les cotes v3 "prédictives" issues de la
+    // startlist avec le fichier de résultats qualifs/classique uploadé,
+    // au lieu des cotes v3 post-course habituellement utilisées via
+    // /admin/cotes (qui nécessitent des ffck_resultats déjà synchronisés).
+    if (body.special_results?.length) {
+      try {
+        if (body.type_competition === "sprint_finale") {
+          cotes = combineSprintFinale(cotes, body.special_results, cat);
+        } else if (body.type_competition === "mass_start") {
+          cotes = combineMassStart(cotes, body.special_results, cat);
+        }
+      } catch (e) {
+        console.error(`[import-startlist] combine ${body.type_competition} ${cat}:`, e);
+      }
+    }
 
     // Chaque sauvegarde est indépendante : un échec de l'une (ex: le système
     // course_id, réservé à l'admin FFCK) ne doit jamais empêcher l'autre ni
