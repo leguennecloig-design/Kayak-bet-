@@ -13,6 +13,18 @@ import runtimeCaching from "next-pwa/cache";
 
 precacheAndRoute(self.__WB_MANIFEST);
 
+// next-pwa's `skipWaiting`/`register` options only affect its own
+// auto-generated service worker — since we provide a custom source
+// (swSrc), those config options are silently ignored here. Without this,
+// a newly deployed SW stays stuck in "waiting" behind any already-open
+// tab, and won't take control of open pages even once activated — every
+// deploy required fully closing the site to pick up new code, which
+// looked like fixes "not applying" the same way twice in this session.
+self.skipWaiting();
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 const STRATEGIES = { CacheFirst, StaleWhileRevalidate, NetworkFirst };
 
 for (const entry of runtimeCaching) {
