@@ -9,6 +9,7 @@ import "./login.css";
 type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding" | "push-prompt";
 
 const PUSH_PROMPT_DISMISSED_KEY = "kb_push_prompt_dismissed";
+const REFERRAL_CODE_KEY = "kb_referral_code";
 type OnbStep = "profile" | "athlete" | "source" | "push";
 
 type AthleteResult = {
@@ -336,6 +337,15 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false);
   const push = usePushNotifications();
 
+  // Capture le code de parrainage depuis l'URL (?ref=CODE) dès l'arrivée sur
+  // la page, indépendamment du mode — doit survivre à la redirection OAuth
+  // ou à la confirmation d'email avant d'être appliqué (voir onDone du mode
+  // "welcome" plus bas), donc stocké en localStorage plutôt qu'en state.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) localStorage.setItem(REFERRAL_CODE_KEY, ref.trim().toUpperCase());
+  }, []);
+
   // Rien à proposer (déjà abonné, ou pas supporté sur cet appareil) — on
   // n'affiche pas cet écran pour rien, direct dans l'app.
   useEffect(() => {
@@ -417,6 +427,24 @@ export default function LoginPage() {
         <div className="lp-glow g1" /><div className="lp-glow g2" />
         <WelcomeOverlay onDone={() => {
           (async () => {
+            // Applique un éventuel code de parrainage capturé à l'arrivée
+            // (?ref=CODE) — no-op silencieux côté serveur si absent, déjà
+            // utilisé, ou invalide. Retiré du localStorage dans tous les cas
+            // pour ne jamais retenter indéfiniment.
+            const refCode = typeof window !== "undefined" ? localStorage.getItem(REFERRAL_CODE_KEY) : null;
+            if (refCode) {
+              localStorage.removeItem(REFERRAL_CODE_KEY);
+              try {
+                await fetch("/api/referral/apply", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ code: refCode }),
+                });
+              } catch {
+                // pas bloquant — au pire le parrainage n'est pas appliqué
+              }
+            }
+
             try {
               const res = await fetch("/api/user/profile");
               const data = await res.json();

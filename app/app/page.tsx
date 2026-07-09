@@ -1033,6 +1033,32 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
 
   const push = usePushNotifications();
 
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referredUsers, setReferredUsers] = useState<{ name: string; date: string }[]>([]);
+  const [referralCopied, setReferralCopied] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/referral")
+      .then(res => res.json())
+      .then((data) => {
+        setReferralCode(data.code ?? null);
+        setReferredUsers(data.referredUsers ?? []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const referralLink = referralCode && typeof window !== "undefined"
+    ? `${window.location.origin}/login?ref=${referralCode}`
+    : "";
+
+  function copyReferralLink() {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink).then(() => {
+      setReferralCopied(true);
+      setTimeout(() => setReferralCopied(false), 2000);
+    });
+  }
+
   return (
     <>
       <div className="profil-hero">
@@ -1216,6 +1242,40 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
           </p>
         )}
         {push.error && <p className="catmodal-status err">{push.error}</p>}
+      </div>
+
+      <div className="profil-section">
+        <div className="profil-section-head">
+          <span>Parrainage</span>
+          <span className="ps-count">{referredUsers.length} filleul{referredUsers.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        {referralCode && (
+          <div className="profil-actions" style={{ marginBottom: 14, flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+            <p style={{ color: "#7c9aaa", fontFamily: "var(--font-archivo)", fontSize: "12.5px" }}>
+              Partage ton lien : {200} crédits offerts à ton filleul, {200} crédits pour toi dès son inscription.
+            </p>
+            <button className="profil-edit-btn" onClick={copyReferralLink}>
+              {referralCopied ? "Lien copié ✓" : `Copier mon lien (${referralCode})`}
+            </button>
+          </div>
+        )}
+
+        <div className="history-list">
+          {referredUsers.length === 0 ? (
+            <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
+              Pas encore de filleul. Partage ton lien pour gagner des crédits !
+            </p>
+          ) : referredUsers.map((r, i) => (
+            <div key={i} className="home-lb-row">
+              <div className="nm">
+                {r.name}
+                <small>Inscrit le {new Date(r.date).toLocaleDateString("fr-FR")}</small>
+              </div>
+              <span className="pts">+200</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {["loig.le.guennec@icloud.com", "leguennec.loig@gmail.com"].includes(userEmail ?? "") && (
