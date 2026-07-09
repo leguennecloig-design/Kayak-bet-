@@ -16,8 +16,19 @@ import runtimeCaching from "next-pwa/cache";
 // on gère donc l'installation nous-mêmes pour qu'un échec partiel de
 // précache n'empêche jamais le SW de s'activer (symptôme observé :
 // "le service worker a échoué à s'installer").
+//
+// app-build-manifest.json en particulier renvoie systématiquement un 404
+// une fois précaché (incompatibilité connue next-pwa / App Router) — c'est
+// un fichier de métadonnées interne à Next, pas quelque chose dont l'app a
+// besoin hors-ligne, donc on l'exclut directement du précache plutôt que
+// de laisser Workbox échouer dessus à chaque installation.
+const manifest = (self.__WB_MANIFEST ?? []).filter((entry) => {
+  const url = typeof entry === "string" ? entry : entry.url;
+  return !url.includes("app-build-manifest.json");
+});
+
 const precacheController = new PrecacheController();
-precacheController.addToCacheList(self.__WB_MANIFEST);
+precacheController.addToCacheList(manifest);
 registerRoute(new PrecacheRoute(precacheController));
 
 self.addEventListener("install", (event) => {
