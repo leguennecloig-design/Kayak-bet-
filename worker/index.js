@@ -4,14 +4,29 @@
 // cache que next-pwa/cache utilise en interne, pour ne rien régresser côté
 // comportement hors-ligne.
 
-import { precacheAndRoute } from "workbox-precaching";
+import { PrecacheController, PrecacheRoute } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
 import { CacheFirst, StaleWhileRevalidate, NetworkFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
 import runtimeCaching from "next-pwa/cache";
 
-precacheAndRoute(self.__WB_MANIFEST);
+// precacheAndRoute() fait échouer TOUTE l'installation si UN SEUL asset ne
+// peut pas être précaché (réseau instable, timing de déploiement, etc.) —
+// on gère donc l'installation nous-mêmes pour qu'un échec partiel de
+// précache n'empêche jamais le SW de s'activer (symptôme observé :
+// "le service worker a échoué à s'installer").
+const precacheController = new PrecacheController();
+precacheController.addToCacheList(self.__WB_MANIFEST);
+registerRoute(new PrecacheRoute(precacheController));
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    precacheController.install(event).catch((err) => {
+      console.error("[sw] précache partiellement échoué, installation poursuivie quand même:", err);
+    })
+  );
+});
 
 // next-pwa's `skipWaiting`/`register` options only affect its own
 // auto-generated service worker — since we provide a custom source
@@ -22,7 +37,12 @@ precacheAndRoute(self.__WB_MANIFEST);
 // looked like fixes "not applying" the same way twice in this session.
 self.skipWaiting();
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      precacheController.activate(event).catch(() => {}),
+      self.clients.claim(),
+    ])
+  );
 });
 
 const STRATEGIES = { CacheFirst, StaleWhileRevalidate, NetworkFirst };
