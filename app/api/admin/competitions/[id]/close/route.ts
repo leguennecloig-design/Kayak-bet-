@@ -87,12 +87,21 @@ export async function POST(
     );
   }
 
-  // ── 3. Récupérer les paris en attente sur cette compétition ─────
+  // ── 3. Récupérer les paris en attente touchant cette compétition ─
+  // Un pari multi-compétition a competition_id = null (cf. /api/user/bets),
+  // donc un filtre .eq("competition_id", ...) ne le trouvait jamais — ces
+  // paris restaient "pending" pour toujours, mise déjà débitée, jamais
+  // réglés. On cherche désormais par containment JSONB : tout pari dont au
+  // moins une sélection référence cette compétition, mono ou multi-comp.
+  // .contains() sérialise différemment selon le type reçu : un tableau JS
+  // est traité comme un ARRAY Postgres natif ({a,b}), pas comme du JSONB —
+  // il faut donc passer la chaîne déjà encodée pour obtenir l'opérateur
+  // JSONB "cs." attendu par selections (jsonb, tableau d'objets).
   const { data: pendingBets, error: pendingBetsErr } = await supabase
     .from("bets")
     .select("id, user_id, competition_id, selections, stake, gain_potentiel")
-    .eq("competition_id", competitionId)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .contains("selections", JSON.stringify([{ competitionId }]));
 
   if (pendingBetsErr) {
     return NextResponse.json(
@@ -109,13 +118,12 @@ export async function POST(
   }));
 
   const now = new Date().toISOString();
-  let won = 0, lost = 0;
+  let won = 0, lost = 0, deferred = 0;
   const totalPaid: Record<string, number> = {};
   const failedSettlements: { betId: string; userId: string; error: string }[] = [];
 
   for (const bet of bets) {
     // Évaluer chaque sélection de cette compétition
-    let allWon  = true;
     let anyLost = false;
     let hasSelFromThisComp = false;
     let competitionNom = "";
@@ -137,7 +145,57 @@ export async function POST(
 
     if (!hasSelFromThisComp) continue;
 
-    if (anyLost) {
+    // Pari multi-compétition (accumulateur) : une jambe gagnée dans CETTE
+    // compétition ne suffit pas à régler le pari — il faut connaître le sort
+    // des sélections des AUTRES compétitions référencées avant de payer.
+    // Une jambe perdue ici, en revanche, suffit à perdre tout le pari
+    // immédiatement, quel que soit l'état des autres jambes.
+    let allWon = !anyLost;
+    if (allWon) {
+      const otherCompIds = [...new Set(
+        bet.selections.map(s => s.competitionId).filter(id => id !== competitionId)
+      )];
+      if (otherCompIds.length > 0) {
+        const { data: otherComps } = await supabase
+          .from("competitions")
+          .select("id, status")
+          .in("id", otherCompIds);
+        const allOthersClosed =
+          (otherComps ?? []).length === otherCompIds.length &&
+          (otherComps ?? []).every(c => c.status === "closed");
+
+        if (!allOthersClosed) {
+          // Une autre jambe du pari n'a pas encore eu lieu — on ne règle
+          // rien pour l'instant, le pari reste "pending".
+          deferred++;
+          continue;
+        }
+
+        // Toutes les autres compétitions référencées sont déjà clôturées :
+        // on revérifie leurs résultats pour CE pari (ce sont elles qui,
+        // avant ce fix, ne trouvaient jamais ce pari lors de leur propre
+        // clôture — on complète donc la vérification ici).
+        for (const otherCompId of otherCompIds) {
+          const { data: otherResultats } = await supabase
+            .from("resultats")
+            .select("categorie, nom, rang")
+            .eq("competition_id", otherCompId)
+            .eq("rang", 1);
+          const otherWinnerMap = new Map<string, string>();
+          for (const w of (otherResultats ?? [])) {
+            if (w.categorie && w.nom) otherWinnerMap.set(w.categorie, normalize(w.nom));
+          }
+          for (const sel of bet.selections) {
+            if (sel.competitionId !== otherCompId) continue;
+            const winner = otherWinnerMap.get(sel.categorie);
+            if (!winner) continue;
+            if (normalize(sel.nom) !== winner) allWon = false;
+          }
+        }
+      }
+    }
+
+    if (!allWon) {
       // ── Paris perdu ──────────────────────────────────────────────
       await supabase
         .from("bets")
@@ -153,8 +211,8 @@ export async function POST(
       } catch (e) {
         console.error(`[close] push (perdu) échoué pour le pari ${bet.id}:`, e);
       }
-    } else if (allWon) {
-      // ── Toutes les sélections ont gagné ──────────────────────────
+    } else {
+      // ── Toutes les sélections (de toutes les compétitions référencées) ont gagné ──
       // Créditer le gain — si le RPC échoue, on ne marque PAS le pari
       // gagné ni n'insère de transaction : mieux vaut le laisser en
       // attente (traitable manuellement) qu'afficher un gain jamais crédité.
@@ -204,9 +262,10 @@ export async function POST(
 
   return NextResponse.json({
     ok:           true,
-    betsSettled:  bets.length,
+    betsSettled:  won + lost,
     won,
     lost,
+    deferred,
     categories:   winnerMap.size,
     totalPaid:    Object.values(totalPaid).reduce((a, b) => a + b, 0),
     ...(failedSettlements.length > 0 ? { failedSettlements } : {}),

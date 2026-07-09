@@ -36,7 +36,13 @@ export async function PATCH(
   const allowed: Record<string, unknown> = {};
   if (body.nom  !== undefined) allowed.nom  = body.nom;
   if (body.pays !== undefined) allowed.pays = body.pays || null;
-  if (body.cote !== undefined) allowed.cote = body.cote ? parseFloat(body.cote) : null;
+  if (body.cote !== undefined) {
+    const parsed = body.cote ? parseFloat(body.cote) : null;
+    if (parsed !== null && Number.isNaN(parsed)) {
+      return NextResponse.json({ error: "Cote invalide" }, { status: 400 });
+    }
+    allowed.cote = parsed;
+  }
 
   const supabase = createAdminSupabase();
   const { error } = await supabase

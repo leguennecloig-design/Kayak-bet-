@@ -748,6 +748,7 @@
   top: 0;
   right: 0;
   height: 100vh;
+  height: 100dvh;
   width: 392px;
   max-width: 92vw;
   z-index: 50;
@@ -978,7 +979,7 @@
 .kb-app .toast {
   position: fixed;
   left: 50%;
-  bottom: 30px;
+  bottom: calc(30px + env(safe-area-inset-bottom));
   z-index: 60;
   translate: -50% 0;
   display: flex;
@@ -2202,7 +2203,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 .kb-app .catmodal {
   width: 100%;

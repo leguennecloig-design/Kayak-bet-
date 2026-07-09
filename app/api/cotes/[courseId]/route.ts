@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { courseId: string } }
 ) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  }
+
   const { courseId } = params;
   const categorie = req.nextUrl.searchParams.get("categorie");
 

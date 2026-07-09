@@ -245,7 +245,11 @@ export default function EditClient({
       const failedMsg = failed && failed.length > 0
         ? ` · ⚠ ${failed.length} pari(s) gagnant(s) non réglé(s) (échec du crédit) — à traiter manuellement`
         : "";
-      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés${failedMsg}`);
+      const deferred = Number(json.deferred ?? 0);
+      const deferredMsg = deferred > 0
+        ? ` · ${deferred} pari(s) multi-compétitions en attente d'une autre compétition`
+        : "";
+      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés${deferredMsg}${failedMsg}`);
       setCloseState(failed && failed.length > 0 ? "error" : "ok");
       setStatus("closed");
     } catch (e) {

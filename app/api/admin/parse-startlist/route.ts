@@ -7,7 +7,7 @@ import { parseStartlistText, normalizeName } from "@/lib/startlist/parse";
 
 export async function POST(req: NextRequest) {
   if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
   const formData = await req.formData();
