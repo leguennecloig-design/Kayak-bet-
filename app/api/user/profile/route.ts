@@ -72,7 +72,6 @@ export async function GET() {
 }
 
 // PATCH /api/user/profile
-// { deposit: number }   → recharge le solde (démo, pas de vrai paiement)
 // { username: string }  → change le pseudo
 export async function PATCH(req: NextRequest) {
   const supabase = createServerSupabase();
@@ -82,22 +81,6 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
 
   const body = await req.json();
-
-  if (body.deposit != null) {
-    const amount = Math.min(Math.max(Number(body.deposit) || 0, 1), 5000);
-    const { data: newBal } = await adminSb.rpc("increment_user_balance", {
-      user_uuid: user.id,
-      delta: amount,
-    });
-    // Créer une transaction de dépôt
-    await adminSb.from("transactions").insert({
-      user_id:     user.id,
-      type:        "deposit",
-      amount:      amount,
-      description: `Dépôt de ${amount} crédits`,
-    });
-    return NextResponse.json({ balance: newBal ?? amount });
-  }
 
   if (body.username != null) {
     const username = String(body.username).trim();

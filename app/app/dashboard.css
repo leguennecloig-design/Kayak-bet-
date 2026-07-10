@@ -52,12 +52,23 @@
   flex: none;
 }
 .kb-app .logo .wm {
-  font: 900 italic 22px/0.9 var(--font-archivo), sans-serif;
-  letter-spacing: -0.02em;
+  position: relative;
+  display: inline-block;
+  font: 400 italic 22px/0.82 var(--font-anton), sans-serif;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
   color: #fff;
+  padding-bottom: 7px;
 }
 .kb-app .logo .wm .b {
-  color: var(--cyan);
+  color: var(--accent);
+}
+.kb-app .logo .wm-wave {
+  position: absolute;
+  left: -3px;
+  bottom: 0;
+  width: calc(100% + 6px);
+  height: 10px;
 }
 .kb-app nav.links {
   position: relative;
@@ -505,6 +516,29 @@
   width: 13px;
   height: 13px;
   display: inline-flex;
+}
+.kb-app .live-pulse-dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent2);
+  flex: none;
+}
+.kb-app .live-pulse-dot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent2);
+  animation: kb-pulse-dot 2.2s ease-out infinite;
+}
+@keyframes kb-pulse-dot {
+  0%   { transform: scale(.4); opacity: .9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kb-app .live-pulse-dot::before { animation: none; }
 }
 .kb-app .feature h2 {
   font: 400 italic 46px/0.92 var(--font-anton), sans-serif;
@@ -1611,40 +1645,19 @@
 
 .kb-app .profil-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-bottom: 28px;
 }
-.kb-app .profil-stat {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px 12px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.kb-app .profil-stats .chip-stat {
+  padding: 12px 14px;
 }
-.kb-app .ps-val {
-  font: 400 italic 22px/0.9 var(--font-anton), sans-serif;
-  color: var(--cyan);
-  display: block;
+.kb-app .kb-coin-lg {
+  width: 34px;
+  height: 34px;
 }
-.kb-app .profil-stat-winrate .ps-val {
-  color: var(--success);
-}
-.kb-app .ps-label {
-  font: 700 9px/1 var(--font-grotesk), monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--idle);
-  display: block;
-  margin-top: 2px;
-}
-.kb-app .ps-sub {
-  font: 600 10.5px/1 var(--font-archivo);
-  color: var(--sub);
-  display: block;
+.kb-app .kb-coin-lg .kb-letters {
+  font-size: 12px;
 }
 
 .kb-app .profil-section {
@@ -1667,6 +1680,77 @@
   font: 700 11px/1 var(--font-grotesk), monospace;
   letter-spacing: 0.08em;
   color: var(--sub);
+}
+.kb-app .ps-head-ic {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.kb-app .ps-head-ic svg {
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+}
+
+.kb-app .notif-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font: 800 13px/1 var(--font-archivo);
+  color: var(--accent);
+  background: var(--accent-soft, rgba(40, 215, 230, 0.1));
+  border: 1px solid rgba(40, 215, 230, 0.32);
+  border-radius: 11px;
+  padding: 11px 0;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kb-app .notif-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+.kb-app .notif-toggle.on {
+  color: var(--coral);
+  background: rgba(255, 122, 69, 0.08);
+  border-color: rgba(255, 122, 69, 0.4);
+}
+
+.kb-app .referral-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-2);
+  border: 1px solid rgba(40, 215, 230, 0.32);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.kb-app .referral-card .tx {
+  flex: 1;
+  min-width: 0;
+}
+.kb-app .referral-card .tx .l {
+  display: block;
+  font: 700 9px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.kb-app .referral-card .tx .v {
+  display: block;
+  font: 400 italic 17px/1 var(--font-anton), sans-serif;
+  letter-spacing: 0.02em;
+  color: #fff;
+  margin-top: 2px;
+}
+.kb-app .referral-card .cp {
+  flex: none;
+  font: 800 11.5px/1 var(--font-archivo);
+  color: var(--accent);
 }
 
 .kb-app .history-list {

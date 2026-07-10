@@ -38,6 +38,15 @@ const Drop = () => (
   </svg>
 );
 
+const Wordmark = () => (
+  <span className="wm">
+    Kayak<span className="b">bet</span>
+    <svg className="wm-wave" viewBox="0 0 240 20" preserveAspectRatio="none" fill="none" aria-hidden="true">
+      <path d="M2 13c36 0 36-8 72-8s36 8 72 8 36-8 92-8" stroke="var(--accent)" strokeWidth="5" fill="none" strokeLinecap="round" />
+    </svg>
+  </span>
+);
+
 const NavIcon = ({ name }: { name: string }) => {
   switch (name) {
     case "home": return (
@@ -132,6 +141,44 @@ const Bolt      = ({ c }: { c: string }) => <svg viewBox="0 0 24 24" fill="none"
 const Check     = ({ c }: { c: string }) => <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5 10 17.5 19 7" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 const XIcon     = ({ c }: { c: string }) => <svg viewBox="0 0 24 24" fill="none"><path d="M6 6 18 18M18 6 6 18" stroke={c} strokeWidth="2.2" strokeLinecap="round" /></svg>;
 const Arrow     = () => <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+const ColTarget = () => <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="#1FB57A" strokeWidth="1.7" /><circle cx="12" cy="12" r="4.6" stroke="#1FB57A" strokeWidth="1.7" /><circle cx="12" cy="12" r="1.3" fill="#1FB57A" /></svg>;
+
+function ProfilStatsRow({ bets, wins, winRate, balance }: { bets: number; wins: number; winRate: number; balance: number }) {
+  return (
+    <div className="profil-stats">
+      <div className="chip-stat">
+        <span className="ic" style={{ background: "color-mix(in srgb, var(--turq) 16%, transparent)", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--turq) 42%, transparent)" }}><ColTicket /></span>
+        <span className="tx"><span className="l">Paris</span><span className="v">{bets}</span></span>
+      </div>
+      <div className="chip-stat">
+        <span className="ic" style={{ background: "color-mix(in srgb, var(--accent2) 16%, transparent)", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--accent2) 42%, transparent)" }}><ColRank /></span>
+        <span className="tx"><span className="l">Victoires</span><span className="v">{wins}</span></span>
+      </div>
+      <div className="chip-stat">
+        <span className="ic" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--success) 42%, transparent)" }}><ColTarget /></span>
+        <span className="tx"><span className="l">Win rate</span><span className="v" style={{ color: "var(--success)" }}>{winRate}%</span></span>
+      </div>
+      <div className="chip-stat">
+        <span className="kb-coin kb-coin-lg" aria-hidden="true"><span className="kb-face"><span className="kb-letters">KB</span></span></span>
+        <span className="tx"><span className="l">Crédits</span><span className="v">{balance.toLocaleString("fr-FR")}</span></span>
+      </div>
+    </div>
+  );
+}
+
+const GiftIcon  = () => (
+  <svg viewBox="0 0 24 24" fill="none">
+    <rect x="4" y="9.5" width="16" height="10" rx="1.5" stroke="#28D7E6" strokeWidth="1.8" />
+    <path d="M4 12.5h16M12 9.5v10" stroke="#28D7E6" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M12 9.5c-1-3.2-2.8-4.6-4.2-4.6a2 2 0 0 0 0 4h4.2Zm0 0c1-3.2 2.8-4.6 4.2-4.6a2 2 0 0 1 0 4h-4.2Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" />
+  </svg>
+);
+const BellIcon  = () => (
+  <svg viewBox="0 0 24 24" fill="none">
+    <path d="M6 10.5a6 6 0 0 1 12 0c0 3.6 1 5 2 6H4c1-1 2-2.4 2-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M9.7 19.5a2.3 2.3 0 0 0 4.6 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
 const ChevRight = () => <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 const LogOutIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 const StarIcon  = ({ filled }: { filled?: boolean }) => (
@@ -390,6 +437,7 @@ function HomeView({
           <div className="ft-top">
             <div className="ft-head">
               <span className="live">
+                <span className="live-pulse-dot" />
                 <span className="bolt"><Bolt c="#FF7A45" /></span>
                 Prochaine grande compétition{feat.date ? ` · ${fmtDate(feat.date)}` : ""}
               </span>
@@ -854,24 +902,7 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
             </div>
           </div>
 
-          <div className="profil-stats">
-            <div className="profil-stat">
-              <span className="ps-val">{profile.totalBets}</span>
-              <span className="ps-label">Paris</span>
-            </div>
-            <div className="profil-stat">
-              <span className="ps-val">{profile.wins}</span>
-              <span className="ps-label">Victoires</span>
-            </div>
-            <div className="profil-stat profil-stat-winrate">
-              <span className="ps-val">{profile.winRate}%</span>
-              <span className="ps-label">Win rate</span>
-            </div>
-            <div className="profil-stat">
-              <span className="ps-val">{profile.balance.toLocaleString("fr-FR")}</span>
-              <span className="ps-label">Crédits</span>
-            </div>
-          </div>
+          <ProfilStatsRow bets={profile.totalBets} wins={profile.wins} winRate={profile.winRate} balance={profile.balance} />
 
           <div className="profil-section">
             <div className="profil-section-head">
@@ -1162,24 +1193,7 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
         </div>
       </div>
 
-      <div className="profil-stats">
-        <div className="profil-stat">
-          <span className="ps-val">{totalBets}</span>
-          <span className="ps-label">Paris</span>
-        </div>
-        <div className="profil-stat">
-          <span className="ps-val">{totalWins}</span>
-          <span className="ps-label">Victoires</span>
-        </div>
-        <div className="profil-stat profil-stat-winrate">
-          <span className="ps-val">{winRate}%</span>
-          <span className="ps-label">Win rate</span>
-        </div>
-        <div className="profil-stat">
-          <span className="ps-val">{balance.toLocaleString("fr-FR")}</span>
-          <span className="ps-label">Crédits</span>
-        </div>
-      </div>
+      <ProfilStatsRow bets={totalBets} wins={totalWins} winRate={winRate} balance={balance} />
 
       <div className="profil-section">
         <div className="profil-section-head">
@@ -1296,15 +1310,16 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
 
       <div className="profil-section">
         <div className="profil-section-head">
-          <span>Notifications push</span>
+          <span className="ps-head-ic"><BellIcon /> Notifications push</span>
         </div>
         {push.supported ? (
           <div className="profil-actions" style={{ marginBottom: 6 }}>
             <button
-              className="profil-edit-btn"
+              className={`notif-toggle${push.subscribed ? " on" : ""}`}
               disabled={push.busy}
               onClick={push.subscribed ? push.unsubscribe : push.subscribe}
             >
+              <BellIcon />
               {push.busy ? "…" : push.subscribed ? "Désactiver les notifications" : "Activer les notifications"}
             </button>
           </div>
@@ -1316,19 +1331,24 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
         {push.error && <p className="catmodal-status err">{push.error}</p>}
       </div>
 
-      <div className="profil-section">
+      <div className="profil-section" id="profil-parrainage">
         <div className="profil-section-head">
-          <span>Parrainage</span>
+          <span className="ps-head-ic"><GiftIcon /> Parrainage</span>
           <span className="ps-count">{referredUsers.length} filleul{referredUsers.length !== 1 ? "s" : ""}</span>
         </div>
 
         {referralCode && (
-          <div className="profil-actions" style={{ marginBottom: 14, flexDirection: "column", alignItems: "stretch", gap: 8 }}>
-            <p style={{ color: "#7c9aaa", fontFamily: "var(--font-archivo)", fontSize: "12.5px" }}>
-              Partage ton lien : {200} crédits offerts à ton filleul, {200} crédits pour toi dès son inscription.
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ color: "var(--soft)", fontFamily: "var(--font-archivo)", fontSize: "12.5px", margin: "0 0 13px" }}>
+              Partage ton lien : 200 crédits offerts à ton filleul, 200 crédits pour toi dès son inscription.
             </p>
-            <button className="profil-edit-btn" onClick={copyReferralLink}>
-              {referralCopied ? "Lien copié ✓" : `Copier mon lien (${referralCode})`}
+            <button className="referral-card" onClick={copyReferralLink}>
+              <span className="kb-coin kb-coin-lg" aria-hidden="true"><span className="kb-face"><span className="kb-letters">KB</span></span></span>
+              <span className="tx">
+                <span className="l">Mon code</span>
+                <span className="v">{referralCode}</span>
+              </span>
+              <span className="cp">{referralCopied ? "Copié ✓" : "Copier"}</span>
             </button>
           </div>
         )}
@@ -1569,23 +1589,11 @@ export default function DashboardPage() {
     navigate("ligue");
   }
 
-  async function addCredits() {
-    try {
-      const res = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deposit: 1000 }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setBalance(Number(json.balance));
-        showToast(<Check c="#28D7E6" />, <>Solde rechargé · <span>{Number(json.balance).toLocaleString("fr-FR")} cr.</span></>);
-      } else {
-        showToast(<XIcon c="#FF7A45" />, json.error ?? "Erreur", true);
-      }
-    } catch {
-      showToast(<XIcon c="#FF7A45" />, "Erreur réseau", true);
-    }
+  function goToParrainage() {
+    navigate("profil");
+    setTimeout(() => {
+      document.getElementById("profil-parrainage")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
   }
 
   async function validate() {
@@ -1684,7 +1692,7 @@ export default function DashboardPage() {
         <div className="wrap nav-in">
           <a className="logo" href="/app" aria-label="Kayakbet" onClick={(e) => { e.preventDefault(); navigate("home"); }}>
             <Drop />
-            <span className="wm">Kayak<span className="b">bet</span></span>
+            <Wordmark />
           </a>
 
           <nav className="links" ref={navRef}>
@@ -1704,8 +1712,8 @@ export default function DashboardPage() {
                   <span className="kb-letters">KB</span>
                 </span>
               </span>
-              <button className="plus" onClick={addCredits} aria-label="Recharger">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#28D7E6" strokeWidth="2.2" strokeLinecap="round" /></svg>
+              <button className="plus" onClick={goToParrainage} aria-label="Parrainage — gagne des crédits">
+                <GiftIcon />
               </button>
             </div>
             <button className="avatar" onClick={() => navigate("profil")} title="Profil">
