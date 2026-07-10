@@ -383,23 +383,19 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
   50%       { transform: translateY(-8px); }
 }
 
+/* Pas de découpage lettre par lettre : "Anton" n'a pas de vraie graisse
+   italique (Google Fonts ne fournit que le style normal), donc
+   `font-style: italic` y est toujours un italique synthétique — l'animer
+   caractère par caractère produisait un rendu dédoublé/fantôme sur iOS
+   Safari/PWA. Un fondu du bloc entier est bien plus fiable. */
 .lp-w-heading {
   font: 400 italic 34px/1.05 var(--font-anton), sans-serif;
   text-transform: uppercase;
   color: #fff;
   margin: 0 0 12px;
   max-width: 360px;
-}
-.lp-char {
-  display: inline-block;
   opacity: 0;
-  transform: translateY(10px);
-}
-.lp-w-heading.fonts-ready .lp-char {
-  animation: lp-charIn .5s cubic-bezier(.2,.9,.2,1) forwards;
-}
-@keyframes lp-charIn {
-  to { opacity: 1; transform: translateY(0); }
+  animation: lp-fadeUp .6s cubic-bezier(.2,.9,.2,1) .3s forwards;
 }
 
 .lp-w-sub {
@@ -411,7 +407,7 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
 
 @media (prefers-reduced-motion: reduce) {
   .lp-w-coin { animation: none; }
-  .lp-char { animation: none; opacity: 1; transform: none; }
+  .lp-w-heading { animation: none; opacity: 1; }
   .lp-w-sub { animation: none; opacity: 1; }
 }
 

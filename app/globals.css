@@ -399,19 +399,11 @@ body.play[data-anim-style="drift"] {
 }
 
 body.play .hero-copy .eyebrow     { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .05s both; }
-/* Le H1 n'utilise plus l'entrée CSS générique du bloc ci-dessus : il reste
-   invisible jusqu'à ce que GSAP SplitText (une fois les fonts prêtes) le
-   révèle lettre par lettre. Les deux animations qui se chevauchaient
-   (fondu générique du bloc entier, puis reset+réanimation par lettre
-   quelques centaines de ms plus tard) produisaient un effet de texte
-   "fantôme"/dédoublé, surtout visible sur un chargement PWA iOS plus lent.
-   Si le JS échoue, .catch() dans Hero.tsx force opacity:1 en secours. */
-.hero-copy h1                     { opacity: 0; }
-.hero-copy h1.h1-gsap-managed      { animation: none !important; opacity: 1 !important; }
-.hero-copy h1 .split-char          { display: inline-block; will-change: transform, opacity; }
-@media (prefers-reduced-motion: reduce) {
-  .hero-copy h1 { opacity: 1; }
-}
+/* Le H1 s'anime en un seul bloc (pas de découpage par lettre) — voir le
+   commentaire dans Hero.tsx pour pourquoi le découpage par caractère a été
+   retiré (rendu dédoublé/fantôme sur iOS avec l'italique synthétique
+   d'Anton). Un simple fondu est nettement plus fiable sur tous les moteurs. */
+body.play .hero-copy h1           { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .15s both; }
 body.play .hero-copy .lede        { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .25s both; }
 body.play .hero-copy .hero-cta    { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .35s both; }
 body.play .hero-copy .hero-alt    { animation: var(--e-kf) var(--e-dur) var(--e-ease)   .42s both; }

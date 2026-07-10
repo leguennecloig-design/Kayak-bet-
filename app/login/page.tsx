@@ -56,43 +56,18 @@ const DropLogo = () => (
 function WelcomeOverlay({ onDone }: { onDone: () => void }) {
   const cbRef = useRef(onDone);
   cbRef.current = onDone;
-  // N'anime les lettres qu'une fois la police (Anton) réellement chargée —
-  // sinon l'animation démarre avec les métriques de la police de repli, qui
-  // change de largeur en cours d'animation quand Anton finit de charger,
-  // ce qui fait apparaître les lettres comme dédoublées/décalées (bug plus
-  // visible sur un premier chargement PWA iOS, plus lent).
-  const [fontsReady, setFontsReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    document.fonts.ready.then(() => { if (!cancelled) setFontsReady(true); });
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => cbRef.current(), 2400);
     return () => clearTimeout(t);
   }, []);
 
-  const chars = [...'Bon retour parmi nous'];
-
   return (
     <div className="lp-welcome" role="status" aria-live="polite">
       <div className="lp-w-coin" aria-hidden="true">
         <div className="lp-w-face"><span>KB</span></div>
       </div>
-      <h2 className={`lp-w-heading${fontsReady ? " fonts-ready" : ""}`} aria-label="Bon retour parmi nous">
-        {chars.map((ch, i) => (
-          <span
-            key={i}
-            className="lp-char"
-            aria-hidden="true"
-            style={{ animationDelay: `${0.35 + i * 0.045}s` }}
-          >
-            {ch === ' ' ? ' ' : ch}
-          </span>
-        ))}
-      </h2>
+      <h2 className="lp-w-heading">Bon retour parmi nous</h2>
       <p className="lp-w-sub">On t'emmène vers la ligne de départ…</p>
     </div>
   );

@@ -14,7 +14,6 @@ const GoogleIcon = () => (
 
 export default function Hero() {
   const ferroWrapRef = useRef<HTMLDivElement>(null);
-  const h1Ref = useRef<HTMLHeadingElement>(null);
   const trustPanelRef = useRef<HTMLDivElement>(null);
 
   async function signInWithGoogle() {
@@ -55,38 +54,16 @@ export default function Hero() {
     return () => { cancelled = true; handle?.destroy(); };
   }, []);
 
-  // ---- H1 lettre par lettre (GSAP SplitText) ----
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (!h1Ref.current) return;
-    let split: { chars: Element[]; revert: () => void } | null = null;
-    let cancelled = false;
-
-    Promise.all([document.fonts.ready, import("gsap"), import("gsap/SplitText")]).then(
-      ([, { gsap }, { SplitText }]) => {
-        if (cancelled || !h1Ref.current) return;
-        gsap.registerPlugin(SplitText);
-        h1Ref.current.classList.add("h1-gsap-managed");
-        split = new SplitText(h1Ref.current, { type: "chars,words", smartWrap: true }) as unknown as {
-          chars: Element[];
-          revert: () => void;
-        };
-        split.chars.forEach((c) => c.classList.add("split-char"));
-        gsap.fromTo(
-          split.chars,
-          { opacity: 0, y: 42 },
-          { opacity: 1, y: 0, duration: 0.75, ease: "power3.out", stagger: 0.026 }
-        );
-      }
-    ).catch(() => {
-      // GSAP/SplitText n'a pas pu se charger (réseau, etc.) — le h1 reste
-      // invisible sinon (opacity:0 par défaut tant que .h1-gsap-managed
-      // n'est pas posé), donc on le révèle simplement en secours.
-      if (h1Ref.current) h1Ref.current.style.opacity = "1";
-    });
-
-    return () => { cancelled = true; split?.revert(); };
-  }, []);
+  // Le H1 n'anime plus lettre par lettre : sur iOS Safari/PWA, "Anton" n'a
+  // pas de vraie graisse italique (Google Fonts ne fournit que le style
+  // normal) — `font-style: italic` y est donc toujours un italique
+  // synthétique (le moteur incline les glyphes lui-même). Combiner cette
+  // inclinaison synthétique avec une animation par caractère (chaque lettre
+  // découpée et transformée individuellement par GSAP SplitText) faisait
+  // apparaître un rendu dédoublé/fantôme sur iOS, y compris après avoir
+  // essayé d'attendre le chargement des fonts. Un simple fondu du bloc
+  // entier (CSS ci-dessous, pas de découpage par lettre) est le rendu le
+  // plus robuste possible dans ce cas précis.
 
   // ---- chiffres du bandeau de confiance, lettre par lettre à l'entrée ----
   useEffect(() => {
@@ -149,7 +126,7 @@ export default function Hero() {
           <span className="eyebrow">
             <span className="tick" /> Paris sportifs · 100% gratuit
           </span>
-          <h1 ref={h1Ref} className="font-anton italic uppercase text-white mt-6 text-[60px] min-[561px]:text-[74px] min-[921px]:text-[96px] leading-[0.84] tracking-[.005em]">
+          <h1 className="font-anton italic uppercase text-white mt-6 text-[60px] min-[561px]:text-[74px] min-[921px]:text-[96px] leading-[0.84] tracking-[.005em]">
             Ride the<br /><span className="text-cyan">rankings.</span>
           </h1>
           <p className="lede text-[18.5px] leading-[1.65] text-soft max-w-[476px] mt-[26px]">
