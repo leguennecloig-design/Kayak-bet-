@@ -78,7 +78,12 @@ export default function Hero() {
           { opacity: 1, y: 0, duration: 0.75, ease: "power3.out", stagger: 0.026 }
         );
       }
-    );
+    ).catch(() => {
+      // GSAP/SplitText n'a pas pu se charger (réseau, etc.) — le h1 reste
+      // invisible sinon (opacity:0 par défaut tant que .h1-gsap-managed
+      // n'est pas posé), donc on le révèle simplement en secours.
+      if (h1Ref.current) h1Ref.current.style.opacity = "1";
+    });
 
     return () => { cancelled = true; split?.revert(); };
   }, []);

@@ -394,6 +394,8 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
   display: inline-block;
   opacity: 0;
   transform: translateY(10px);
+}
+.lp-w-heading.fonts-ready .lp-char {
   animation: lp-charIn .5s cubic-bezier(.2,.9,.2,1) forwards;
 }
 @keyframes lp-charIn {

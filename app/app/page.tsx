@@ -190,7 +190,7 @@ const StarIcon  = ({ filled }: { filled?: boolean }) => (
 /* ----------------------------------------------------------------
    Types
 ---------------------------------------------------------------- */
-type View = "home" | "competitions" | "classement" | "profil" | "joueur" | "ligue" | "coupon" | "competition-detail";
+type View = "home" | "competitions" | "classement" | "profil" | "joueur" | "ligue" | "competition-detail";
 
 type Odd = {
   id: string;            // clé composite `${participantId}:${betType}`
@@ -261,16 +261,16 @@ function fmtDate(iso: string) {
 }
 
 const TOPNAV = [
-  { ic: "home",   t: "Accueil",      v: "home"         as View },
-  { ic: "trophy", t: "Compétitions", v: "competitions" as View },
-  { ic: "chart",  t: "Classement",   v: "classement"   as View },
-  { ic: "ticket", t: "Mes paris",    v: "coupon"       as View },
+  { ic: "home",   t: "Accueil",      v: "home"         as View | "drawer" },
+  { ic: "trophy", t: "Compétitions", v: "competitions" as View | "drawer" },
+  { ic: "chart",  t: "Classement",   v: "classement"   as View | "drawer" },
+  { ic: "ticket", t: "Mes paris",    v: "drawer"       as View | "drawer" },
 ];
 
 const BOTNAV = [
   { ic: "home",   t: "Accueil",    kind: "nav", v: "home"         as View },
   { ic: "trophy", t: "Compét.",    kind: "nav", v: "competitions" as View },
-  { ic: "ticket", t: "Coupon",     kind: "fab", v: "coupon"       as View },
+  { ic: "ticket", t: "Coupon",     kind: "bet"                           },
   { ic: "chart",  t: "Classement", kind: "nav", v: "classement"   as View },
   { ic: "user",   t: "Profil",     kind: "nav", v: "profil"       as View },
 ] as const;
@@ -284,7 +284,7 @@ type HomeViewProps = {
   competitions: Competition[];
   name: string;
   cd: { d: string; h: string; m: string; s: string };
-  navigate: (v: View) => void;
+  navigate: (v: View | "drawer") => void;
   myRank: number | null;
   pendingCount: number;
   streak: number;
@@ -622,78 +622,6 @@ function CompetitionsView({
           </div>
         ))}
       </div>
-    </>
-  );
-}
-
-type CouponViewProps = {
-  selected: Odd[];
-  count: number;
-  stake: number;
-  setStake: Dispatch<SetStateAction<number>>;
-  totalOdds: number;
-  gain: number;
-  betLoading: boolean;
-  removeBet: (id: string) => void;
-  validate: () => void;
-  navigate: (v: View) => void;
-};
-
-function CouponView({
-  selected, count, stake, setStake, totalOdds, gain, betLoading, removeBet, validate, navigate,
-}: CouponViewProps) {
-  return (
-    <>
-      <div className="view-header">
-        <h1>Mon coupon</h1>
-        <p>{count > 0 ? `${count} sélection${count > 1 ? "s" : ""} en attente` : "Compose ton pari en sélectionnant des cotes"}</p>
-      </div>
-
-      {count === 0 ? (
-        <div className="empty empty-coupon">
-          <TicketStroke c="#5C7C8C" />
-          <p>Ton coupon est vide. Clique sur une cote pour commencer.</p>
-          <button className="empty-link" onClick={() => navigate("competitions")}>
-            Voir les compétitions <Arrow />
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="coupon-list">
-            {selected.map((o) => (
-              <div className="bet" key={o.id}>
-                <div className="ev">{o.note}{o.betType !== "TOP_1" && <> · {o.betLabel}</>}</div>
-                <div className="row">
-                  <div className="nm">{o.nm}</div>
-                  <div className="od">{o.val.toFixed(2)}</div>
-                </div>
-                <button className="rm" onClick={() => removeBet(o.id)}><XIcon c="currentColor" /></button>
-              </div>
-            ))}
-          </div>
-
-          <div className="drawer-foot">
-            <div className="stake">
-              <label>Mise</label>
-              <div className="field">
-                <input type="number" min={1} value={stake} onChange={(e) => setStake(Math.max(0, +e.target.value || 0))} />
-                <div className="chips">
-                  <button className="chip" onClick={() => setStake((s) => (s || 0) + 10)}>+10</button>
-                  <button className="chip" onClick={() => setStake((s) => (s || 0) + 50)}>+50</button>
-                </div>
-              </div>
-            </div>
-            <div className="summary"><span>Cote totale</span><span className="od">{totalOdds.toFixed(2)}</span></div>
-            <div className="summary big">
-              <span className="lab">Gain potentiel</span>
-              <span className="gain">{gain.toLocaleString("fr-FR")}</span>
-            </div>
-            <button className="validate" onClick={validate} disabled={betLoading} style={{ opacity: betLoading ? 0.6 : 1 }}>
-              {betLoading ? "Validation…" : "Valider le pari"}
-            </button>
-          </div>
-        </>
-      )}
     </>
   );
 }
@@ -1396,10 +1324,23 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
 export default function DashboardPage() {
   const supabase = createClient();
 
+  // Splash de lancement — masque le bref instant où le solde/le nom
+  // affichent leurs valeurs par défaut avant que /api/user/profile réponde,
+  // et donne une sensation d'ouverture d'app native quand on relance la PWA
+  // en étant déjà connecté (le middleware saute alors directement ici).
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashMounted, setSplashMounted] = useState(true);
+  useEffect(() => {
+    const hide    = setTimeout(() => setSplashVisible(false), 700);
+    const unmount = setTimeout(() => setSplashMounted(false), 1050);
+    return () => { clearTimeout(hide); clearTimeout(unmount); };
+  }, []);
+
   const [view,          setView]          = useState<View>("home");
   const [balance,       setBalance]       = useState(0);
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
   const [stake,         setStake]         = useState(50);
+  const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [betLoading,    setBetLoading]    = useState(false);
   const [cd,            setCd]            = useState({ d: "00", h: "00", m: "00", s: "00" });
   const [dbComps,       setDbComps]       = useState<Competition[] | null>(null);
@@ -1625,7 +1566,7 @@ export default function DashboardPage() {
 
       setBalance(Number(json.newBalance));
       setCoupon({});
-      navigate("home");
+      setDrawerOpen(false);
       showToast(<Check c="#28D7E6" />, <>Pari validé · gain potentiel <span>{Math.round(json.gainPotentiel).toLocaleString("fr-FR")} cr.</span></>);
       void firstComp;
       fetchBetHistory();
@@ -1641,12 +1582,13 @@ export default function DashboardPage() {
     location.href = "/";
   }
 
-  function navigate(v: View) {
+  function navigate(v: View | "drawer") {
+    if (v === "drawer") { setDrawerOpen(true); return; }
     setView(v);
   }
 
-  const topActive = { home: 0, competitions: 1, classement: 2, coupon: 3, profil: -1, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;
-  const botActive = { home: 0, competitions: 1, coupon: 2, classement: 3, profil: 4, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;
+  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;
+  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;
 
   useLayoutEffect(() => {
     const nav  = navRef.current;
@@ -1680,6 +1622,14 @@ export default function DashboardPage() {
   ================================================================ */
   return (
     <div className="kb-app">
+
+      {splashMounted && (
+        <div className={`app-splash${splashVisible ? "" : " hide"}`} aria-hidden="true">
+          <span className="kb-coin kb-coin-splash">
+            <span className="kb-face"><span className="kb-letters">KB</span></span>
+          </span>
+        </div>
+      )}
 
       {/* ============ HEADER ============ */}
       <header className="site">
@@ -1745,20 +1695,6 @@ export default function DashboardPage() {
             />
           )}
           {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} />}
-          {view === "coupon" && (
-            <CouponView
-              selected={selected}
-              count={count}
-              stake={stake}
-              setStake={setStake}
-              totalOdds={totalOdds}
-              gain={gain}
-              betLoading={betLoading}
-              removeBet={removeBet}
-              validate={validate}
-              navigate={navigate}
-            />
-          )}
           {view === "competition-detail" && viewedCompetitionId && (
             <CategoryBetModal
               onBack={() => navigate(viewedCompetitionId.from)}
@@ -1769,7 +1705,7 @@ export default function DashboardPage() {
               coupon={coupon}
               toggle={toggle}
               couponCount={count}
-              onOpenCoupon={() => navigate("coupon")}
+              onOpenCoupon={() => setDrawerOpen(true)}
             />
           )}
           {view === "joueur" && viewedPlayerId && (
@@ -1799,6 +1735,63 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+
+      {/* ============ COUPON FAB ============ */}
+      <button className="fab" onClick={() => setDrawerOpen(true)}>
+        <TicketStroke c="#0A2A3D" /> Coupon <span className="cnt">{count}</span>
+      </button>
+
+      {/* ============ SCRIM + DRAWER ============ */}
+      <div className={`scrim${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} />
+      <aside className={`drawer${drawerOpen ? " open" : ""}`}>
+        <div className="drawer-head">
+          <div className="ttl"><TicketStroke c="#fff" /> Mon coupon</div>
+          <button className="close" onClick={() => setDrawerOpen(false)}><XIcon c="#9FBAC6" /></button>
+        </div>
+
+        <div className="drawer-body">
+          {count === 0 ? (
+            <div className="empty">
+              <TicketStroke c="#5C7C8C" />
+              <p>Ton coupon est vide. Clique sur une cote pour commencer.</p>
+            </div>
+          ) : (
+            selected.map((o) => (
+              <div className="bet" key={o.id}>
+                <div className="ev">{o.note}{o.betType !== "TOP_1" && <> · {o.betLabel}</>}</div>
+                <div className="row">
+                  <div className="nm">{o.nm}</div>
+                  <div className="od">{o.val.toFixed(2)}</div>
+                </div>
+                <button className="rm" onClick={() => removeBet(o.id)}><XIcon c="currentColor" /></button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {count > 0 && (
+          <div className="drawer-foot">
+            <div className="stake">
+              <label>Mise</label>
+              <div className="field">
+                <input type="number" min={1} value={stake} onChange={(e) => setStake(Math.max(0, +e.target.value || 0))} />
+                <div className="chips">
+                  <button className="chip" onClick={() => setStake((s) => (s || 0) + 10)}>+10</button>
+                  <button className="chip" onClick={() => setStake((s) => (s || 0) + 50)}>+50</button>
+                </div>
+              </div>
+            </div>
+            <div className="summary"><span>Cote totale</span><span className="od">{totalOdds.toFixed(2)}</span></div>
+            <div className="summary big">
+              <span className="lab">Gain potentiel</span>
+              <span className="gain">{gain.toLocaleString("fr-FR")}</span>
+            </div>
+            <button className="validate" onClick={validate} disabled={betLoading} style={{ opacity: betLoading ? 0.6 : 1 }}>
+              {betLoading ? "Validation…" : "Valider le pari"}
+            </button>
+          </div>
+        )}
+      </aside>
 
       <EditProfileModal
         open={editProfileOpen}
@@ -1837,13 +1830,11 @@ export default function DashboardPage() {
       {/* ============ BOTTOM NAV ============ */}
       <nav className="botnav">
         {BOTNAV.map((n, i) => {
-          if (n.kind === "fab") {
+          if (n.kind === "bet") {
             return (
-              <button key={n.t} className={`botnav-fab${i === botActive ? " active" : ""}`} onClick={() => navigate(n.v)}>
-                <span className="botnav-fab-ic">
-                  <NavIcon name={n.ic} />
-                  {count > 0 && <span className="bdot on">{count}</span>}
-                </span>
+              <button key={n.t} onClick={() => setDrawerOpen(true)}>
+                <NavIcon name={n.ic} />
+                <span className={`bdot${count > 0 ? " on" : ""}`}>{count}</span>
                 <span className="bl">{n.t}</span>
               </button>
             );
