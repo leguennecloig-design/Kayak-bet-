@@ -512,11 +512,6 @@
   border-radius: 9px;
   padding: 8px 12px;
 }
-.kb-app .live .bolt {
-  width: 13px;
-  height: 13px;
-  display: inline-flex;
-}
 .kb-app .live-pulse-dot {
   position: relative;
   width: 6px;
@@ -1204,20 +1199,16 @@
 .kb-app .comp-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font: 700 9.5px/1 var(--font-grotesk), monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #FF7A45;
-  background: rgba(255, 122, 69, 0.12);
-  border: 1px solid rgba(255, 122, 69, 0.28);
+  color: var(--accent2);
+  background: rgba(40, 215, 230, 0.1);
+  border: 1px solid rgba(40, 215, 230, 0.32);
   border-radius: 7px;
-  padding: 5px 8px;
+  padding: 5px 9px;
   margin-bottom: 11px;
-}
-.kb-app .comp-badge svg {
-  width: 10px;
-  height: 10px;
 }
 .kb-app .comp-name {
   font: 400 italic 22px/0.95 var(--font-anton), sans-serif;

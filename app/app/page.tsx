@@ -137,7 +137,6 @@ const TicketStroke = ({ c }: { c: string }) => (
     <path d="M13.5 6.8v8.2" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeDasharray="1.4 2.4" />
   </svg>
 );
-const Bolt      = ({ c }: { c: string }) => <svg viewBox="0 0 24 24" fill="none"><path d="M13 2 4 13.5h6.2L9 22l10-12.2h-6.3L14 2Z" fill={c} /></svg>;
 const Check     = ({ c }: { c: string }) => <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5 10 17.5 19 7" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 const XIcon     = ({ c }: { c: string }) => <svg viewBox="0 0 24 24" fill="none"><path d="M6 6 18 18M18 6 6 18" stroke={c} strokeWidth="2.2" strokeLinecap="round" /></svg>;
 const Arrow     = () => <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -438,7 +437,6 @@ function HomeView({
             <div className="ft-head">
               <span className="live">
                 <span className="live-pulse-dot" />
-                <span className="bolt"><Bolt c="#FF7A45" /></span>
                 Prochaine grande compétition{feat.date ? ` · ${fmtDate(feat.date)}` : ""}
               </span>
               <h2>{feat.name}</h2>
@@ -600,7 +598,7 @@ function CompetitionsView({
           <div key={c.id} className={`comp-card${c.featured ? " comp-featured" : ""}`}>
             <div className="comp-card-top" onClick={() => openBetModal(c.id, c.name)}>
               <div className="comp-left">
-                {c.featured && <span className="comp-badge"><Bolt c="#FF7A45" /> Featured</span>}
+                {c.featured && <span className="comp-badge"><span className="live-pulse-dot" /> À la une</span>}
                 <h2 className="comp-name">{c.name}</h2>
                 <div className="comp-meta">
                   <span><ColPin />{c.location}</span>
