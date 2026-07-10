@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { BetType } from "@/lib/algo/types";
 
 export type BetOdd = {
@@ -54,41 +54,38 @@ const COTE_FIELD: Record<BetType, keyof CotesRow> = {
 const TYPE_LABEL: Record<string, string> = { sprint: "Sprint", classique: "Classique" };
 
 type Props = {
-  open: boolean;
-  onClose: () => void;
+  onBack: () => void;
   competitionId: string;
   competitionNom: string;
   odds: BetOdd[]; // toutes catégories confondues — la startlist complète de la compétition
   typeCompetition?: string | null;
   coupon: Record<string, BetOdd>;
   toggle: (o: BetOdd) => void;
+  couponCount: number;
+  onOpenCoupon: () => void;
 };
 
 export default function CategoryBetModal({
-  open, onClose, competitionId, competitionNom, odds, typeCompetition, coupon, toggle,
+  onBack, competitionId, competitionNom, odds, typeCompetition, coupon, toggle, couponCount, onOpenCoupon,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
   const [cotes, setCotes] = useState<CotesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   const cats = [...new Set(odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
 
   // Choisit une catégorie par défaut à l'ouverture. Ne dépend volontairement
-  // que de [open, competitionId] (pas de `cats`) — sinon un re-render parent
+  // que de [competitionId] (pas de `cats`) — sinon un re-render parent
   // (ex: le compte à rebours) pourrait réinitialiser la sélection de
   // l'utilisateur en cours de consultation.
   useEffect(() => {
-    if (!open) return;
     setSelectedCat(prev => (cats.includes(prev) && prev) || cats[0] || "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, competitionId]);
+  }, [competitionId]);
 
   useEffect(() => {
-    if (!open || !selectedCat) return;
+    if (!selectedCat) return;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -98,52 +95,30 @@ export default function CategoryBetModal({
       .catch(() => { if (!cancelled) setError("Impossible de charger les cotes."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, competitionId, selectedCat]);
-
-  // Ne dépend que de `open` — voir EditProfileModal pour le pourquoi (sinon
-  // le re-render périodique du parent, ex: le compte à rebours, relance ce
-  // focus-grab en boucle).
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onCloseRef.current();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    dialogRef.current?.focus();
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
-
-  if (!open) return null;
+  }, [competitionId, selectedCat]);
 
   const cotesByCode = new Map((cotes ?? []).map(c => [c.code_bateau, c]));
   const participants = odds.filter(o => o.categorie === selectedCat);
 
   return (
-    <div className="catmodal-scrim" onClick={onClose}>
-      <div
-        className="catmodal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Paris ${selectedCat} — ${competitionNom}`}
-        tabIndex={-1}
-        ref={dialogRef}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="catmodal-head">
-          <div>
-            <div className="catmodal-cat">
-              {selectedCat}
-              {typeCompetition && TYPE_LABEL[typeCompetition] && (
-                <span className="catmodal-type"> · {TYPE_LABEL[typeCompetition]}</span>
-              )}
-            </div>
-            <h3>{competitionNom}</h3>
+    <>
+      <div className="catmodal-head">
+        <button className="catmodal-back" aria-label="Retour" onClick={onBack}>
+          <svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+        <div>
+          <div className="catmodal-cat">
+            {selectedCat}
+            {typeCompetition && TYPE_LABEL[typeCompetition] && (
+              <span className="catmodal-type"> · {TYPE_LABEL[typeCompetition]}</span>
+            )}
           </div>
-          <button className="catmodal-close" aria-label="Fermer" onClick={onClose}>
-            <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-          </button>
+          <h3>{competitionNom}</h3>
         </div>
+        <span className="catmodal-spacer" />
+      </div>
 
+      <div className="catmodal-scroll">
         {cats.length > 1 && (
           <div className="cat-tabs catmodal-cat-tabs">
             {cats.map(cat => (
@@ -204,6 +179,15 @@ export default function CategoryBetModal({
           })}
         </div>
       </div>
-    </div>
+
+      {couponCount > 0 && (
+        <div className="catmodal-foot">
+          <button className="catmodal-foot-btn" onClick={onOpenCoupon}>
+            <span className="n">{couponCount} sélection{couponCount > 1 ? "s" : ""}</span>
+            <span className="go">Voir mon coupon</span>
+          </button>
+        </div>
+      )}
+    </>
   );
 }
