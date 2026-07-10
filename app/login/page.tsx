@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
+import Turnstile, { TURNSTILE_SITE_KEY } from "@/app/components/Turnstile";
 import "./login.css";
 
 type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding" | "push-prompt";
@@ -335,6 +336,8 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaReset, setCaptchaReset] = useState(0);
   const push = usePushNotifications();
 
   // Capture le code de parrainage depuis l'URL (?ref=CODE) dès l'arrivée sur
@@ -373,16 +376,28 @@ export default function LoginPage() {
     };
   }, []);
 
+  function resetCaptcha() {
+    setCaptchaToken("");
+    setCaptchaReset((n) => n + 1);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError("Merci de valider la vérification anti-robot avant de continuer.");
+      return;
+    }
+
     setLoading(true);
 
     if (mode === "forgot") {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${location.origin}/auth/callback`,
+        captchaToken: captchaToken || undefined,
       });
-      if (error) setError(error.message);
+      if (error) { setError(error.message); resetCaptcha(); }
       else setMode("reset-sent");
       setLoading(false);
       return;
@@ -392,13 +407,13 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${location.origin}/auth/callback`, captchaToken: captchaToken || undefined },
       });
-      if (error) setError(error.message);
+      if (error) { setError(error.message); resetCaptcha(); }
       else setMode("sent");
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) { setError(error.message); }
+      const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captchaToken || undefined } });
+      if (error) { setError(error.message); resetCaptcha(); }
       else { setMode("welcome"); }
     }
 
@@ -417,6 +432,7 @@ export default function LoginPage() {
     setMode(next);
     setError("");
     setPassword("");
+    resetCaptcha();
   }
 
   /* ---- Welcome overlay ---- */
@@ -652,6 +668,12 @@ export default function LoginPage() {
                   >
                     Mot de passe oublié ?
                   </button>
+                </div>
+              )}
+
+              {TURNSTILE_SITE_KEY && (
+                <div style={{ margin: "4px 0 18px" }}>
+                  <Turnstile onToken={setCaptchaToken} onExpire={() => setCaptchaToken("")} resetKey={captchaReset} />
                 </div>
               )}
 

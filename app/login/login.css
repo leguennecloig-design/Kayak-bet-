@@ -177,6 +177,8 @@
   text-transform: uppercase;
 }
 
+.lp-turnstile { display: flex; justify-content: center; }
+
 /* ---- Fields ---- */
 .lp-field { margin-bottom: 18px; }
 .lp-field label {

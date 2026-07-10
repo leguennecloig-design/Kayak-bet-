@@ -175,24 +175,27 @@ export async function POST(req: NextRequest) {
     s.cote = serverCote; // jamais la valeur client pour le calcul financier
   }
 
-  // Récupérer le solde actuel
-  const { data: userRow } = await adminSb
-    .from("users")
-    .select("balance")
-    .eq("id", user.id)
-    .single();
-
-  const currentBalance = Number(userRow?.balance ?? 0);
-  if (currentBalance < stake) {
-    return NextResponse.json({ error: "Solde insuffisant" }, { status: 400 });
-  }
-
   const coteTotale    = selections.reduce((t, s) => t * s.cote, 1);
   const gainPotentiel = Math.round(stake * coteTotale * 100) / 100;
 
   // competition_id = compétition du 1er sélectionné (ou null si multi-comp)
   const uniqueComps = [...new Set(selections.map(s => s.competitionId))];
   const competitionId = uniqueComps.length === 1 ? uniqueComps[0] : null;
+
+  // Débiter le solde de façon atomique ET conditionnelle (WHERE balance >=
+  // stake dans le même UPDATE, voir migration 20260714) — élimine la course
+  // entre deux requêtes concurrentes qui, avec un SELECT solde puis un débit
+  // séparé, pouvaient toutes les deux lire le même solde suffisant avant
+  // qu'aucune n'écrive, et donc placer plusieurs paris pour un solde qui
+  // n'aurait dû en couvrir qu'un (voire faire passer le solde en négatif).
+  const { data: newBalance, error: debitErr } = await adminSb.rpc("decrement_balance_if_sufficient", {
+    user_uuid: user.id,
+    amount: stake,
+  });
+  if (debitErr) return NextResponse.json({ error: debitErr.message }, { status: 500 });
+  if (newBalance == null) {
+    return NextResponse.json({ error: "Solde insuffisant" }, { status: 400 });
+  }
 
   // Insérer le pari
   const { data: bet, error: betErr } = await adminSb
@@ -210,14 +213,10 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (betErr || !bet) {
+    // Le pari n'a finalement pas été créé : rembourse le débit déjà effectué.
+    await adminSb.rpc("increment_user_balance", { user_uuid: user.id, delta: stake });
     return NextResponse.json({ error: betErr?.message ?? "Erreur insertion" }, { status: 500 });
   }
-
-  // Débiter le solde atomiquement
-  const { data: newBal } = await adminSb.rpc("increment_user_balance", {
-    user_uuid: user.id,
-    delta: -stake,
-  });
 
   // Créer la transaction de mise
   await adminSb.from("transactions").insert({
@@ -230,7 +229,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     betId:         bet.id,
-    newBalance:    Number(newBal ?? (currentBalance - stake)),
+    newBalance:    Number(newBalance),
     gainPotentiel,
   });
 }

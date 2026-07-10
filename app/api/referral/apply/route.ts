@@ -17,17 +17,6 @@ export async function POST(req: NextRequest) {
   const trimmed = String(code ?? "").trim().toUpperCase();
   if (!trimmed) return NextResponse.json({ ok: false, reason: "no_code" });
 
-  const { data: me } = await adminSb
-    .from("users")
-    .select("id, referred_by")
-    .eq("id", user.id)
-    .single();
-
-  // Idempotent : un compte ne peut être parrainé qu'une fois.
-  if (me?.referred_by) {
-    return NextResponse.json({ ok: false, reason: "already_referred" });
-  }
-
   const { data: referrer } = await adminSb
     .from("users")
     .select("id")
@@ -38,11 +27,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "invalid_code" });
   }
 
-  const { error: updateErr } = await adminSb
+  // Mise à jour atomique conditionnée à `referred_by IS NULL` : élimine la
+  // course entre deux requêtes concurrentes (deux codes envoyés en parallèle
+  // par le même compte) qui, avec un simple SELECT-puis-UPDATE, pouvaient
+  // toutes les deux lire "pas encore parrainé" avant qu'aucune n'écrive, et
+  // donc créditer le même compte deux fois. Seule la requête qui gagne la
+  // course trouve une ligne à mettre à jour ; l'autre reçoit `updated: null`
+  // et s'arrête sans créditer personne.
+  const { data: updated, error: updateErr } = await adminSb
     .from("users")
     .update({ referred_by: referrer.id })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .is("referred_by", null)
+    .select("id")
+    .maybeSingle();
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  if (!updated) {
+    return NextResponse.json({ ok: false, reason: "already_referred" });
+  }
 
   await adminSb.rpc("increment_user_balance", { user_uuid: referrer.id, delta: REFERRAL_BONUS });
   await adminSb.rpc("increment_user_balance", { user_uuid: user.id, delta: REFERRAL_BONUS });

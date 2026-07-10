@@ -92,9 +92,9 @@ export default function LinkAthleteModal({ open, onClose, onLinked }: Props) {
   }
 
   return (
-    <div className="catmodal-scrim" onClick={onClose}>
+    <div className="kb-modal-scrim" onClick={onClose}>
       <div
-        className="catmodal"
+        className="kb-modal"
         role="dialog"
         aria-modal="true"
         aria-label="Lier mon profil athlète"
@@ -102,14 +102,14 @@ export default function LinkAthleteModal({ open, onClose, onLinked }: Props) {
         ref={dialogRef}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="catmodal-head">
+        <div className="kb-modal-head">
           <h3>Lier mon profil athlète</h3>
-          <button className="catmodal-close" aria-label="Fermer" onClick={onClose}>
+          <button className="kb-modal-close" aria-label="Fermer" onClick={onClose}>
             <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           </button>
         </div>
 
-        <div className="catmodal-body">
+        <div className="kb-modal-body">
           {error && <p className="catmodal-status err">{error}</p>}
 
           {!confirming ? (

@@ -1743,6 +1743,20 @@
   font: 800 11.5px/1 var(--font-archivo);
   color: var(--accent);
 }
+.kb-app .referral-explain {
+  font: 600 13px/1.55 var(--font-archivo);
+  color: var(--soft);
+  margin: 0;
+}
+.kb-app .referral-explain b {
+  color: #fff;
+}
+.kb-app .referral-count {
+  font: 700 12px/1.4 var(--font-archivo);
+  color: var(--mute);
+  text-align: center;
+  margin: 0;
+}
 
 .kb-app .history-list {
   display: flex;
@@ -2401,6 +2415,71 @@
   .kb-app .catmodal-bet {
     padding: 7px 10px;
   }
+}
+
+/* ============ MODALE GÉNÉRIQUE (scrim + carte centrée) ============ */
+/* Utilisée par Modifier le profil, Lier mon profil athlète, Parrainage. */
+.kb-app .kb-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 16, 24, 0.62);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+.kb-app .kb-modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--navy-2), var(--navy) 40%, var(--deep));
+  border: 1px solid var(--border-2);
+  border-radius: 20px;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.65);
+  outline: none;
+}
+.kb-app .kb-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.kb-app .kb-modal-head h3 {
+  font: 400 italic 21px/1.05 var(--font-anton), sans-serif;
+  text-transform: uppercase;
+  color: #fff;
+  margin: 0;
+}
+.kb-app .kb-modal-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--border-2);
+  background: transparent;
+  color: var(--idle);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kb-app .kb-modal-close svg {
+  width: 14px;
+  height: 14px;
+}
+.kb-app .kb-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ============ EDIT PROFILE MODAL ============ */

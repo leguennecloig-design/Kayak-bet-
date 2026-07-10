@@ -7,6 +7,7 @@ import type { BetType } from "@/lib/algo/types";
 import CategoryBetModal from "@/app/components/CategoryBetModal";
 import EditProfileModal from "@/app/components/EditProfileModal";
 import LinkAthleteModal from "@/app/components/LinkAthleteModal";
+import ReferralModal from "@/app/components/ReferralModal";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
 
@@ -1414,6 +1415,7 @@ export default function DashboardPage() {
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [linkedAthlete, setLinkedAthlete] = useState<LinkedAthlete | null>(null);
   const [linkAthleteOpen, setLinkAthleteOpen] = useState(false);
+  const [referralModalOpen, setReferralModalOpen] = useState(false);
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [viewedCompetitionId, setViewedCompetitionId] = useState<{ compId: string; compNom: string; from: View } | null>(null);
@@ -1587,12 +1589,6 @@ export default function DashboardPage() {
     navigate("ligue");
   }
 
-  function goToParrainage() {
-    navigate("profil");
-    setTimeout(() => {
-      document.getElementById("profil-parrainage")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 60);
-  }
 
   async function validate() {
     const s = Math.max(0, stake || 0);
@@ -1710,7 +1706,7 @@ export default function DashboardPage() {
                   <span className="kb-letters">KB</span>
                 </span>
               </span>
-              <button className="plus" onClick={goToParrainage} aria-label="Parrainage — gagne des crédits">
+              <button className="plus" onClick={() => setReferralModalOpen(true)} aria-label="Parrainage — gagne des crédits">
                 <GiftIcon />
               </button>
             </div>
@@ -1825,6 +1821,11 @@ export default function DashboardPage() {
         open={linkAthleteOpen}
         onClose={() => setLinkAthleteOpen(false)}
         onLinked={(athlete) => setLinkedAthlete(athlete)}
+      />
+
+      <ReferralModal
+        open={referralModalOpen}
+        onClose={() => setReferralModalOpen(false)}
       />
 
       {/* ============ TOAST ============ */}
