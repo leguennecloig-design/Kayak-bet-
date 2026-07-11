@@ -433,7 +433,7 @@
 }
 .kb-app .chip-stat .tx .v {
   display: block;
-  font: 800 16px/1.1 var(--font-archivo);
+  font: 400 italic 18px/1.1 var(--font-anton), sans-serif;
   color: #fff;
   margin-top: 6px;
 }
@@ -514,9 +514,9 @@
   text-align: center;
   padding-right: 0;
 }
-.kb-app .live-table td.lv-rank.top1 { color: #FFD700; }
-.kb-app .live-table td.lv-rank.top2 { color: #C0C0C0; }
-.kb-app .live-table td.lv-rank.top3 { color: #CD7F32; }
+.kb-app .live-table td.lv-rank.top1 { color: var(--cyan); }
+.kb-app .live-table td.lv-rank.top2 { color: var(--idle); }
+.kb-app .live-table td.lv-rank.top3 { color: var(--coral); }
 .kb-app .live-table td.lv-name {
   font-weight: 700;
   color: #fff;
@@ -2343,21 +2343,22 @@
 
 /* ---- CAT-TABS "OUVRIR MODAL" BUTTON ---- */
 .kb-app .cat-open-modal {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
+  justify-content: center;
   gap: 9px;
-  font: 700 13px/1 var(--font-archivo);
-  color: var(--cyan);
-  background: rgba(40, 215, 230, 0.08);
-  border: 1px solid rgba(40, 215, 230, 0.3);
+  font: 800 14px/1 var(--font-archivo);
+  color: var(--navy);
+  background: linear-gradient(95deg, var(--cyan), var(--turq));
+  border: none;
   border-radius: 12px;
-  padding: 13px 16px;
+  padding: 15px 16px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  box-shadow: 0 12px 26px -10px rgba(40, 215, 230, 0.55);
+  transition: transform 0.12s;
 }
 .kb-app .cat-open-modal:hover {
-  background: rgba(40, 215, 230, 0.14);
-  border-color: rgba(40, 215, 230, 0.5);
   transform: translateY(-1px);
 }
 .kb-app .cat-open-modal svg {
