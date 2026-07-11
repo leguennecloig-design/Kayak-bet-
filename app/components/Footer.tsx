@@ -14,7 +14,6 @@ const COLS = [
     h: "Disciplines",
     links: [
       { t: "Descente", href: "#" },
-      { t: "Kayak-cross", href: "#" },
     ],
   },
   {
@@ -22,7 +21,7 @@ const COLS = [
     links: [
       { t: "L'équipe", href: "#" },
       { t: "Jeu responsable", href: "#" },
-      { t: "Conditions", href: "#" },
+      { t: "Conditions", href: "/conditions" },
       { t: "Contact", href: "mailto:contact.loig@kayakbet.fr" },
     ],
   },
@@ -106,14 +105,11 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="mt-11 pt-6 border-t border-[var(--border)] flex items-center justify-between gap-[18px] flex-wrap">
+        <div className="mt-11 pt-6 border-t border-[var(--border)]">
           <p className="font-archivo font-medium text-[12.5px] leading-[1.6] text-mute m-0">
             © 2026 Kayakbet · Jeu gratuit à crédits fictifs, sans valeur
             monétaire et sans gain réel.
           </p>
-          <span className="font-grotesk font-extrabold text-[12px] leading-none text-coral border-[1.5px] border-coral rounded-[8px] px-[9px] py-[6px] tracking-[.04em]">
-            18+ · Jeu responsable
-          </span>
         </div>
       </div>
     </footer>
