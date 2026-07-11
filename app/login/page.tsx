@@ -665,9 +665,73 @@ export default function LoginPage() {
     );
   }
 
-  /* ---- Email sent screens ---- */
-  if (mode === "sent" || mode === "reset-sent") {
-    const isSent = mode === "sent";
+  /* ---- Écran de confirmation d'inscription (design dédié) ---- */
+  if (mode === "sent") {
+    return (
+      <div className="lp-verify">
+        <div className="lp-bg" />
+        <div className="lp-glow g1" /><div className="lp-glow g2" />
+        <div className="lp-verify-inner">
+          <div className="lp-verify-logo">
+            <DropLogo />
+            <span>KAYAKBET</span>
+          </div>
+
+          <span className="lp-verify-pill"><span className="dot" />Activation du compte</span>
+
+          <h1 className="lp-verify-title">
+            Vérifie ton email<br /><span className="c">pour t&apos;activer.</span>
+          </h1>
+          <svg className="lp-verify-wave" viewBox="0 0 240 20" preserveAspectRatio="none" fill="none" aria-hidden="true">
+            <path d="M2 13c36 0 36-8 72-8s36 8 72 8 36-8 92-8" stroke="#28D7E6" strokeWidth="5" fill="none" strokeLinecap="round"/>
+          </svg>
+
+          <ol className="lp-verify-steps">
+            <li>
+              <span className="n">01</span>
+              <div><h3>Ouvre ta boîte mail</h3><p>Un message vient d&apos;arriver juste après ton inscription.</p></div>
+            </li>
+            <li>
+              <span className="n">02</span>
+              <div><h3>Trouve le mail de Supabase Auth</h3><p>Regarde aussi du côté des spams si tu ne le vois pas.</p></div>
+            </li>
+            <li>
+              <span className="n">03</span>
+              <div><h3>Clique sur le lien de confirmation</h3><p>Il active ton compte Kayakbet en un instant.</p></div>
+            </li>
+            <li>
+              <span className="n">04</span>
+              <div><h3>Reconnecte-toi</h3><p>Une fois le lien cliqué, reviens te connecter avec ton email{email ? <> (<strong>{email}</strong>)</> : ""}.</p></div>
+            </li>
+          </ol>
+
+          <div className="lp-verify-mail">
+            <div className="lp-verify-mail-hd">
+              <span className="lp-verify-mail-av">S</span>
+              <div>
+                <div className="nm">Supabase Auth</div>
+                <div className="addr">noreply@mail.app.supabase.io</div>
+              </div>
+            </div>
+            <div className="lp-verify-mail-body">
+              <h4>Confirme ton inscription</h4>
+              <p>Clique sur le bouton ci-dessous pour confirmer ton adresse et activer ton compte Kayakbet.</p>
+              <span className="lp-verify-mail-btn">Confirmer mon compte</span>
+            </div>
+          </div>
+
+          <p className="lp-verify-foot">
+            Rien reçu ? Vérifie tes spams ou{" "}
+            <button type="button" onClick={() => switchMode("signup")}>réessaie l&apos;inscription</button>.
+          </p>
+          <button className="lp-verify-back" onClick={() => switchMode("login")}>← Retour à la connexion</button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Lien de réinitialisation envoyé ---- */
+  if (mode === "reset-sent") {
     return (
       <div className="lp-bg-bg min-h-screen flex flex-col items-center justify-center px-5">
         <div className="lp-bg" />
@@ -683,12 +747,10 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="font-anton italic uppercase text-white text-[36px] leading-[0.9] mb-4">
-            {isSent ? <>Vérifie<br />ton mail</> : <>Lien<br />envoyé</>}
+            Lien<br />envoyé
           </h1>
           <p className="text-soft text-[15px] leading-[1.6]">
-            {isSent
-              ? <>Un lien de confirmation a été envoyé à <strong className="text-white">{email}</strong>. Clique dessus pour activer ton compte.</>
-              : <>Un lien de réinitialisation a été envoyé à <strong className="text-white">{email}</strong>.</>}
+            Un lien de réinitialisation a été envoyé à <strong className="text-white">{email}</strong>.
           </p>
           <button
             onClick={() => switchMode("login")}

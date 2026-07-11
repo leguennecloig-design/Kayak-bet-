@@ -750,3 +750,168 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
   border-color: transparent;
   background: linear-gradient(95deg, var(--cyan), var(--turq));
 }
+
+/* ============================================================
+   Écran "vérifie ton email" (confirmation d'inscription)
+   ============================================================ */
+.lp-verify {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  padding: max(56px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+.lp-verify-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  animation: lp-cardIn .5s cubic-bezier(.2,.9,.2,1) both;
+}
+
+.lp-verify-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+.lp-verify-logo svg { width: 24px; height: 27px; }
+.lp-verify-logo span {
+  font: 800 15px/1 var(--font-archivo);
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.lp-verify-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 10.5px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  background: rgba(40,215,230,.08);
+  border: 1px solid rgba(40,215,230,.28);
+  border-radius: 999px;
+  padding: 10px 16px;
+  margin-bottom: 22px;
+}
+.lp-verify-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  flex: none;
+}
+
+.lp-verify-title {
+  font: 400 italic 32px/0.98 var(--font-anton), sans-serif;
+  text-transform: uppercase;
+  color: #fff;
+  margin: 0;
+}
+.lp-verify-title .c { color: var(--cyan); }
+
+.lp-verify-wave { width: 90px; height: 14px; margin: 16px 0 30px; display: block; }
+
+.lp-verify-steps {
+  list-style: none;
+  margin: 0 0 26px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.lp-verify-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.lp-verify-steps .n {
+  font: 400 italic 30px/1 var(--font-anton), sans-serif;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--cyan);
+  flex: none;
+  width: 40px;
+}
+.lp-verify-steps h3 {
+  font: 800 16px/1.25 var(--font-archivo);
+  color: #fff;
+  margin: 0 0 3px;
+}
+.lp-verify-steps p {
+  font: 600 13px/1.45 var(--font-archivo);
+  color: var(--soft);
+  margin: 0;
+}
+
+.lp-verify-mail {
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.lp-verify-mail-hd {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.lp-verify-mail-av {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: #1FB57A;
+  color: #fff;
+  font: 800 13px/1 var(--font-archivo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.lp-verify-mail-hd .nm { font: 800 13.5px/1.2 var(--font-archivo); color: #fff; }
+.lp-verify-mail-hd .addr { font: 600 11px/1.3 var(--font-grotesk), monospace; color: var(--mute); margin-top: 2px; }
+.lp-verify-mail-body { padding: 18px; }
+.lp-verify-mail-body h4 { font: 800 15px/1.2 var(--font-archivo); color: #fff; margin: 0 0 6px; }
+.lp-verify-mail-body p { font: 600 13px/1.5 var(--font-archivo); color: var(--soft); margin: 0 0 16px; }
+.lp-verify-mail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 800 13.5px/1 var(--font-archivo);
+  color: #06202E;
+  background: linear-gradient(95deg, var(--cyan), var(--blue));
+  border-radius: 11px;
+  padding: 13px 20px;
+}
+
+.lp-verify-foot {
+  text-align: center;
+  font: 600 12.5px/1.5 var(--font-archivo);
+  color: var(--mute);
+  margin: 0 0 18px;
+}
+.lp-verify-foot button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--cyan);
+  text-decoration: underline;
+}
+.lp-verify-foot button:hover { color: #fff; }
+
+.lp-verify-back {
+  display: block;
+  margin: 0 auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: 700 13px/1 var(--font-archivo);
+  color: var(--cyan);
+  padding: 8px;
+  transition: color .16s;
+}
+.lp-verify-back:hover { color: #fff; }

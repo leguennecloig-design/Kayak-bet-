@@ -1834,11 +1834,6 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* ============ COUPON FAB ============ */}
-      <button className="fab" onClick={() => setDrawerOpen(true)}>
-        <TicketStroke c="#0A2A3D" /> Coupon <span className="cnt">{count}</span>
-      </button>
-
       {/* ============ SCRIM + DRAWER ============ */}
       <div className={`scrim${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} />
       <aside className={`drawer${drawerOpen ? " open" : ""}`}>
@@ -1930,9 +1925,11 @@ export default function DashboardPage() {
         {BOTNAV.map((n, i) => {
           if (n.kind === "bet") {
             return (
-              <button key={n.t} onClick={() => setDrawerOpen(true)}>
-                <NavIcon name={n.ic} />
-                <span className={`bdot${count > 0 ? " on" : ""}`}>{count}</span>
+              <button key={n.t} className="botnav-fab" onClick={() => setDrawerOpen(true)}>
+                <span className="botnav-fab-ic">
+                  <NavIcon name={n.ic} />
+                  <span className={`bdot${count > 0 ? " on" : ""}`}>{count}</span>
+                </span>
                 <span className="bl">{n.t}</span>
               </button>
             );

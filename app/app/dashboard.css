@@ -818,47 +818,7 @@
   padding: 3px 6px;
 }
 
-/* ============ COUPON FAB + DRAWER ============ */
-.kb-app .fab {
-  position: fixed;
-  right: 30px;
-  bottom: 26px;
-  z-index: 42;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  cursor: pointer;
-  background: linear-gradient(95deg, var(--cyan), var(--turq));
-  color: var(--navy);
-  border: none;
-  font: 800 14px/1 var(--font-archivo);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  padding: 15px 22px;
-  border-radius: 14px;
-  box-shadow: 0 14px 30px -10px rgba(40, 215, 230, 0.6);
-  transition: transform 0.14s;
-}
-.kb-app .fab:hover {
-  transform: translateY(-2px);
-}
-.kb-app .fab svg {
-  width: 17px;
-  height: 17px;
-}
-.kb-app .fab .cnt {
-  min-width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  background: var(--navy);
-  color: var(--cyan);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 700 13px/1 var(--font-grotesk), monospace;
-  padding: 0 6px;
-}
-
+/* ============ DRAWER ============ */
 .kb-app .scrim {
   position: fixed;
   inset: 0;
@@ -1251,9 +1211,35 @@
   .kb-app .botnav button .bdot.on {
     display: block;
   }
-  .kb-app .fab {
-    right: 18px;
-    bottom: calc(84px + env(safe-area-inset-bottom));
+
+  /* ---- Coupon FAB, intégré dans la tab bar (item central surélevé) ---- */
+  .kb-app .botnav button.botnav-fab {
+    transform: translateY(-16px);
+  }
+  .kb-app .botnav-fab-ic {
+    position: relative;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(95deg, var(--cyan), var(--turq));
+    box-shadow: 0 14px 30px -10px rgba(40, 215, 230, 0.6);
+  }
+  .kb-app .botnav button.botnav-fab svg {
+    width: 24px;
+    height: 24px;
+  }
+  .kb-app .botnav button.botnav-fab svg [data-s] {
+    stroke: var(--navy);
+  }
+  .kb-app .botnav-fab .bl {
+    color: var(--cyan);
+  }
+  .kb-app .botnav button.botnav-fab .botnav-fab-ic .bdot {
+    top: -6px;
+    right: -6px;
   }
 }
 
