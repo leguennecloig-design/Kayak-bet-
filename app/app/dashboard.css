@@ -1475,7 +1475,7 @@
    ============================================================ */
 .kb-app .podium {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1.14fr 1fr;
   gap: 12px;
   margin-bottom: 20px;
   align-items: end;
@@ -1492,17 +1492,17 @@
 .kb-app .pod:hover,
 .kb-app .pod:focus-visible { transform: translateY(-3px); border-color: rgba(40,215,230,.4); outline: none; }
 .kb-app .pod-1 {
-  background: radial-gradient(120% 140% at 50% -10%, rgba(255, 215, 0, 0.12), transparent 70%);
-  border-color: rgba(255, 215, 0, 0.25);
+  background: radial-gradient(140% 160% at 50% -10%, rgba(40, 215, 230, 0.14), var(--surface-hi) 60%);
+  border-color: rgba(40, 215, 230, 0.4);
   padding-top: 28px;
 }
 .kb-app .pod-2 {
-  background: radial-gradient(120% 140% at 50% -10%, rgba(192, 192, 192, 0.1), transparent 70%);
-  border-color: rgba(192, 192, 192, 0.2);
+  background: radial-gradient(120% 140% at 50% -10%, rgba(159, 186, 198, 0.1), transparent 70%);
+  border-color: rgba(159, 186, 198, 0.25);
 }
 .kb-app .pod-3 {
-  background: radial-gradient(120% 140% at 50% -10%, rgba(205, 127, 50, 0.1), transparent 70%);
-  border-color: rgba(205, 127, 50, 0.2);
+  background: radial-gradient(120% 140% at 50% -10%, rgba(255, 122, 69, 0.1), transparent 70%);
+  border-color: rgba(255, 122, 69, 0.25);
 }
 .kb-app .pod-star {
   width: 16px;

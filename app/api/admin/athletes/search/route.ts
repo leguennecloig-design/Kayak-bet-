@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
-import { classement } from "@/lib/athletes";
+import { searchAthletes } from "@/lib/athletes";
 
 export type AthleteResult = {
   rang: number;
@@ -18,26 +18,13 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q")?.toLowerCase().trim() ?? "";
+  const q = searchParams.get("q")?.trim() ?? "";
   const cat = searchParams.get("cat") ?? "";
 
   if (!q && !cat) {
     return NextResponse.json([]);
   }
 
-  const results: AthleteResult[] = [];
-  const catsToSearch = cat ? [cat] : Object.keys(classement);
-
-  for (const c of catsToSearch) {
-    const athletes = classement[c] ?? [];
-    for (const a of athletes) {
-      if (!q || a.nom_prenom.toLowerCase().includes(q) || a.club.toLowerCase().includes(q)) {
-        results.push({ ...a, categorie: c });
-      }
-      if (results.length >= 30) break;
-    }
-    if (results.length >= 30) break;
-  }
-
-  return NextResponse.json(results);
+  const results = await searchAthletes(q, cat);
+  return NextResponse.json(results satisfies AthleteResult[]);
 }

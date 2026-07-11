@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/app/components/Turnstile";
+import AvatarUpload from "@/app/components/AvatarUpload";
 import "./login.css";
 
 type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "credits" | "onboarding" | "push-prompt";
 
 const PUSH_PROMPT_DISMISSED_KEY = "kb_push_prompt_dismissed";
 const REFERRAL_CODE_KEY = "kb_referral_code";
-type OnbStep = "profile" | "athlete" | "source" | "push";
+type OnbStep = "profile" | "setup" | "athlete" | "source" | "push";
 
 type AthleteResult = {
   id: string;
@@ -102,7 +103,7 @@ function CreditsRevealOverlay({ balance, onDone }: { balance: number; onDone: ()
 ================================================================ */
 function OnboardingFlow({ onDone }: { onDone: () => void }) {
   const supabase = createClient();
-  const [steps, setSteps] = useState<OnbStep[]>(["profile", "source", "push"]);
+  const [steps, setSteps] = useState<OnbStep[]>(["profile", "setup", "source", "push"]);
   const push = usePushNotifications();
   const [stepIdx, setStepIdx] = useState(0);
   const [profile, setProfile] = useState<"athlete" | "bettor" | null>(null);
@@ -115,20 +116,72 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState("");
 
+  // Étape "setup" — pp / bio / pseudo, juste après le choix de profil.
+  const [userId, setUserId] = useState("");
+  const [setupInitials, setSetupInitials] = useState("??");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const id = data.user?.id ?? "";
+      setUserId(id);
+      const email = data.user?.email ?? "";
+      const base = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+      if (base) setSetupInitials(base.slice(0, 2).toUpperCase());
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const currentStep = steps[stepIdx];
 
   function selectProfile(p: "athlete" | "bettor") {
     setProfile(p);
     if (p === "athlete" && !steps.includes("athlete")) {
-      setSteps(["profile", "athlete", "source", "push"]);
+      setSteps(["profile", "setup", "athlete", "source", "push"]);
     } else if (p === "bettor" && steps.includes("athlete")) {
-      setSteps(["profile", "source", "push"]);
+      setSteps(["profile", "setup", "source", "push"]);
     }
   }
 
   function goNext() {
     if (stepIdx + 1 >= steps.length) { onDone(); return; }
     setStepIdx(i => i + 1);
+  }
+
+  async function saveSetupAndContinue() {
+    const trimmedUsername = username.trim();
+    if (trimmedUsername && !USERNAME_RE.test(trimmedUsername)) {
+      setSetupError("Pseudo invalide : 3 à 20 caractères, lettres/chiffres/underscore uniquement");
+      return;
+    }
+    setSetupSaving(true);
+    setSetupError("");
+    try {
+      const updates: { username?: string; bio?: string } = {};
+      if (trimmedUsername) updates.username = trimmedUsername;
+      if (bio.trim()) updates.bio = bio.trim();
+      for (const [key, value] of Object.entries(updates)) {
+        const res = await fetch("/api/user/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [key]: value }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.error ?? "Erreur");
+        }
+      }
+      goNext();
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "Erreur réseau");
+    } finally {
+      setSetupSaving(false);
+    }
   }
 
   useEffect(() => {
@@ -213,6 +266,53 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
                 </div>
               </div>
               <button className="lp-btn-primary" disabled={!profile} onClick={goNext}>Continuer</button>
+            </div>
+          )}
+
+          {/* Step 1b — configuration du profil (pp / pseudo / bio) */}
+          {currentStep === "setup" && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Ton identité</h2>
+              <p className="lp-onb-sub">Personnalise ton profil — tu pourras toujours changer ça plus tard.</p>
+
+              <div className="lp-onb-avatar-row">
+                {userId && (
+                  <AvatarUpload
+                    userId={userId}
+                    avatarUrl={avatarUrl}
+                    initials={setupInitials}
+                    onUploaded={setAvatarUrl}
+                  />
+                )}
+              </div>
+
+              <label className="lp-onb-field">
+                <span>Pseudo</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="Ton pseudo public"
+                  maxLength={20}
+                />
+              </label>
+
+              <label className="lp-onb-field">
+                <span>Bio</span>
+                <textarea
+                  value={bio}
+                  onChange={e => setBio(e.target.value.slice(0, 280))}
+                  placeholder="Quelques mots sur toi (optionnel)"
+                  rows={3}
+                />
+              </label>
+
+              {setupError && <p className="lp-onb-error">{setupError}</p>}
+
+              <button className="lp-btn-primary" disabled={setupSaving} onClick={saveSetupAndContinue}>
+                {setupSaving ? "…" : "Continuer"}
+              </button>
+              <button className="lp-btn-skip" onClick={goNext}>Passer</button>
             </div>
           )}
 
@@ -475,11 +575,18 @@ export default function LoginPage() {
 
             try {
               const res = await fetch("/api/user/profile");
-              const data = await res.json();
-              if (!data.onboarded) {
-                setRevealBalance(Number(data.balance ?? 0));
-                setMode("credits");
-                return;
+              // Ne teste `data.onboarded` que si la requête a réellement
+              // réussi — sinon (ex: session pas encore propagée juste après
+              // la connexion, réponse 401) `data.onboarded` vaut `undefined`,
+              // et `!undefined` est vrai : un compte déjà onboardé se
+              // retrouvait à refaire tout l'onboarding à chaque connexion.
+              if (res.ok) {
+                const data = await res.json();
+                if (!data.onboarded) {
+                  setRevealBalance(Number(data.balance ?? 0));
+                  setMode("credits");
+                  return;
+                }
               }
             } catch {
               // en cas d'erreur réseau, on ne bloque pas l'utilisateur derrière

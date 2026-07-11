@@ -258,7 +258,7 @@ const BOTNAV = [
   { ic: "user",   t: "Profil",     kind: "nav", v: "profil"       as View },
 ] as const;
 
-const rankColors: Record<number, string> = { 1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32" };
+const rankColors: Record<number, string> = { 1: "var(--cyan)", 2: "var(--idle)", 3: "var(--coral)" };
 
 /* ----------------------------------------------------------------
    Sub-view prop types

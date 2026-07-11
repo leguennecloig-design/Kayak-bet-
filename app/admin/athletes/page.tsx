@@ -1,5 +1,5 @@
 import { adminGuard } from "@/lib/auth/admin-guard";
-import { classement, categories, CATEGORY_LABELS, Athlete } from "@/lib/athletes";
+import { getClassement, categories, CATEGORY_LABELS, Athlete } from "@/lib/athletes";
 import AthletesClient from "./AthletesClient";
 
 export default async function AthletesPage({
@@ -9,8 +9,10 @@ export default async function AthletesPage({
 }) {
   await adminGuard();
 
+  const classement = await getClassement();
+
   const selectedCat =
-    searchParams.cat && classement[searchParams.cat]
+    searchParams.cat && categories.includes(searchParams.cat)
       ? searchParams.cat
       : categories[0];
 

@@ -1,13 +1,8 @@
 import { adminGuard } from "@/lib/auth/admin-guard";
-import { classement, CATEGORY_LABELS, Athlete } from "@/lib/athletes";
+import { findAthleteByCodeBateau, CATEGORY_LABELS } from "@/lib/athletes";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { notFound } from "next/navigation";
 import AthleteDetail from "./AthleteDetail";
-
-type AthleteWithCat = {
-  athlete: Athlete;
-  categorie: string;
-};
 
 export default async function AthletePage({
   params,
@@ -18,15 +13,8 @@ export default async function AthletePage({
 
   const code = decodeURIComponent(params.code_bateau);
 
-  // Trouver l'athlète dans toutes les catégories du JSON
-  let found: AthleteWithCat | null = null;
-  for (const [cat, athletes] of Object.entries(classement)) {
-    const match = athletes.find((a) => a.code_bateau === code);
-    if (match) {
-      found = { athlete: match, categorie: cat };
-      break;
-    }
-  }
+  // Trouver l'athlète en direct dans Supabase (jamais un snapshot figé).
+  const found = await findAthleteByCodeBateau(code);
 
   if (!found) notFound();
 
