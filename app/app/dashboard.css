@@ -207,8 +207,10 @@
   inset: 0;
   z-index: 200;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 18px;
   background: var(--deep);
   transition: opacity 0.35s ease;
 }
@@ -224,13 +226,29 @@
 .kb-app .kb-coin-splash .kb-letters {
   font-size: 26px;
 }
+/* Fondu du bloc entier, pas de découpage lettre par lettre — voir le hero
+   et l'écran de bienvenue du login pour pourquoi (italique synthétique
+   d'Anton + animation par caractère = rendu dédoublé sur iOS). */
+.kb-app .app-splash-txt {
+  font: 400 italic 20px/1 var(--font-anton), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: #fff;
+  opacity: 0;
+  animation: app-splash-txt-in 0.5s ease-out 0.15s both;
+}
 @keyframes app-splash-pop {
   from { opacity: 0; transform: scale(0.6); }
   to   { opacity: 1; transform: scale(1); }
 }
+@keyframes app-splash-txt-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
   .kb-app .app-splash { transition: none; }
   .kb-app .kb-coin-splash { animation: none; }
+  .kb-app .app-splash-txt { animation: none; opacity: 1; }
 }
 .kb-app .balance .plus {
   width: 24px;
@@ -2145,9 +2163,8 @@
 .kb-app .home-lb-row .av img { width: 100%; height: 100%; object-fit: cover; }
 .kb-app .home-lb-row { cursor: pointer; }
 
-/* ============ INSTAGRAM / DISCORD ============ */
-.kb-app .insta-link,
-.kb-app .discord-link {
+/* ============ INSTAGRAM ============ */
+.kb-app .insta-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2158,20 +2175,14 @@
   font: 700 11px/1 var(--font-grotesk), monospace;
   letter-spacing: .01em;
 }
-.kb-app .insta-link:hover,
-.kb-app .discord-link:hover { color: var(--cyan); }
-.kb-app .insta-link svg,
-.kb-app .discord-link svg { width: 14px; height: 14px; flex: none; }
+.kb-app .insta-link:hover { color: var(--cyan); }
+.kb-app .insta-link svg { width: 14px; height: 14px; flex: none; }
 .kb-app .profil-name .insta-link,
-.kb-app .profil-name .discord-link,
-.kb-app .pod-name .insta-link,
-.kb-app .pod-name .discord-link {
+.kb-app .pod-name .insta-link {
   font-size: 12px;
 }
 .kb-app .profil-name .insta-link svg,
-.kb-app .profil-name .discord-link svg,
-.kb-app .pod-name .insta-link svg,
-.kb-app .pod-name .discord-link svg { width: 16px; height: 16px; }
+.kb-app .pod-name .insta-link svg { width: 16px; height: 16px; }
 
 /* ============ AMIS ============ */
 .kb-app .friend-requests {

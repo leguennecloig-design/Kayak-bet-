@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase-server";
 
-const REFERRAL_BONUS = 200;
+const REFERRAL_BONUS = 400;
 
 // POST /api/referral/apply { code } — applique un code de parrainage à
 // l'utilisateur connecté (une seule fois par compte). Crédite le parrain

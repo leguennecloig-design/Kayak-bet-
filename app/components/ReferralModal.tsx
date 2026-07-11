@@ -72,8 +72,8 @@ export default function ReferralModal({ open, onClose }: Props) {
 
         <div className="kb-modal-body">
           <p className="referral-explain">
-            Invite tes amis sur Kayakbet : ils reçoivent <b>200 crédits</b> dès leur inscription via ton lien,
-            et toi tu reçois aussi <b>200 crédits</b> — à chaque nouveau filleul.
+            Invite tes amis sur Kayakbet : ils reçoivent <b>400 crédits</b> dès leur inscription via ton lien,
+            et toi tu reçois aussi <b>400 crédits</b> — à chaque nouveau filleul.
           </p>
 
           {loading ? (

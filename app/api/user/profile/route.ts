@@ -16,14 +16,14 @@ export async function GET() {
   const { data: profile, error } = await adminSb
     .from("users")
     .upsert({ id: user.id, email: user.email }, { onConflict: "id", ignoreDuplicates: true })
-    .select("id, username, email, balance, avatar_url, bio, instagram_handle, onboarded_at, created_at")
+    .select("id, username, email, balance, avatar_url, bio, instagram_handle, onboarded_at, instagram_reward_claimed_at, created_at")
     .eq("id", user.id)
     .single();
 
   // Si upsert ne retourne rien (ignoreDuplicates), re-fetch
   const row = profile ?? (await adminSb
     .from("users")
-    .select("id, username, email, balance, avatar_url, bio, instagram_handle, onboarded_at, created_at")
+    .select("id, username, email, balance, avatar_url, bio, instagram_handle, onboarded_at, instagram_reward_claimed_at, created_at")
     .eq("id", user.id)
     .single()
   ).data;
@@ -54,11 +54,12 @@ export async function GET() {
     id:         user.id,
     email:      user.email ?? row?.email,
     username:   row?.username ?? null,
-    balance:    row?.balance ?? 1000,
+    balance:    row?.balance ?? 3000,
     avatarUrl:  row?.avatar_url ?? null,
     bio:        row?.bio ?? "",
     instagram:  row?.instagram_handle ?? null,
     onboarded:  row?.onboarded_at != null,
+    instagramRewardClaimed: row?.instagram_reward_claimed_at != null,
     linkedAthlete: linkedAthleteRow ?? null,
     created_at: row?.created_at,
     stats: {

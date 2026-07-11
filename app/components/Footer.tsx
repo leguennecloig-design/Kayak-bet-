@@ -13,10 +13,8 @@ const COLS = [
   {
     h: "Disciplines",
     links: [
-      { t: "Slalom", href: "#" },
       { t: "Descente", href: "#" },
       { t: "Kayak-cross", href: "#" },
-      { t: "Coupe du Monde", href: "#" },
     ],
   },
   {
@@ -25,7 +23,7 @@ const COLS = [
       { t: "L'équipe", href: "#" },
       { t: "Jeu responsable", href: "#" },
       { t: "Conditions", href: "#" },
-      { t: "Contact", href: "#" },
+      { t: "Contact", href: "mailto:contact.loig@kayakbet.fr" },
     ],
   },
 ];
@@ -33,10 +31,12 @@ const COLS = [
 const SOCIALS = [
   {
     label: "X",
+    href: "#",
     path: <path d="M4 4l16 16M20 4 4 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />,
   },
   {
     label: "Instagram",
+    href: "https://www.instagram.com/kayakbet/",
     path: (
       <>
         <rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" strokeWidth="1.8" />
@@ -47,6 +47,7 @@ const SOCIALS = [
   },
   {
     label: "YouTube",
+    href: "#",
     path: (
       <>
         <rect x="3" y="6" width="18" height="12" rx="4" stroke="currentColor" strokeWidth="1.8" />
@@ -73,7 +74,9 @@ export default function Footer() {
               {SOCIALS.map((s) => (
                 <a
                   key={s.label}
-                  href="#"
+                  href={s.href}
+                  target={s.href !== "#" ? "_blank" : undefined}
+                  rel={s.href !== "#" ? "noopener noreferrer" : undefined}
                   aria-label={s.label}
                   className="w-[38px] h-[38px] rounded-[11px] border border-[var(--border)] flex items-center justify-center text-soft transition-[border-color,color,transform] hover:border-[var(--cyan)] hover:text-cyan hover:-translate-y-[2px]"
                 >
