@@ -416,14 +416,23 @@
 .kb-app .chip-stat.chip-rank:hover   { border-color: rgba(40,215,230,.35); }
 .kb-app .chip-stat.chip-bets:hover   { border-color: rgba(17,194,194,.35); }
 .kb-app .chip-stat.chip-streak:hover { border-color: rgba(255,122,69,.35); }
+.kb-app .chip-stat .tx {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .kb-app .chip-stat .tx .l {
+  display: block;
   font: 700 8.5px/1 var(--font-grotesk), monospace;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--sub);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .kb-app .chip-stat .tx .v {
+  display: block;
   font: 800 16px/1.1 var(--font-archivo);
   color: #fff;
   margin-top: 6px;

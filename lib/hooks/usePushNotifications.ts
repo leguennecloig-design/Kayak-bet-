@@ -78,7 +78,22 @@ export function usePushNotifications() {
     if (!isSupported) { setChecked(true); return; }
     getReadyRegistration()
       .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setSubscribed(!!sub))
+      .then(async (sub) => {
+        // L'abonnement navigateur (PushManager) est partagé par tous les
+        // comptes utilisés sur cet appareil — un compte qui n'a jamais activé
+        // les notifs hériterait sinon à tort de l'abonnement laissé par un
+        // autre compte déjà testé sur le même téléphone. On confirme donc
+        // côté serveur que CE compte précis est bien celui associé à cet
+        // endpoint avant de considérer l'utilisateur comme abonné.
+        if (!sub) { setSubscribed(false); return; }
+        try {
+          const res = await fetch(`/api/push/subscribe?endpoint=${encodeURIComponent(sub.endpoint)}`);
+          const data = res.ok ? await res.json() : null;
+          setSubscribed(!!data?.subscribed);
+        } catch {
+          setSubscribed(false);
+        }
+      })
       .catch(() => {})
       .finally(() => setChecked(true));
   }, []);
