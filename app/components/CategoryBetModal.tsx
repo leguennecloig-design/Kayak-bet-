@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { BetType } from "@/lib/algo/types";
+import OddsInfoModal from "./OddsInfoModal";
 
 export type BetOdd = {
   id: string;
@@ -59,19 +60,28 @@ type Props = {
   competitionNom: string;
   odds: BetOdd[]; // toutes catégories confondues — la startlist complète de la compétition
   typeCompetition?: string | null;
+  parisOuvertsA?: string | null;
   coupon: Record<string, BetOdd>;
   toggle: (o: BetOdd) => void;
   couponCount: number;
   onOpenCoupon: () => void;
 };
 
+function fmtOpensAt(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" });
+}
+
 export default function CategoryBetModal({
-  onBack, competitionId, competitionNom, odds, typeCompetition, coupon, toggle, couponCount, onOpenCoupon,
+  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
   const [cotes, setCotes] = useState<CotesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState<string | null>(
+    parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null
+  );
 
   const cats = [...new Set(odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
 
@@ -85,17 +95,28 @@ export default function CategoryBetModal({
   }, [competitionId]);
 
   useEffect(() => {
-    if (!selectedCat) return;
+    setLockedUntil(parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null);
+  }, [competitionId, parisOuvertsA]);
+
+  useEffect(() => {
+    if (!selectedCat || lockedUntil) return;
     let cancelled = false;
     setLoading(true);
     setError("");
     fetch(`/api/competitions/${competitionId}/cotes?categorie=${encodeURIComponent(selectedCat)}`)
-      .then(res => res.json())
+      .then(async (res) => {
+        if (res.status === 403) {
+          const body = await res.json().catch(() => ({}));
+          if (!cancelled && body.locked && body.opensAt) setLockedUntil(body.opensAt);
+          return [];
+        }
+        return res.json();
+      })
       .then((data) => { if (!cancelled) setCotes(Array.isArray(data) ? data : []); })
       .catch(() => { if (!cancelled) setError("Impossible de charger les cotes."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [competitionId, selectedCat]);
+  }, [competitionId, selectedCat, lockedUntil]);
 
   const cotesByCode = new Map((cotes ?? []).map(c => [c.code_bateau, c]));
   const participants = odds.filter(o => o.categorie === selectedCat);
@@ -115,11 +136,19 @@ export default function CategoryBetModal({
           </div>
           <h3>{competitionNom}</h3>
         </div>
-        <span className="catmodal-spacer" />
+        <button className="catmodal-back" aria-label="Comprendre les cotes" onClick={() => setInfoOpen(true)}>
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
+        </button>
       </div>
 
       <div className="catmodal-scroll">
-        {cats.length > 1 && (
+        {lockedUntil ? (
+          <div className="catmodal-locked">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.8" /><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+            <p className="catmodal-locked-title">Paris pas encore ouverts</p>
+            <p className="catmodal-locked-sub">Rendez-vous le {fmtOpensAt(lockedUntil)}</p>
+          </div>
+        ) : cats.length > 1 && (
           <div className="cat-tabs catmodal-cat-tabs">
             {cats.map(cat => (
               <button
@@ -133,7 +162,7 @@ export default function CategoryBetModal({
           </div>
         )}
 
-        <div className="catmodal-body">
+        {!lockedUntil && <div className="catmodal-body">
           {loading && <p className="catmodal-status">Chargement des cotes…</p>}
           {!loading && error && <p className="catmodal-status err">{error}</p>}
           {!loading && !error && participants.length === 0 && (
@@ -177,7 +206,7 @@ export default function CategoryBetModal({
               </div>
             );
           })}
-        </div>
+        </div>}
       </div>
 
       {couponCount > 0 && (
@@ -188,6 +217,8 @@ export default function CategoryBetModal({
           </button>
         </div>
       )}
+
+      <OddsInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
     </>
   );
 }

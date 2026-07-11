@@ -15,7 +15,16 @@ type Competition = {
   ffck_match_status: string;
   type_competition: string | null;
   type_epreuve: string | null;
+  paris_ouverts_a: string | null;
 };
+
+// ISO -> "YYYY-MM-DDTHH:mm" pour <input type="datetime-local"> (en heure locale)
+function toDatetimeLocal(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 type InscriptionRow = {
   id: string;
@@ -83,6 +92,7 @@ export default function EditClient({
   const [discipline, setDiscipline] = useState(competition.discipline ?? "");
   const [typeCompetition, setTypeCompetition] = useState(competition.type_competition ?? "");
   const [lieu,       setLieu]       = useState(competition.lieu ?? "");
+  const [parisOuvertsA, setParisOuvertsA] = useState(toDatetimeLocal(competition.paris_ouverts_a));
   const [status,     setStatus]     = useState(competition.status);
   const [saving,     setSaving]     = useState(false);
   const [saveMsg,    setSaveMsg]    = useState("");
@@ -136,7 +146,11 @@ export default function EditClient({
     const res = await fetch(`/api/admin/competitions/${compId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom, date, discipline, lieu, type_competition: typeCompetition || null }),
+      body: JSON.stringify({
+        nom, date, discipline, lieu,
+        type_competition: typeCompetition || null,
+        paris_ouverts_a: parisOuvertsA ? new Date(parisOuvertsA).toISOString() : null,
+      }),
     });
     setSaving(false);
     setSaveMsg(res.ok ? "Enregistré ✓" : "Erreur lors de la sauvegarde");
@@ -417,6 +431,17 @@ export default function EditClient({
           <div className="flex flex-col gap-1.5">
             <label className={labelCls}>Date</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+          </div>
+          <div className="sm:col-span-2 flex flex-col gap-1.5">
+            <label className={labelCls}>
+              Ouverture des paris <span className="normal-case text-[#5c7c8c]">(optionnel — sinon dès la publication)</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={parisOuvertsA}
+              onChange={(e) => setParisOuvertsA(e.target.value)}
+              className={inputCls}
+            />
           </div>
         </div>
         <div className="flex items-center gap-3 mt-5">

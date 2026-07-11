@@ -52,6 +52,9 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
   const [editDateDebut,   setEditDateDebut]   = useState("");
   const [editDateFin,     setEditDateFin]     = useState("");
   const [editTypeEpreuve, setEditTypeEpreuve] = useState("");
+  // Optionnel : programme l'heure à partir de laquelle la startlist/les
+  // paris deviennent accessibles, indépendamment de la publication.
+  const [parisOuvertsA, setParisOuvertsA] = useState("");
 
   // Sprint Finale / Mass Start : fichier optionnel des résultats qualifs /
   // classique du week-end, uploadé au moment même de la création plutôt que
@@ -122,6 +125,7 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
           type_epreuve: editTypeEpreuve.trim() || result.type_epreuve,
           type_competition: typeCompetition || null,
           special_results: specialPreview?.data ?? null,
+          paris_ouverts_a: parisOuvertsA ? new Date(parisOuvertsA).toISOString() : null,
           force,
         }),
       });
@@ -294,6 +298,17 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
                 <option value="mass_start" className="bg-[#0a2a3d]">Mass start</option>
                 <option value="sprint_finale" className="bg-[#0a2a3d]">Sprint finale</option>
               </select>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">
+                Ouverture des paris <span className="normal-case text-[#5c7c8c]">(optionnel — sinon dès la publication)</span>
+              </p>
+              <input
+                type="datetime-local"
+                value={parisOuvertsA}
+                onChange={(e) => setParisOuvertsA(e.target.value)}
+                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none w-full"
+              />
             </div>
           </div>
 

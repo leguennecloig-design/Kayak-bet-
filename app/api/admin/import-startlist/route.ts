@@ -42,6 +42,7 @@ type ImportBody = {
   type_competition?: string | null;
   force?: boolean;
   special_results?: ParsedResult[] | null;
+  paris_ouverts_a?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -192,6 +193,13 @@ export async function POST(req: NextRequest) {
     : bettingBaseQ.is("date", null)
   ).maybeSingle();
 
+  if (existingBetting?.id && body.paris_ouverts_a !== undefined) {
+    await supabase
+      .from("competitions")
+      .update({ paris_ouverts_a: body.paris_ouverts_a || null })
+      .eq("id", existingBetting.id);
+  }
+
   if (existingBetting?.id) {
     // Ré-importer une startlist remplace intégralement les participants et
     // cotes (delete + réinsert plus bas) — sur une compétition déjà publiée,
@@ -228,6 +236,7 @@ export async function POST(req: NextRequest) {
         discipline: null,
         type_competition: body.type_competition ?? null,
         type_epreuve: body.type_epreuve || null,
+        paris_ouverts_a: body.paris_ouverts_a || null,
       })
       .select("id")
       .single();

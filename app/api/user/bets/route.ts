@@ -14,6 +14,10 @@ type Selection = {
 };
 
 const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME"];
+const RANK_TIERS: Set<BetType> = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
+const MIN_STAKE = 30;
+const MAX_STAKE_PER_ATHLETE = 200;
+const BALANCE_FLOOR = 200;
 
 function coteColumn(betType: BetType, row: Record<string, unknown>): number {
   switch (betType) {
@@ -98,8 +102,8 @@ export async function POST(req: NextRequest) {
   if (selections.length === 0) {
     return NextResponse.json({ error: "Aucune sélection" }, { status: 400 });
   }
-  if (stake <= 0) {
-    return NextResponse.json({ error: "Mise invalide" }, { status: 400 });
+  if (stake < MIN_STAKE) {
+    return NextResponse.json({ error: `Mise minimum : ${MIN_STAKE} cr` }, { status: 400 });
   }
   if (selections.some(s => !s.participantId || !s.cote || s.cote <= 1)) {
     return NextResponse.json({ error: "Sélection invalide" }, { status: 400 });
@@ -107,6 +111,59 @@ export async function POST(req: NextRequest) {
   for (const s of selections) {
     if (s.betType != null && !VALID_BET_TYPES.includes(s.betType)) {
       return NextResponse.json({ error: "Type de pari invalide" }, { status: 400 });
+    }
+  }
+
+  // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète, et Place
+  // exacte incompatible avec Vainqueur pour ce même athlète (déjà appliqué
+  // côté client dans toggle(), revalidé ici car le client n'est pas fiable).
+  const byParticipant = new Map<string, BetType[]>();
+  for (const s of selections) {
+    const bt = s.betType ?? "TOP_1";
+    byParticipant.set(s.participantId, [...(byParticipant.get(s.participantId) ?? []), bt]);
+  }
+  for (const [, types] of byParticipant) {
+    const rankTiersUsed = types.filter(t => RANK_TIERS.has(t));
+    if (rankTiersUsed.length > 1) {
+      return NextResponse.json(
+        { error: "Un seul type de classement (Vainqueur/Top 3/5/10/20) par athlète" },
+        { status: 400 }
+      );
+    }
+    if (types.includes("TOP_1") && types.includes("EXACT_PLACE")) {
+      return NextResponse.json(
+        { error: "Vainqueur et Place exacte sont incompatibles pour un même athlète" },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Plafond cumulé de 200 cr de mise par athlète, tous paris en attente
+  // confondus (pas seulement celui-ci) — la mise entière d'un pari combiné
+  // compte pour chaque athlète qu'il référence.
+  const uniqueParticipantIds = [...new Set(selections.map(s => s.participantId))];
+  const { data: pendingBetsRows } = await adminSb
+    .from("bets")
+    .select("stake, selections")
+    .eq("user_id", user.id)
+    .eq("status", "pending");
+
+  const existingStakeByParticipant = new Map<string, number>();
+  for (const b of pendingBetsRows ?? []) {
+    const sels: Selection[] = Array.isArray(b.selections) ? b.selections : [];
+    const participantsInBet = new Set(sels.map(s => s.participantId));
+    for (const pid of participantsInBet) {
+      existingStakeByParticipant.set(pid, (existingStakeByParticipant.get(pid) ?? 0) + Number(b.stake));
+    }
+  }
+  for (const pid of uniqueParticipantIds) {
+    const already = existingStakeByParticipant.get(pid) ?? 0;
+    if (already + stake > MAX_STAKE_PER_ATHLETE) {
+      const nom = selections.find(s => s.participantId === pid)?.nom ?? "cet athlète";
+      return NextResponse.json(
+        { error: `${MAX_STAKE_PER_ATHLETE} cr maximum par athlète (déjà ${already} cr en attente sur ${nom})` },
+        { status: 400 }
+      );
     }
   }
 
@@ -125,9 +182,10 @@ export async function POST(req: NextRequest) {
   const compIds = [...new Set(selections.map(s => s.competitionId))];
   const { data: compsRows } = await adminSb
     .from("competitions")
-    .select("id, status")
+    .select("id, status, paris_ouverts_a")
     .in("id", compIds);
   const compStatusById = new Map((compsRows ?? []).map(c => [c.id, c.status]));
+  const compOpensAtById = new Map((compsRows ?? []).map(c => [c.id, c.paris_ouverts_a as string | null]));
 
   const { data: cotesRows } = await adminSb
     .from("cotes")
@@ -147,6 +205,13 @@ export async function POST(req: NextRequest) {
     }
     if (compStatusById.get(participant.competition_id) !== "published") {
       return NextResponse.json({ error: "Cette compétition n'est plus ouverte aux paris" }, { status: 400 });
+    }
+    const opensAt = compOpensAtById.get(participant.competition_id);
+    if (opensAt && new Date(opensAt).getTime() > Date.now()) {
+      return NextResponse.json(
+        { error: `Les paris ouvrent le ${new Date(opensAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}` },
+        { status: 400 }
+      );
     }
 
     const betType: BetType = s.betType ?? "TOP_1";
@@ -191,10 +256,14 @@ export async function POST(req: NextRequest) {
   const { data: newBalance, error: debitErr } = await adminSb.rpc("decrement_balance_if_sufficient", {
     user_uuid: user.id,
     amount: stake,
+    floor_balance: BALANCE_FLOOR,
   });
   if (debitErr) return NextResponse.json({ error: debitErr.message }, { status: 500 });
   if (newBalance == null) {
-    return NextResponse.json({ error: "Solde insuffisant" }, { status: 400 });
+    return NextResponse.json(
+      { error: `Solde insuffisant (il doit rester au moins ${BALANCE_FLOOR} cr après la mise)` },
+      { status: 400 }
+    );
   }
 
   // Insérer le pari

@@ -7,7 +7,7 @@ import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/app/components/Turnstile";
 import "./login.css";
 
-type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "onboarding" | "push-prompt";
+type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | "credits" | "onboarding" | "push-prompt";
 
 const PUSH_PROMPT_DISMISSED_KEY = "kb_push_prompt_dismissed";
 const REFERRAL_CODE_KEY = "kb_referral_code";
@@ -69,6 +69,30 @@ function WelcomeOverlay({ onDone }: { onDone: () => void }) {
       </div>
       <h2 className="lp-w-heading">Bon retour parmi nous</h2>
       <p className="lp-w-sub">On t'emmène vers la ligne de départ…</p>
+    </div>
+  );
+}
+
+/* ================================================================
+   Credits reveal — shown once, à la création du compte
+================================================================ */
+function CreditsRevealOverlay({ balance, onDone }: { balance: number; onDone: () => void }) {
+  const cbRef = useRef(onDone);
+  cbRef.current = onDone;
+
+  useEffect(() => {
+    const t = setTimeout(() => cbRef.current(), 2400);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="lp-welcome" role="status" aria-live="polite">
+      <div className="lp-w-coin" aria-hidden="true">
+        <div className="lp-w-face"><span>KB</span></div>
+      </div>
+      <h2 className="lp-w-heading">Bienvenue à bord</h2>
+      <p className="lp-credits-amount">+{balance.toLocaleString("fr-FR")} <span>crédits</span></p>
+      <p className="lp-w-sub">Offerts pour démarrer — à toi de jouer !</p>
     </div>
   );
 }
@@ -317,6 +341,7 @@ export default function LoginPage() {
       ? "welcome"
       : "login"
   );
+  const [revealBalance, setRevealBalance] = useState(0);
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
@@ -451,7 +476,11 @@ export default function LoginPage() {
             try {
               const res = await fetch("/api/user/profile");
               const data = await res.json();
-              if (!data.onboarded) { setMode("onboarding"); return; }
+              if (!data.onboarded) {
+                setRevealBalance(Number(data.balance ?? 0));
+                setMode("credits");
+                return;
+              }
             } catch {
               // en cas d'erreur réseau, on ne bloque pas l'utilisateur derrière
               // l'onboarding — on le laisse simplement entrer dans l'app.
@@ -465,6 +494,17 @@ export default function LoginPage() {
             location.href = "/app";
           })();
         }} />
+      </>
+    );
+  }
+
+  /* ---- Révélation des crédits de départ (création de compte) ---- */
+  if (mode === "credits") {
+    return (
+      <>
+        <div className="lp-bg" />
+        <div className="lp-glow g1" /><div className="lp-glow g2" />
+        <CreditsRevealOverlay balance={revealBalance} onDone={() => setMode("onboarding")} />
       </>
     );
   }

@@ -14,13 +14,20 @@ export async function GET(
 
   const { data: comp } = await supabase
     .from("competitions")
-    .select("id, status")
+    .select("id, status, paris_ouverts_a")
     .eq("id", competitionId)
     .eq("status", "published")
     .maybeSingle();
 
   if (!comp) {
     return NextResponse.json({ error: "Compétition introuvable" }, { status: 404 });
+  }
+
+  if (comp.paris_ouverts_a && new Date(comp.paris_ouverts_a).getTime() > Date.now()) {
+    return NextResponse.json(
+      { error: "Les paris ne sont pas encore ouverts", locked: true, opensAt: comp.paris_ouverts_a },
+      { status: 403 }
+    );
   }
 
   let query = supabase

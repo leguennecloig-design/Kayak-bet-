@@ -22,6 +22,7 @@ export async function PATCH(
   if (body.lieu       !== undefined) allowed.lieu       = body.lieu || null;
   if (body.status     !== undefined) allowed.status     = body.status;
   if (body.type_competition !== undefined) allowed.type_competition = body.type_competition || null;
+  if (body.paris_ouverts_a !== undefined) allowed.paris_ouverts_a = body.paris_ouverts_a || null;
 
   const supabase = createAdminSupabase();
 
@@ -47,10 +48,17 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (justPublished) {
+    // Si une heure d'ouverture des paris est programmée dans le futur, la
+    // compétition est publiée (visible) mais pas encore pariable — le texte
+    // de la notif ne doit pas annoncer une ouverture immédiate.
+    const parisOuvertsA = allowed.paris_ouverts_a as string | null | undefined;
+    const opensLater = parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now();
     try {
       await sendPushToAll(supabase, {
         title: "Nouvelle compétition disponible",
-        body: `${nom} est ouverte aux paris !`,
+        body: opensLater
+          ? `${nom} est publiée — paris ouverts à partir du ${new Date(parisOuvertsA!).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}.`
+          : `${nom} est ouverte aux paris !`,
         url: "/app",
       });
     } catch (e) {

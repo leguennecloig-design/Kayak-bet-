@@ -200,6 +200,7 @@ type Competition = {
   featured?: boolean;
   odds: Odd[];
   typeCompetition?: string | null;
+  parisOuvertsA?: string | null;
 };
 
 type Player = {
@@ -283,11 +284,13 @@ type CompetitionsViewProps = {
 type ClassementViewProps = {
   effectiveLb: Player[];
   onOpenProfile: (id: string) => void;
+  seasonLabel: string;
 };
 
 type PlayerProfileViewProps = {
   playerId: string;
   onBack: () => void;
+  seasonLabel: string;
 };
 
 type LeagueViewProps = {
@@ -370,6 +373,7 @@ type ProfilViewProps = {
   instagramRewardClaimed: boolean;
   instagramRewardBusy: boolean;
   onClaimInstagramReward: () => void;
+  seasonLabel: string;
 };
 
 type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null };
@@ -611,7 +615,7 @@ function CompetitionsView({
   );
 }
 
-function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
+function ClassementView({ effectiveLb, onOpenProfile, seasonLabel }: ClassementViewProps) {
   const top3 = effectiveLb.filter((p) => p.rank <= 3);
   const rest = effectiveLb.filter((p) => p.rank > 3 && !p.isMe);
   const me   = effectiveLb.find((p) => p.isMe);
@@ -627,7 +631,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
     <>
       <div className="view-header">
         <h1>Classement</h1>
-        <p>Saison 2026 · {effectiveLb.length} joueurs</p>
+        <p>{seasonLabel} · {effectiveLb.length} joueurs</p>
       </div>
 
       <div className="podium">
@@ -694,7 +698,7 @@ function ClassementView({ effectiveLb, onOpenProfile }: ClassementViewProps) {
   );
 }
 
-function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
+function PlayerProfileView({ playerId, onBack, seasonLabel }: PlayerProfileViewProps) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
@@ -785,12 +789,12 @@ function PlayerProfileView({ playerId, onBack }: PlayerProfileViewProps) {
               <div className="profil-avatar">
                 {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : <span>{profile.initials}</span>}
               </div>
-              <span className="profil-eyebrow">Profil joueur · Saison 2026</span>
+              <span className="profil-eyebrow">Profil joueur · {seasonLabel}</span>
               <h1 className="profil-name">{profile.username}<InstaLink handle={profile.instagram} /></h1>
               {profile.bio && <p className="profil-bio">{profile.bio}</p>}
               <span className="profil-rank">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-                Rang {profile.rank} · Saison 2026
+                Rang {profile.rank} · {seasonLabel}
               </span>
               {friendState && (
                 <div className="profil-friend-actions">
@@ -978,7 +982,7 @@ function LeagueView({ leagueId, onBack }: LeagueViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardClaimed, instagramRewardBusy, onClaimInstagramReward }: ProfilViewProps) {
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardClaimed, instagramRewardBusy, onClaimInstagramReward, seasonLabel }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
@@ -1086,13 +1090,13 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
           <div className="profil-avatar">
             {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{initials}</span>}
           </div>
-          <span className="profil-eyebrow">Mon profil · Saison 2026</span>
+          <span className="profil-eyebrow">Mon profil · {seasonLabel}</span>
           <h1 className="profil-name">{name}<InstaLink handle={instagram} /></h1>
           <p className="profil-email">{userEmail}</p>
           {bio && <p className="profil-bio">{bio}</p>}
           <span className="profil-rank">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16.5 7.1 18.2l.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="#28D7E6" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-            Rang {myRank ?? "—"} · Saison 2026
+            Rang {myRank ?? "—"} · {seasonLabel}
           </span>
           <div className="profil-actions">
             <button className="profil-edit-btn" onClick={onEditProfile}>Modifier le profil</button>
@@ -1351,10 +1355,25 @@ export default function DashboardPage() {
     return () => { clearTimeout(hide); clearTimeout(unmount); };
   }, []);
 
+  // Animation de validation du coupon (voir showBetSuccessOverlay).
+  const [betSuccessOverlay, setBetSuccessOverlay] = useState<{ gain: number } | null>(null);
+  const [betSuccessHiding,  setBetSuccessHiding]  = useState(false);
+  const betSuccessTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function showBetSuccessOverlay(gain: number) {
+    betSuccessTimers.current.forEach(clearTimeout);
+    setBetSuccessHiding(false);
+    setBetSuccessOverlay({ gain });
+    betSuccessTimers.current = [
+      setTimeout(() => setBetSuccessHiding(true), 1700),
+      setTimeout(() => setBetSuccessOverlay(null), 2050),
+    ];
+  }
+
   const [view,          setView]          = useState<View>("home");
   const [balance,       setBalance]       = useState(0);
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
-  const [stake,         setStake]         = useState(50);
+  const [stake,         setStake]         = useState(30);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [betLoading,    setBetLoading]    = useState(false);
   const [cd,            setCd]            = useState({ d: "00", h: "00", m: "00", s: "00" });
@@ -1376,6 +1395,7 @@ export default function DashboardPage() {
   const [instagramRewardBusy,    setInstagramRewardBusy]    = useState(false);
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
+  const [seasonLabel,   setSeasonLabel]   = useState("Saison en cours");
   const [viewedCompetitionId, setViewedCompetitionId] = useState<{ compId: string; compNom: string; from: View } | null>(null);
   const [viewedPlayerId, setViewedPlayerId] = useState<string | null>(null);
   const [viewedLeagueId, setViewedLeagueId] = useState<string | null>(null);
@@ -1455,13 +1475,17 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchBetHistory();
     fetchLeaderboard();
+    fetch("/api/season/current")
+      .then(res => res.json())
+      .then(data => { if (data.label) setSeasonLabel(data.label); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     async function fetchComps() {
       const { data } = await supabase
         .from("competitions")
-        .select("id, nom, date, discipline, lieu, type_competition, participants(id, nom, pays, cote, categorie, code_bateau)")
+        .select("id, nom, date, discipline, lieu, type_competition, paris_ouverts_a, participants(id, nom, pays, cote, categorie, code_bateau)")
         .eq("status", "published")
         .order("date", { ascending: true });
       if (!data || data.length === 0) return;
@@ -1479,6 +1503,7 @@ export default function DashboardPage() {
           bettors: 0,
           featured: i === 0,
           typeCompetition: c.type_competition ?? null,
+          parisOuvertsA: c.paris_ouverts_a ?? null,
           odds: parts.map((p: any) => ({
             id:            `${p.id}:TOP_1`,
             participantId: p.id,
@@ -1521,10 +1546,27 @@ export default function DashboardPage() {
     toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 2800);
   }
 
+  // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète — en
+  // sélectionner un nouveau remplace l'ancien plutôt que de les cumuler.
+  // Place exacte est incompatible avec Vainqueur pour ce même athlète
+  // (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). Temps exact
+  // reste toujours cumulable, sans exclusion.
+  const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
+
   function toggle(o: Odd) {
     setCoupon((prev) => {
       const next = { ...prev };
-      if (next[o.id]) delete next[o.id]; else next[o.id] = o;
+      if (next[o.id]) { delete next[o.id]; return next; }
+      for (const key of Object.keys(next)) {
+        const existing = next[key];
+        if (existing.participantId !== o.participantId) continue;
+        const bothRankTiers  = RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
+        const top1VsExactPl  =
+          (o.betType === "TOP_1" && existing.betType === "EXACT_PLACE") ||
+          (o.betType === "EXACT_PLACE" && existing.betType === "TOP_1");
+        if (bothRankTiers || top1VsExactPl) delete next[key];
+      }
+      next[o.id] = o;
       return next;
     });
   }
@@ -1572,8 +1614,9 @@ export default function DashboardPage() {
 
   async function validate() {
     const s = Math.max(0, stake || 0);
-    if (s <= 0 || count === 0) return;
-    if (s > balance) { showToast(<XIcon c="#FF7A45" />, "Solde insuffisant", true); return; }
+    if (count === 0) return;
+    if (s < 30) { showToast(<XIcon c="#FF7A45" />, "Mise minimum : 30 cr", true); return; }
+    if (s > balance - 200) { showToast(<XIcon c="#FF7A45" />, "Il doit te rester au moins 200 cr après la mise", true); return; }
     if (betLoading) return;
 
     setBetLoading(true);
@@ -1606,7 +1649,7 @@ export default function DashboardPage() {
       setBalance(Number(json.newBalance));
       setCoupon({});
       setDrawerOpen(false);
-      showToast(<Check c="#28D7E6" />, <>Pari validé · gain potentiel <span>{Math.round(json.gainPotentiel).toLocaleString("fr-FR")} cr.</span></>);
+      showBetSuccessOverlay(Math.round(json.gainPotentiel));
       void firstComp;
       fetchBetHistory();
     } catch {
@@ -1668,6 +1711,16 @@ export default function DashboardPage() {
             <span className="kb-face"><span className="kb-letters">KB</span></span>
           </span>
           <span className="app-splash-txt">Te revoilà</span>
+        </div>
+      )}
+
+      {betSuccessOverlay && (
+        <div className={`app-splash bet-success${betSuccessHiding ? " hide" : ""}`} aria-hidden="true">
+          <span className="bet-success-badge">
+            <Check c="#06202E" />
+          </span>
+          <span className="app-splash-txt">Pari validé !</span>
+          <span className="bet-success-gain">Gain potentiel · {betSuccessOverlay.gain.toLocaleString("fr-FR")} cr</span>
         </div>
       )}
 
@@ -1734,7 +1787,7 @@ export default function DashboardPage() {
               openBetModal={openBetModal}
             />
           )}
-          {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} />}
+          {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} seasonLabel={seasonLabel} />}
           {view === "competition-detail" && viewedCompetitionId && (
             <CategoryBetModal
               onBack={() => navigate(viewedCompetitionId.from)}
@@ -1742,6 +1795,7 @@ export default function DashboardPage() {
               competitionNom={viewedCompetitionId.compNom}
               odds={competitions.find(c => c.id === viewedCompetitionId.compId)?.odds ?? []}
               typeCompetition={competitions.find(c => c.id === viewedCompetitionId.compId)?.typeCompetition}
+              parisOuvertsA={competitions.find(c => c.id === viewedCompetitionId.compId)?.parisOuvertsA}
               coupon={coupon}
               toggle={toggle}
               couponCount={count}
@@ -1749,7 +1803,7 @@ export default function DashboardPage() {
             />
           )}
           {view === "joueur" && viewedPlayerId && (
-            <PlayerProfileView playerId={viewedPlayerId} onBack={() => navigate("classement")} />
+            <PlayerProfileView playerId={viewedPlayerId} onBack={() => navigate("classement")} seasonLabel={seasonLabel} />
           )}
           {view === "ligue" && viewedLeagueId && (
             <LeagueView leagueId={viewedLeagueId} onBack={() => navigate("profil")} />
@@ -1774,6 +1828,7 @@ export default function DashboardPage() {
               instagramRewardClaimed={instagramRewardClaimed}
               instagramRewardBusy={instagramRewardBusy}
               onClaimInstagramReward={claimInstagramReward}
+              seasonLabel={seasonLabel}
             />
           )}
         </div>
@@ -1817,7 +1872,7 @@ export default function DashboardPage() {
             <div className="stake">
               <label>Mise</label>
               <div className="field">
-                <input type="number" min={1} value={stake} onChange={(e) => setStake(Math.max(0, +e.target.value || 0))} />
+                <input type="number" min={30} value={stake} onChange={(e) => setStake(Math.max(0, +e.target.value || 0))} />
                 <div className="chips">
                   <button className="chip" onClick={() => setStake((s) => (s || 0) + 10)}>+10</button>
                   <button className="chip" onClick={() => setStake((s) => (s || 0) + 50)}>+50</button>

@@ -398,6 +398,21 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
   animation: lp-fadeUp .6s cubic-bezier(.2,.9,.2,1) .3s forwards;
 }
 
+.lp-credits-amount {
+  font: 400 italic 44px/1 var(--font-anton), sans-serif;
+  color: var(--cyan);
+  margin: 0 0 14px;
+  opacity: 0;
+  animation: lp-fadeUp .6s cubic-bezier(.2,.9,.2,1) .9s forwards;
+}
+.lp-credits-amount span {
+  font: 700 15px/1 var(--font-grotesk), monospace;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--soft);
+  margin-left: 6px;
+}
+
 .lp-w-sub {
   font: 600 14.5px/1.5 var(--font-archivo);
   color: var(--soft);
@@ -408,6 +423,7 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
 @media (prefers-reduced-motion: reduce) {
   .lp-w-coin { animation: none; }
   .lp-w-heading { animation: none; opacity: 1; }
+  .lp-credits-amount { animation: none; opacity: 1; }
   .lp-w-sub { animation: none; opacity: 1; }
 }
 

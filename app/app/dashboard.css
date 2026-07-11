@@ -250,6 +250,34 @@
   .kb-app .kb-coin-splash { animation: none; }
   .kb-app .app-splash-txt { animation: none; opacity: 1; }
 }
+
+/* ---- Animation de validation du coupon (réutilise .app-splash) ---- */
+.kb-app .bet-success-badge {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  box-shadow: 0 20px 50px -18px var(--accent);
+  animation: app-splash-pop 0.5s cubic-bezier(.2,.9,.2,1) both;
+}
+.kb-app .bet-success-badge svg {
+  width: 34px;
+  height: 34px;
+}
+.kb-app .bet-success-gain {
+  font: 700 13px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.03em;
+  color: var(--soft);
+  opacity: 0;
+  animation: app-splash-txt-in 0.5s ease-out 0.35s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kb-app .bet-success-badge { animation: none; }
+  .kb-app .bet-success-gain { animation: none; opacity: 1; }
+}
 .kb-app .balance .plus {
   width: 24px;
   height: 24px;
@@ -2402,6 +2430,31 @@
   flex-direction: column;
   gap: 16px;
 }
+.kb-app .catmodal-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 50px 20px;
+  color: var(--sub);
+}
+.kb-app .catmodal-locked svg {
+  width: 38px;
+  height: 38px;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+.kb-app .catmodal-locked-title {
+  font: 800 15px/1.3 var(--font-archivo);
+  color: #fff;
+  margin: 0;
+}
+.kb-app .catmodal-locked-sub {
+  font: 600 13px/1.5 var(--font-archivo);
+  color: var(--soft);
+  margin: 0;
+}
 .kb-app .catmodal-foot {
   position: sticky;
   bottom: 14px;
@@ -2578,6 +2631,63 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* ============ POP-UP EXPLICATION DES COTES ============ */
+.kb-app .odds-info-body p {
+  font: 600 13px/1.6 var(--font-archivo);
+  color: var(--soft);
+  margin: 0;
+}
+.kb-app .odds-info-example {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  padding: 14px;
+  font: 800 13px/1 var(--font-archivo);
+  color: #fff;
+  flex-wrap: wrap;
+}
+.kb-app .odds-info-example .x,
+.kb-app .odds-info-example .eq {
+  color: var(--mute);
+  font-weight: 700;
+}
+.kb-app .odds-info-example .cote {
+  font: 400 italic 20px/1 var(--font-anton), sans-serif;
+  color: var(--cyan);
+}
+.kb-app .odds-info-example .gain {
+  font: 400 italic 20px/1 var(--font-anton), sans-serif;
+  color: var(--success);
+}
+.kb-app .odds-info-types {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kb-app .odds-info-type {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 600 12.5px/1.4 var(--font-archivo);
+  color: var(--soft);
+}
+.kb-app .odds-info-type b {
+  flex: none;
+  color: #fff;
+  font-weight: 800;
+  min-width: 130px;
+}
+.kb-app .odds-info-note {
+  font-size: 12px !important;
+  color: var(--mute) !important;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
 
 /* ============ EDIT PROFILE MODAL ============ */
