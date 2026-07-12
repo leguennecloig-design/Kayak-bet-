@@ -1713,6 +1713,11 @@ export default function DashboardPage() {
         competitionId:  o.competitionId ?? "",
         competitionNom: competitions.find(c => c.id === o.competitionId)?.name ?? "",
         categorie:      o.categorie ?? "",
+        // Valeurs saisies pour les paris "place exacte" / "temps exact" —
+        // sans ça le serveur rejette le pari (targetPlace/predictedTimeSeconds
+        // manquants), ce qui cassait entièrement ces deux types de pari.
+        ...(o.targetPlace != null ? { targetPlace: o.targetPlace } : {}),
+        ...(o.predictedTimeSeconds != null ? { predictedTimeSeconds: o.predictedTimeSeconds } : {}),
       }));
 
       const res  = await fetch("/api/user/bets", {
