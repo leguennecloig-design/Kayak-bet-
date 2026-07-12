@@ -52,6 +52,9 @@ export default function InscriptionsClient() {
   const [partantsMap,     setPartantsMap]     = useState<Record<number, InscriptionRow[]>>({});
   const [partantsLoading, setPartantsLoading] = useState<Record<number, boolean>>({});
 
+  const [genState, setGenState] = useState<Record<number, "idle" | "loading" | "ok" | "error">>({});
+  const [genMsg,   setGenMsg]   = useState<Record<number, string>>({});
+
   // ── Scan FFCK ────────────────────────────────────────────────────────────
   const handleScan = useCallback(async () => {
     setScanState("loading");
@@ -97,6 +100,28 @@ export default function InscriptionsClient() {
     } catch (e) {
       setImportState(prev => ({ ...prev, [comp.ffckCode]: "error" }));
       setImportMsg(prev => ({ ...prev, [comp.ffckCode]: e instanceof Error ? e.message : "Erreur" }));
+    }
+  }, []);
+
+  // ── Générer la compétition : cotes + participants depuis les inscriptions ──
+  const handleGenerate = useCallback(async (comp: FFCKCompetition) => {
+    if (!comp.competition_id) return;
+    setGenState(prev => ({ ...prev, [comp.ffckCode]: "loading" }));
+    setGenMsg(prev => ({ ...prev, [comp.ffckCode]: "" }));
+    try {
+      const fd = new FormData();
+      fd.append("race_type", "standard");
+      const res  = await fetch(`/api/admin/competitions/${comp.competition_id}/calculate-cotes`, { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      setGenState(prev => ({ ...prev, [comp.ffckCode]: "ok" }));
+      setGenMsg(prev => ({
+        ...prev,
+        [comp.ffckCode]: `${json.participants_created} participants créés · ${json.total_cotes} cotes. Ouvre l'admin pour publier.`,
+      }));
+    } catch (e) {
+      setGenState(prev => ({ ...prev, [comp.ffckCode]: "error" }));
+      setGenMsg(prev => ({ ...prev, [comp.ffckCode]: e instanceof Error ? e.message : "Erreur" }));
     }
   }, []);
 
@@ -232,8 +257,35 @@ export default function InscriptionsClient() {
                       {iState === "loading" ? <SpinIcon cls="w-3 h-3" /> : null}
                       {iState === "ok" ? "Importé ✓" : iState === "error" ? "Erreur" : comp.nb_partants > 0 ? "Réimporter" : "Importer les partants"}
                     </button>
+                    {comp.nb_partants > 0 && comp.competition_id && (
+                      <button
+                        onClick={() => handleGenerate(comp)}
+                        disabled={genState[comp.ffckCode] === "loading"}
+                        className="inline-flex items-center gap-1.5 bg-gradient-to-r from-[#28D7E6] to-[#11C2C2] text-[#0A2A3D] font-archivo font-bold text-[12px] px-4 py-2 rounded-[9px] hover:-translate-y-[1px] transition-transform disabled:opacity-50 disabled:translate-y-0 whitespace-nowrap"
+                      >
+                        {genState[comp.ffckCode] === "loading" ? <SpinIcon cls="w-3 h-3" /> : null}
+                        {genState[comp.ffckCode] === "ok" ? "Compétition créée ✓" : "Créer la compétition & les cotes"}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* Message génération de la compétition */}
+                {genMsg[comp.ffckCode] && (
+                  <div className="flex items-center gap-4 mt-2 flex-wrap">
+                    <p className={`font-archivo text-[12px] ${genState[comp.ffckCode] === "error" ? "text-red-400" : "text-[#a0f0a0]"}`}>
+                      {genMsg[comp.ffckCode]}
+                    </p>
+                    {genState[comp.ffckCode] === "ok" && comp.competition_id && (
+                      <a
+                        href={`/admin/competitions/${comp.competition_id}`}
+                        className="inline-flex items-center gap-1.5 font-archivo font-bold text-[12px] text-[#28D7E6] hover:underline"
+                      >
+                        Ouvrir &amp; publier →
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Message import + lien admin */}
                 {(iMsg || (iState === "ok" && comp.competition_id)) && (
