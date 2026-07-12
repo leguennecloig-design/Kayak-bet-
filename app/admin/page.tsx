@@ -28,9 +28,14 @@ export default async function AdminDashboard() {
     .select("id, nom, date, discipline, lieu, status, created_at, participants(id)")
     .order("created_at", { ascending: false });
 
+  // Nombre de joueurs inscrits
+  const { count: userCount } = await supabase
+    .from("users")
+    .select("id", { count: "exact", head: true });
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-anton italic uppercase text-white text-[36px] leading-[0.9]">
             Compétitions
@@ -38,6 +43,24 @@ export default async function AdminDashboard() {
           <p className="font-archivo text-[14px] text-[#7c9aaa] mt-2">
             {competitions?.length ?? 0} au total — brouillons et publiées
           </p>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+        <div className="bg-[rgba(40,215,230,.06)] border border-[rgba(40,215,230,.25)] rounded-2xl px-5 py-4">
+          <p className="font-grotesk font-bold text-[9px] tracking-[.14em] uppercase text-[#28D7E6] mb-1">Joueurs inscrits</p>
+          <p className="font-anton italic text-[30px] leading-none text-white">{userCount ?? 0}</p>
+        </div>
+        <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-2xl px-5 py-4">
+          <p className="font-grotesk font-bold text-[9px] tracking-[.14em] uppercase text-[#7c9aaa] mb-1">Compétitions actives</p>
+          <p className="font-anton italic text-[30px] leading-none text-white">
+            {competitions?.filter((c) => c.status === "published").length ?? 0}
+          </p>
+        </div>
+        <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-2xl px-5 py-4">
+          <p className="font-grotesk font-bold text-[9px] tracking-[.14em] uppercase text-[#7c9aaa] mb-1">Compétitions au total</p>
+          <p className="font-anton italic text-[30px] leading-none text-white">{competitions?.length ?? 0}</p>
         </div>
       </div>
 
