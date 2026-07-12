@@ -44,6 +44,28 @@ export async function GET() {
   const totalWon    = betStats?.filter(b => b.status === "won")
     .reduce((sum, b) => sum + (b.gain_reel ?? 0), 0) ?? 0;
 
+  // Filet de sécurité — solde de départ à 3000 crédits.
+  // Si la migration DB (20260716) qui passe le défaut à 3000 n'a pas été
+  // appliquée sur l'instance, le trigger crée les nouveaux comptes avec un
+  // ancien montant (1000/1200). On corrige donc UNE seule fois les comptes
+  // tout neufs (jamais onboardés, aucun pari, aucune transaction) pour que
+  // l'animation d'inscription et le solde affichent bien 3000 — sans jamais
+  // écraser un solde déjà modifié (parrainage, mises, gains).
+  const STARTING_CREDITS = 3000;
+  if (row && row.onboarded_at == null && totalBets === 0 && Number(row.balance) < STARTING_CREDITS) {
+    const { count: txCount } = await adminSb
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if ((txCount ?? 0) === 0) {
+      const { error: fixErr } = await adminSb
+        .from("users")
+        .update({ balance: STARTING_CREDITS })
+        .eq("id", user.id);
+      if (!fixErr) row.balance = STARTING_CREDITS;
+    }
+  }
+
   const { data: linkedAthleteRow } = await adminSb
     .from("athletes")
     .select("id, nom, prenom, club, categorie")

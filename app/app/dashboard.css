@@ -1478,6 +1478,80 @@
 /* ============================================================
    CLASSEMENT
    ============================================================ */
+/* Mes ligues — en tête du classement */
+.kb-app .cls-leagues {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.kb-app .cls-leagues-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 2px;
+}
+.kb-app .cls-leagues-head .bar {
+  width: 24px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--cyan);
+}
+.kb-app .cls-leagues-head .lbl {
+  font: 700 10.5px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.kb-app .cls-league-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(40, 215, 230, 0.06);
+  border: 1px solid rgba(40, 215, 230, 0.25);
+  border-radius: 13px;
+  padding: 13px 15px;
+  cursor: pointer;
+  transition: transform .12s, border-color .15s;
+}
+.kb-app .cls-league-row:hover,
+.kb-app .cls-league-row:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(40, 215, 230, 0.5);
+  outline: none;
+}
+.kb-app .cls-league-rank {
+  font: 400 italic 18px/1 var(--font-anton), sans-serif;
+  color: var(--cyan);
+  min-width: 34px;
+  text-align: center;
+  flex: none;
+}
+.kb-app .cls-league-info {
+  flex: 1;
+  min-width: 0;
+}
+.kb-app .cls-league-info .nm {
+  display: block;
+  font: 800 14px/1.2 var(--font-archivo);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kb-app .cls-league-info small {
+  display: block;
+  font: 600 11px/1 var(--font-archivo);
+  color: var(--sub);
+  margin-top: 4px;
+}
+.kb-app .cls-league-row > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--sub);
+}
+
 .kb-app .podium {
   display: grid;
   grid-template-columns: 1fr 1.14fr 1fr;
@@ -1796,6 +1870,39 @@
   overflow: hidden;
   margin-bottom: 24px;
 }
+/* Guide d'installation (profil) */
+.kb-app .install-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.kb-app .install-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 13px 15px;
+}
+.kb-app .install-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 800 12.5px/1 var(--font-archivo);
+  color: #fff;
+  margin-bottom: 10px;
+}
+.kb-app .install-head svg { width: 17px; height: 17px; color: var(--cyan); flex: none; }
+.kb-app .install-card ol {
+  margin: 0;
+  padding-left: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kb-app .install-card li {
+  font: 600 12px/1.45 var(--font-archivo);
+  color: var(--soft);
+}
+.kb-app .install-card li b { color: #fff; font-weight: 800; }
 .kb-app .profil-section-head {
   display: flex;
   align-items: center;

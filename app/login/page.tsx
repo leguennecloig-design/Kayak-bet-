@@ -12,7 +12,7 @@ type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | 
 
 const PUSH_PROMPT_DISMISSED_KEY = "kb_push_prompt_dismissed";
 const REFERRAL_CODE_KEY = "kb_referral_code";
-type OnbStep = "profile" | "setup" | "athlete" | "source" | "push";
+type OnbStep = "profile" | "setup" | "athlete" | "source" | "push" | "install";
 
 type AthleteResult = {
   id: string;
@@ -103,7 +103,7 @@ function CreditsRevealOverlay({ balance, onDone }: { balance: number; onDone: ()
 ================================================================ */
 function OnboardingFlow({ onDone }: { onDone: () => void }) {
   const supabase = createClient();
-  const [steps, setSteps] = useState<OnbStep[]>(["profile", "setup", "source", "push"]);
+  const [steps, setSteps] = useState<OnbStep[]>(["profile", "setup", "source", "push", "install"]);
   const push = usePushNotifications();
   const [stepIdx, setStepIdx] = useState(0);
   const [profile, setProfile] = useState<"athlete" | "bettor" | null>(null);
@@ -142,9 +142,9 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
   function selectProfile(p: "athlete" | "bettor") {
     setProfile(p);
     if (p === "athlete" && !steps.includes("athlete")) {
-      setSteps(["profile", "setup", "athlete", "source", "push"]);
+      setSteps(["profile", "setup", "athlete", "source", "push", "install"]);
     } else if (p === "bettor" && steps.includes("athlete")) {
-      setSteps(["profile", "setup", "source", "push"]);
+      setSteps(["profile", "setup", "source", "push", "install"]);
     }
   }
 
@@ -421,12 +421,57 @@ function OnboardingFlow({ onDone }: { onDone: () => void }) {
                 <p className="lp-onb-sub">Non disponible sur cet appareil — tu pourras l&apos;activer plus tard depuis ton profil.</p>
               )}
               <button className="lp-btn-skip" onClick={goNext}>
-                {push.subscribed ? "Terminer" : "Plus tard"}
+                {push.subscribed ? "Continuer" : "Plus tard"}
               </button>
             </div>
           )}
 
+          {/* Step 5 — installer l'app sur le téléphone */}
+          {currentStep === "install" && (
+            <div className="lp-onb-step">
+              <h2 className="lp-onb-title">Installe l'app</h2>
+              <p className="lp-onb-sub">
+                Ajoute Kayakbet à ton écran d'accueil pour un accès en un tap, en plein écran, comme une vraie app.
+              </p>
+              <InstallGuide />
+              <button className="lp-btn-primary" onClick={goNext}>C'est parti !</button>
+              <button className="lp-btn-skip" onClick={goNext}>Plus tard</button>
+            </div>
+          )}
+
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
+   Guide d'installation (iOS + Android) — réutilisé onboarding + profil
+================================================================ */
+function InstallGuide() {
+  return (
+    <div className="lp-install">
+      <div className="lp-install-card">
+        <div className="lp-install-head">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+          <span>iPhone / iPad — Safari</span>
+        </div>
+        <ol>
+          <li>Ouvre Kayakbet dans <b>Safari</b>.</li>
+          <li>Appuie sur le bouton <b>Partager</b> (le carré avec une flèche vers le haut).</li>
+          <li>Choisis <b>« Sur l'écran d'accueil »</b>, puis <b>Ajouter</b>.</li>
+        </ol>
+      </div>
+      <div className="lp-install-card">
+        <div className="lp-install-head">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M11 18h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+          <span>Android — Chrome</span>
+        </div>
+        <ol>
+          <li>Ouvre Kayakbet dans <b>Chrome</b>.</li>
+          <li>Appuie sur le menu <b>⋮</b> en haut à droite.</li>
+          <li>Choisis <b>« Installer l'application »</b> (ou « Ajouter à l'écran d'accueil »).</li>
+        </ol>
       </div>
     </div>
   );

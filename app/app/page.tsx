@@ -97,6 +97,9 @@ const ColMedal  = () => <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 3.5 1
 const ColUsers  = () => <svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.5" r="3" stroke="#28D7E6" strokeWidth="1.7" /><path d="M3.5 19c0-3 2.5-4.6 5.5-4.6s5.5 1.6 5.5 4.6" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" /><path d="M16 5.4a3 3 0 0 1 0 6M17.5 14.6c2.4.4 4 2 4 4.4" stroke="#28D7E6" strokeWidth="1.7" strokeLinecap="round" /></svg>;
 
 const InstaIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.7" /><circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" /></svg>;
+const DownloadIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>;
+const AppleIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-.9-1.4-2.4-1.5-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7c-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 8 .7 1 1.5 2.1 2.5 2 1-.04 1.4-.65 2.6-.65s1.6.65 2.6.63c1.1-.02 1.8-1 2.4-2 .8-1.1 1.1-2.2 1.1-2.3-.02 0-2.2-.85-2.2-3.4ZM14.6 6.6c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-1 1.6-.8 2.5.9.07 1.8-.45 2.4-1.1Z" fill="currentColor"/></svg>;
+const AndroidIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="3" width="12" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.7"/><path d="M10.5 18h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>;
 
 function InstaLink({ handle, className = "insta-link" }: { handle?: string | null; className?: string }) {
   if (!handle) return null;
@@ -286,6 +289,7 @@ type CompetitionsViewProps = {
 type ClassementViewProps = {
   effectiveLb: Player[];
   onOpenProfile: (id: string) => void;
+  onOpenLeague: (id: string) => void;
   seasonLabel: string;
 };
 
@@ -617,10 +621,18 @@ function CompetitionsView({
   );
 }
 
-function ClassementView({ effectiveLb, onOpenProfile, seasonLabel }: ClassementViewProps) {
+function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel }: ClassementViewProps) {
   const top3 = effectiveLb.filter((p) => p.rank <= 3);
   const rest = effectiveLb.filter((p) => p.rank > 3 && !p.isMe);
   const me   = effectiveLb.find((p) => p.isMe);
+
+  const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
+  useEffect(() => {
+    fetch("/api/leagues")
+      .then(res => res.json())
+      .then((data) => setLeagues(data.leagues ?? []))
+      .catch(() => {});
+  }, []);
 
   function openProfile(p: Player) {
     if (p.id) onOpenProfile(p.id);
@@ -635,6 +647,32 @@ function ClassementView({ effectiveLb, onOpenProfile, seasonLabel }: ClassementV
         <h1>Classement</h1>
         <p>{seasonLabel} · {effectiveLb.length} joueurs</p>
       </div>
+
+      {leagues.length > 0 && (
+        <div className="cls-leagues">
+          <div className="cls-leagues-head">
+            <span className="bar" />
+            <span className="lbl">Mes ligues</span>
+          </div>
+          {leagues.map((l) => (
+            <div
+              key={l.id}
+              className="cls-league-row"
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenLeague(l.id)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenLeague(l.id); } }}
+            >
+              <span className="cls-league-rank">#{l.myRank}</span>
+              <div className="cls-league-info">
+                <span className="nm">{l.name}</span>
+                <small>{l.memberCount} membre{l.memberCount > 1 ? "s" : ""} · Saison {l.currentSeason}</small>
+              </div>
+              <ChevRight />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="podium">
         {[top3[1], top3[0], top3[2]].filter(Boolean).map((p) => (
@@ -1251,6 +1289,33 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
 
       <div className="profil-section">
         <div className="profil-section-head">
+          <span className="ps-head-ic"><DownloadIcon /> Installer l&apos;app</span>
+        </div>
+        <p style={{ color: "var(--soft)", fontFamily: "var(--font-archivo)", fontSize: "12.5px", margin: "0 0 13px" }}>
+          Ajoute Kayakbet à ton écran d&apos;accueil pour un accès instantané, en plein écran.
+        </p>
+        <div className="install-guide">
+          <div className="install-card">
+            <div className="install-head"><AppleIcon /> iPhone / iPad — Safari</div>
+            <ol>
+              <li>Ouvre Kayakbet dans <b>Safari</b>.</li>
+              <li>Appuie sur <b>Partager</b> (carré avec flèche vers le haut).</li>
+              <li>Choisis <b>« Sur l&apos;écran d&apos;accueil »</b>, puis <b>Ajouter</b>.</li>
+            </ol>
+          </div>
+          <div className="install-card">
+            <div className="install-head"><AndroidIcon /> Android — Chrome</div>
+            <ol>
+              <li>Ouvre Kayakbet dans <b>Chrome</b>.</li>
+              <li>Appuie sur le menu <b>⋮</b> en haut à droite.</li>
+              <li>Choisis <b>« Installer l&apos;application »</b>.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div className="profil-section">
+        <div className="profil-section-head">
           <span className="ps-head-ic"><InstaIcon /> Bonus Instagram</span>
         </div>
         {instagramRewardClaimed ? (
@@ -1401,6 +1466,7 @@ export default function DashboardPage() {
   const [viewedCompetitionId, setViewedCompetitionId] = useState<{ compId: string; compNom: string; from: View } | null>(null);
   const [viewedPlayerId, setViewedPlayerId] = useState<string | null>(null);
   const [viewedLeagueId, setViewedLeagueId] = useState<string | null>(null);
+  const [leagueFrom,     setLeagueFrom]     = useState<View>("profil");
   const [toast, setToast] = useState<{ icon: ReactNode; msg: ReactNode; err: boolean; show: boolean }>({
     icon: null, msg: null, err: false, show: false,
   });
@@ -1591,6 +1657,7 @@ export default function DashboardPage() {
 
   function openLeague(id: string) {
     setViewedLeagueId(id);
+    setLeagueFrom(view === "classement" ? "classement" : "profil");
     navigate("ligue");
   }
 
@@ -1791,7 +1858,7 @@ export default function DashboardPage() {
               openBetModal={openBetModal}
             />
           )}
-          {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} seasonLabel={seasonLabel} />}
+          {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} onOpenLeague={openLeague} seasonLabel={seasonLabel} />}
           {view === "competition-detail" && viewedCompetitionId && (
             <CategoryBetModal
               onBack={() => navigate(viewedCompetitionId.from)}
@@ -1810,7 +1877,7 @@ export default function DashboardPage() {
             <PlayerProfileView playerId={viewedPlayerId} onBack={() => navigate("classement")} seasonLabel={seasonLabel} />
           )}
           {view === "ligue" && viewedLeagueId && (
-            <LeagueView leagueId={viewedLeagueId} onBack={() => navigate("profil")} />
+            <LeagueView leagueId={viewedLeagueId} onBack={() => navigate(leagueFrom)} />
           )}
           {view === "profil" && (
             <ProfilView

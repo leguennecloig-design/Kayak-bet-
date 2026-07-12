@@ -725,6 +725,45 @@ body.lp-play .lp-card-frame { animation: lp-cardIn .7s cubic-bezier(.2,.9,.2,1) 
 }
 .lp-btn-skip:hover { color: #fff; }
 
+/* guide d'installation (onboarding) */
+.lp-install {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.lp-install-card {
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border-2);
+  border-radius: 14px;
+  padding: 15px 16px;
+}
+.lp-install-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 800 13px/1 var(--font-archivo);
+  color: #fff;
+  margin-bottom: 11px;
+}
+.lp-install-head svg {
+  width: 18px; height: 18px;
+  color: var(--cyan);
+  flex: none;
+}
+.lp-install-card ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.lp-install-card li {
+  font: 600 12.5px/1.45 var(--font-archivo);
+  color: var(--soft);
+}
+.lp-install-card li b { color: #fff; font-weight: 800; }
+
 /* source chips */
 .lp-chip-grid {
   display: flex;
