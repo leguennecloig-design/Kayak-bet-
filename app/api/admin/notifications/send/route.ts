@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
-import { sendPushToAll } from "@/lib/push/send";
+import { notifyAllUsers } from "@/lib/notifications/create";
 
 // POST /api/admin/notifications/send — diffusion manuelle à tous les abonnés
 export async function POST(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminSupabase();
-  const result = await sendPushToAll(supabase, { title, body: message, url });
+  const result = await notifyAllUsers(supabase, { type: "broadcast", title, body: message, url });
 
   return NextResponse.json({ ok: true, sent: result?.sent ?? 0 });
 }

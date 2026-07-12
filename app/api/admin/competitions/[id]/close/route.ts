@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
-import { sendPushToUser } from "@/lib/push/send";
+import { notifyUser } from "@/lib/notifications/create";
 import { parseTempsToSeconds } from "@/lib/utils/time";
 import type { BetType } from "@/lib/algo/types";
 
@@ -236,15 +236,12 @@ export async function POST(
         .update({ status: "lost", settled_at: now })
         .eq("id", bet.id);
       lost++;
-      try {
-        await sendPushToUser(supabase, bet.user_id, {
-          title: "Pari perdu",
-          body: `${competitionNom} — dommage, ce sera pour la prochaine !`,
-          url: "/app",
-        });
-      } catch (e) {
-        console.error(`[close] push (perdu) échoué pour le pari ${bet.id}:`, e);
-      }
+      await notifyUser(supabase, bet.user_id, {
+        type: "bet_lost",
+        title: "Pari perdu",
+        body: `${competitionNom} — dommage, ce sera pour la prochaine !`,
+        url: "/app",
+      });
     } else {
       // ── Toutes les sélections (de toutes les compétitions référencées) ont gagné ──
       // Créditer le gain — si le RPC échoue, on ne marque PAS le pari
@@ -276,15 +273,12 @@ export async function POST(
 
       won++;
       totalPaid[bet.user_id] = (totalPaid[bet.user_id] ?? 0) + bet.gain_potentiel;
-      try {
-        await sendPushToUser(supabase, bet.user_id, {
-          title: "Pari gagné 🎉",
-          body: `${competitionNom} — tu remportes ${Math.round(bet.gain_potentiel).toLocaleString("fr-FR")} crédits !`,
-          url: "/app",
-        });
-      } catch (e) {
-        console.error(`[close] push (gagné) échoué pour le pari ${bet.id}:`, e);
-      }
+      await notifyUser(supabase, bet.user_id, {
+        type: "bet_won",
+        title: "Pari gagné 🎉",
+        body: `${competitionNom} — tu remportes ${Math.round(bet.gain_potentiel).toLocaleString("fr-FR")} crédits !`,
+        url: "/app",
+      });
     }
   }
 

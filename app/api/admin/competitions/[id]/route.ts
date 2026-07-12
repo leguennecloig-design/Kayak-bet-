@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
-import { sendPushToAll } from "@/lib/push/send";
+import { notifyAllUsers } from "@/lib/notifications/create";
 
 // PATCH /api/admin/competitions/[id] — met à jour les infos ou le statut
 export async function PATCH(
@@ -53,17 +53,14 @@ export async function PATCH(
     // de la notif ne doit pas annoncer une ouverture immédiate.
     const parisOuvertsA = allowed.paris_ouverts_a as string | null | undefined;
     const opensLater = parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now();
-    try {
-      await sendPushToAll(supabase, {
-        title: "Nouvelle compétition disponible",
-        body: opensLater
-          ? `${nom} est publiée — paris ouverts à partir du ${new Date(parisOuvertsA!).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}.`
-          : `${nom} est ouverte aux paris !`,
-        url: "/app",
-      });
-    } catch (e) {
-      console.error("[competitions PATCH] push publication échoué:", e);
-    }
+    await notifyAllUsers(supabase, {
+      type: "competition",
+      title: "Nouvelle compétition disponible",
+      body: opensLater
+        ? `${nom} est publiée — paris ouverts à partir du ${new Date(parisOuvertsA!).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}.`
+        : `${nom} est ouverte aux paris !`,
+      url: "/app",
+    });
   }
 
   return NextResponse.json({ ok: true });
