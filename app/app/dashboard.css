@@ -1804,6 +1804,32 @@
   background: rgba(40, 215, 230, 0.14);
   border-color: rgba(40, 215, 230, 0.5);
 }
+.kb-app .profil-edit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Formulaire de demande du bonus Instagram (pseudo + envoi) */
+.kb-app .ig-reward-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+.kb-app .ig-reward-input {
+  flex: 1;
+  min-width: 150px;
+  background: var(--navy);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  padding: 10px 13px;
+  font: 700 13px/1 var(--font-archivo);
+  color: #fff;
+}
+.kb-app .ig-reward-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+.kb-app .ig-reward-input::placeholder { color: var(--sub); font-weight: 600; }
 .kb-app .profil-linked {
   display: inline-flex;
   align-items: center;

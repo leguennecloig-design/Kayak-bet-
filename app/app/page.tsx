@@ -8,6 +8,7 @@ import CategoryBetModal from "@/app/components/CategoryBetModal";
 import EditProfileModal from "@/app/components/EditProfileModal";
 import LinkAthleteModal from "@/app/components/LinkAthleteModal";
 import ReferralModal from "@/app/components/ReferralModal";
+import InstagramRewardCard, { type IgRewardStatus } from "@/app/components/InstagramRewardCard";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
 
@@ -376,9 +377,9 @@ type ProfilViewProps = {
   onLinkAthlete: () => void;
   onOpenProfile: (id: string) => void;
   onOpenLeague: (id: string) => void;
-  instagramRewardClaimed: boolean;
+  instagramRewardStatus: IgRewardStatus;
   instagramRewardBusy: boolean;
-  onClaimInstagramReward: () => void;
+  onRequestInstagramReward: (handle: string) => void;
   seasonLabel: string;
 };
 
@@ -1022,7 +1023,7 @@ function LeagueView({ leagueId, onBack }: LeagueViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardClaimed, instagramRewardBusy, onClaimInstagramReward, seasonLabel }: ProfilViewProps) {
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardStatus, instagramRewardBusy, onRequestInstagramReward, seasonLabel }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
@@ -1314,35 +1315,11 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
         </div>
       </div>
 
-      <div className="profil-section">
-        <div className="profil-section-head">
-          <span className="ps-head-ic"><InstaIcon /> Bonus Instagram</span>
-        </div>
-        {instagramRewardClaimed ? (
-          <p style={{ color: "var(--soft)", fontFamily: "var(--font-archivo)", fontSize: "12.5px", margin: 0 }}>
-            Récompense obtenue · merci de nous suivre ✓
-          </p>
-        ) : (
-          <>
-            <p style={{ color: "var(--soft)", fontFamily: "var(--font-archivo)", fontSize: "12.5px", margin: "0 0 13px" }}>
-              Abonne-toi à notre compte Instagram et récupère 500 crédits offerts.
-            </p>
-            <div className="profil-actions" style={{ marginTop: 0 }}>
-              <a
-                className="profil-edit-btn"
-                href="https://www.instagram.com/kayakbet/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Suivre @kayakbet
-              </a>
-              <button className="profil-edit-btn" disabled={instagramRewardBusy} onClick={onClaimInstagramReward}>
-                {instagramRewardBusy ? "…" : "Récupérer mes 500 crédits"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      <InstagramRewardCard
+        status={instagramRewardStatus}
+        busy={instagramRewardBusy}
+        onRequest={onRequestInstagramReward}
+      />
 
       <div className="profil-section" id="profil-parrainage">
         <div className="profil-section-head">
@@ -1458,7 +1435,7 @@ export default function DashboardPage() {
   const [linkedAthlete, setLinkedAthlete] = useState<LinkedAthlete | null>(null);
   const [linkAthleteOpen, setLinkAthleteOpen] = useState(false);
   const [referralModalOpen, setReferralModalOpen] = useState(false);
-  const [instagramRewardClaimed, setInstagramRewardClaimed] = useState(false);
+  const [instagramRewardStatus, setInstagramRewardStatus] = useState<IgRewardStatus>("loading");
   const [instagramRewardBusy,    setInstagramRewardBusy]    = useState(false);
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
@@ -1519,12 +1496,19 @@ export default function DashboardPage() {
           setBio(prof.bio ?? "");
           setInstagram(prof.instagram ?? null);
           setLinkedAthlete(prof.linkedAthlete ?? null);
-          setInstagramRewardClaimed(!!prof.instagramRewardClaimed);
         }
       } catch { /* ignore */ }
     }
     loadProfile();
   }, [supabase]);
+
+  // Statut de la demande de bonus Instagram (validation manuelle par l'admin).
+  useEffect(() => {
+    fetch("/api/rewards/instagram")
+      .then(res => res.ok ? res.json() : { status: "unavailable" })
+      .then((data) => setInstagramRewardStatus(data.status ?? "none"))
+      .catch(() => setInstagramRewardStatus("unavailable"));
+  }, []);
 
   async function fetchBetHistory() {
     try {
@@ -1661,18 +1645,21 @@ export default function DashboardPage() {
     navigate("ligue");
   }
 
-  async function claimInstagramReward() {
-    if (instagramRewardClaimed || instagramRewardBusy) return;
+  async function requestInstagramReward(handle: string) {
+    if (instagramRewardBusy || !handle) return;
     setInstagramRewardBusy(true);
     try {
-      const res = await fetch("/api/rewards/instagram", { method: "POST" });
+      const res = await fetch("/api/rewards/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle }),
+      });
       const json = await res.json();
-      if (res.ok && json.ok) {
-        setInstagramRewardClaimed(true);
-        setBalance(Number(json.balance));
-        showToast(<Check c="#28D7E6" />, <>Bonus Instagram · +{json.bonus} cr.</>);
-      } else if (json.reason === "already_claimed") {
-        setInstagramRewardClaimed(true);
+      if (res.ok && json.status) {
+        setInstagramRewardStatus(json.status);
+        if (json.status === "pending") {
+          showToast(<Check c="#28D7E6" />, <>Demande envoyée · on vérifie ton abonnement</>);
+        }
       } else {
         showToast(<XIcon c="#FF7A45" />, json.error ?? "Erreur", true);
       }
@@ -1896,9 +1883,9 @@ export default function DashboardPage() {
               onLinkAthlete={() => setLinkAthleteOpen(true)}
               onOpenProfile={openPlayerProfile}
               onOpenLeague={openLeague}
-              instagramRewardClaimed={instagramRewardClaimed}
+              instagramRewardStatus={instagramRewardStatus}
               instagramRewardBusy={instagramRewardBusy}
-              onClaimInstagramReward={claimInstagramReward}
+              onRequestInstagramReward={requestInstagramReward}
               seasonLabel={seasonLabel}
             />
           )}
@@ -1983,9 +1970,9 @@ export default function DashboardPage() {
       <ReferralModal
         open={referralModalOpen}
         onClose={() => setReferralModalOpen(false)}
-        instagramRewardClaimed={instagramRewardClaimed}
+        instagramRewardStatus={instagramRewardStatus}
         instagramRewardBusy={instagramRewardBusy}
-        onClaimInstagramReward={claimInstagramReward}
+        onRequestInstagramReward={requestInstagramReward}
       />
 
       {/* ============ TOAST ============ */}

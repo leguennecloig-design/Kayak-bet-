@@ -31,6 +31,10 @@ const GROUPS: NavGroup[] = [
     label: "Classement",
     links: [{ href: "/admin/seasons", label: "Saisons" }],
   },
+  {
+    label: "Récompenses",
+    links: [{ href: "/admin/instagram", label: "Bonus Instagram" }],
+  },
 ];
 
 function isActive(pathname: string, href: string): boolean {
