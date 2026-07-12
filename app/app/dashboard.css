@@ -1141,11 +1141,20 @@
   .kb-app .greet h1 {
     font-size: 27px;
   }
+  /* Disposition 2+1 des chips stat (comme le design iOS) :
+     Classement + Paris en cours côte à côte, Série en pleine largeur. */
   .kb-app .quick {
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
   .kb-app .chip-stat {
-    flex: 1 1 auto;
+    flex: none;
+    min-width: 0;
+  }
+  .kb-app .chip-stat.chip-streak {
+    grid-column: 1 / -1;
   }
 
   .kb-app .botnav {

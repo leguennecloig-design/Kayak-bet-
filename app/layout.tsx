@@ -8,6 +8,16 @@ export const metadata: Metadata = {
   description:
     "Pronostique sur le circuit mondial de kayak de slalom et de descente. Crédits fictifs, sensations réelles — sans dépôt, sans risque.",
   manifest: "/manifest.json",
+  // Icône d'accueil iOS : lien explicite vers un fichier statique à un chemin
+  // stable et sans hash (/apple-touch-icon.png, servi depuis public/). L'ancien
+  // fichier-convention app/apple-icon.png générait un lien avec un ?hash qui
+  // n'était pas récupéré de façon fiable par le "Ajouter à l'écran d'accueil"
+  // de Safari (icône remplacée par la lettre initiale). Le chemin bien connu
+  // /apple-touch-icon.png est aussi celui qu'iOS cherche par défaut.
+  icons: {
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
