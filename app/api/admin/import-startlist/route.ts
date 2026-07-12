@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
         nom: body.nom_competition,
         date: dateDebut,
         lieu: body.lieu,
-        discipline: null,
+        discipline: "Descente",
         type_competition: body.type_competition ?? null,
         type_epreuve: body.type_epreuve || null,
         paris_ouverts_a: body.paris_ouverts_a || null,

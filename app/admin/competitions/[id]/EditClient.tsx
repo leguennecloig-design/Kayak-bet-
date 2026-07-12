@@ -54,7 +54,8 @@ type AthleteResult = {
   categorie: string;
 };
 
-const DISCIPLINES = ["K1 Descente", "C1 Descente", "K1 Slalom", "C1 Slalom", "K1 Sprint", "C2 Descente"];
+// Kayakbet est 100% kayak de descente — une seule discipline proposée.
+const DISCIPLINES = ["Descente"];
 
 const ATHLETE_CATEGORIES = [
   "C1D", "C1DU15", "C1DU18", "C1HM1", "C1HM2", "C1HM22", "C1HM3",
