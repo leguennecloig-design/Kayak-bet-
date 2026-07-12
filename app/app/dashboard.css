@@ -369,19 +369,24 @@
   color: var(--soft);
   margin: 9px 0 0;
 }
+/* Cartes stat verticales (icône en haut, valeur, libellé) — 3 colonnes
+   égales, même rendu en desktop et en PWA mobile (design iOS de référence). */
 .kb-app .quick {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  flex-wrap: wrap;
 }
 .kb-app .chip-stat {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  text-align: center;
+  gap: 9px;
+  min-width: 88px;
   background: linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.008)), var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 10px 14px 10px 10px;
+  padding: 14px 10px 12px;
   transition: border-color .18s, transform .18s;
 }
 .kb-app .chip-stat:hover {
@@ -417,25 +422,29 @@
 .kb-app .chip-stat.chip-bets:hover   { border-color: rgba(17,194,194,.35); }
 .kb-app .chip-stat.chip-streak:hover { border-color: rgba(255,122,69,.35); }
 .kb-app .chip-stat .tx {
+  /* Valeur au-dessus du libellé (l'ordre DOM est libellé puis valeur) */
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
+  align-items: center;
   min-width: 0;
+  max-width: 100%;
 }
 .kb-app .chip-stat .tx .l {
   display: block;
   font: 700 8.5px/1 var(--font-grotesk), monospace;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--sub);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
+  margin-top: 7px;
 }
 .kb-app .chip-stat .tx .v {
   display: block;
   font: 400 italic 18px/1.1 var(--font-anton), sans-serif;
   color: #fff;
-  margin-top: 6px;
 }
 .kb-app .chip-stat .tx .v em {
   color: var(--cyan);
@@ -1141,20 +1150,12 @@
   .kb-app .greet h1 {
     font-size: 27px;
   }
-  /* Disposition 2+1 des chips stat (comme le design iOS) :
-     Classement + Paris en cours côte à côte, Série en pleine largeur. */
+  /* Même grille 3 colonnes qu'en desktop, en pleine largeur sous le titre. */
   .kb-app .quick {
     width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
   }
   .kb-app .chip-stat {
-    flex: none;
     min-width: 0;
-  }
-  .kb-app .chip-stat.chip-streak {
-    grid-column: 1 / -1;
   }
 
   .kb-app .botnav {

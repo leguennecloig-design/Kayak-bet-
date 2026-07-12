@@ -413,7 +413,7 @@ function HomeView({
           </div>
           <div className="chip-stat chip-streak">
             <span className="ic"><ColFlame /></span>
-            <span className="tx"><span className="l">Série</span><span className="v">{streak > 0 ? `${streak} victoire${streak > 1 ? "s" : ""}` : "—"}</span></span>
+            <span className="tx"><span className="l">Série</span><span className="v">{streak > 0 ? `${streak} v.` : "—"}</span></span>
           </div>
         </div>
       </div>
