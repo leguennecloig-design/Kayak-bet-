@@ -9,6 +9,7 @@ import EditProfileModal from "@/app/components/EditProfileModal";
 import LinkAthleteModal from "@/app/components/LinkAthleteModal";
 import ReferralModal from "@/app/components/ReferralModal";
 import InstagramRewardCard, { type IgRewardStatus } from "@/app/components/InstagramRewardCard";
+import NotificationBell from "@/app/components/NotificationBell";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
 
@@ -1839,6 +1840,7 @@ export default function DashboardPage() {
                 <GiftIcon />
               </button>
             </div>
+            <NotificationBell />
             <button className="avatar" onClick={() => navigate("profil")} title="Profil">
               <span className="pic">{initials}</span>
               <span className="who">

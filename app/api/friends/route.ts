@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase-server";
 import { displayName, initials } from "@/lib/display-name";
+import { notifyUser } from "@/lib/notifications/create";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function actorName(adminSb: any, userId: string): Promise<string> {
+  const { data } = await adminSb.from("users").select("username, email").eq("id", userId).maybeSingle();
+  return data ? displayName(data) : "Un joueur";
+}
 
 function pairKey(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
@@ -84,6 +91,14 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const nm = await actorName(adminSb, user.id);
+    await notifyUser(adminSb, targetUserId, {
+      type: "friend_request",
+      title: "Nouvelle demande d'ami",
+      body: `${nm} veut t'ajouter en ami sur Kayakbet.`,
+      url: "/app?notif=friends",
+      actorId: user.id,
+    });
     return NextResponse.json({ friendshipId: created.id, status: "pending_outgoing" });
   }
 
@@ -101,6 +116,14 @@ export async function POST(req: NextRequest) {
       .update({ status: "accepted", updated_at: new Date().toISOString() })
       .eq("id", existing.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const nm = await actorName(adminSb, user.id);
+    await notifyUser(adminSb, targetUserId, {
+      type: "friend_accepted",
+      title: "Demande d'ami acceptée",
+      body: `${nm} a accepté ta demande d'ami.`,
+      url: "/app?notif=friends",
+      actorId: user.id,
+    });
     return NextResponse.json({ friendshipId: existing.id, status: "friends" });
   }
 
@@ -110,5 +133,13 @@ export async function POST(req: NextRequest) {
     .update({ status: "pending", requested_by: user.id, updated_at: new Date().toISOString() })
     .eq("id", existing.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const nm = await actorName(adminSb, user.id);
+  await notifyUser(adminSb, targetUserId, {
+    type: "friend_request",
+    title: "Nouvelle demande d'ami",
+    body: `${nm} veut t'ajouter en ami sur Kayakbet.`,
+    url: "/app?notif=friends",
+    actorId: user.id,
+  });
   return NextResponse.json({ friendshipId: existing.id, status: "pending_outgoing" });
 }

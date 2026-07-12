@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase-server";
+import { displayName } from "@/lib/display-name";
+import { notifyUser } from "@/lib/notifications/create";
 
 // PATCH /api/friends/[id] { action: "accept" | "decline" }
 // Seul le destinataire d'une demande en attente peut l'accepter/refuser.
@@ -39,6 +41,19 @@ export async function PATCH(
     .update({ status: action === "accept" ? "accepted" : "declined", updated_at: new Date().toISOString() })
     .eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Prévenir le demandeur que sa demande a été acceptée.
+  if (action === "accept") {
+    const { data: me } = await adminSb.from("users").select("username, email").eq("id", user.id).maybeSingle();
+    const nm = me ? displayName(me) : "Un joueur";
+    await notifyUser(adminSb, row.requested_by, {
+      type: "friend_accepted",
+      title: "Demande d'ami acceptée",
+      body: `${nm} a accepté ta demande d'ami.`,
+      url: "/app?notif=friends",
+      actorId: user.id,
+    });
+  }
 
   return NextResponse.json({ ok: true, status: action === "accept" ? "friends" : "declined" });
 }

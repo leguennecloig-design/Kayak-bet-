@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase-server";
+import { displayName } from "@/lib/display-name";
+import { notifyUser } from "@/lib/notifications/create";
 
 const REFERRAL_BONUS = 400;
 
@@ -63,6 +65,17 @@ export async function POST(req: NextRequest) {
       description: "Parrainage — bonus de bienvenue",
     },
   ]);
+
+  // Prévenir le parrain qu'un filleul a rejoint grâce à son lien.
+  const { data: filleul } = await adminSb.from("users").select("username, email").eq("id", user.id).maybeSingle();
+  const nm = filleul ? displayName(filleul) : "Un nouveau joueur";
+  await notifyUser(adminSb, referrer.id, {
+    type: "referral_used",
+    title: "Nouveau filleul ! 🎉",
+    body: `${nm} a rejoint Kayakbet grâce à ton lien. +${REFERRAL_BONUS} crédits pour toi !`,
+    url: "/app",
+    actorId: user.id,
+  });
 
   return NextResponse.json({ ok: true, bonus: REFERRAL_BONUS });
 }
