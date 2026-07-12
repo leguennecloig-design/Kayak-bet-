@@ -581,6 +581,12 @@ export default function LoginPage() {
         // si un compte venait d'être créé, sans savoir qu'il en a déjà un.
         setError("Un compte existe déjà avec cette adresse e-mail. Connecte-toi, ou vérifie ta boîte mail si tu ne l'as jamais confirmé.");
         resetCaptcha();
+      } else if (data.session) {
+        // "Confirm email" désactivé côté Supabase (ou compte auto-confirmé) :
+        // signUp() renvoie directement une session active, pas de mail à
+        // attendre — sinon l'écran "vérifie ton email" s'affichait à des gens
+        // déjà connectés, qui n'auraient jamais reçu ni eu besoin d'un mail.
+        setMode("welcome");
       } else {
         setMode("sent");
       }
