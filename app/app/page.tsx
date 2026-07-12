@@ -101,6 +101,7 @@ const InstaIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.
 const DownloadIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>;
 const AppleIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-.9-1.4-2.4-1.5-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7c-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 8 .7 1 1.5 2.1 2.5 2 1-.04 1.4-.65 2.6-.65s1.6.65 2.6.63c1.1-.02 1.8-1 2.4-2 .8-1.1 1.1-2.2 1.1-2.3-.02 0-2.2-.85-2.2-3.4ZM14.6 6.6c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-1 1.6-.8 2.5.9.07 1.8-.45 2.4-1.1Z" fill="currentColor"/></svg>;
 const AndroidIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="3" width="12" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.7"/><path d="M10.5 18h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>;
+const ShareIcon = () => <svg viewBox="0 0 24 24" fill="none"><path d="M12 15V4m0 0 3.5 3.5M12 4 8.5 7.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 11v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>;
 
 function InstaLink({ handle, className = "insta-link" }: { handle?: string | null; className?: string }) {
   if (!handle) return null;
@@ -1119,6 +1120,20 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
     });
   }
 
+  function shareReferral() {
+    if (!referralLink) return;
+    const shareData = {
+      title: "Kayakbet",
+      text: "Rejoins-moi sur Kayakbet, le pronostic 100% gratuit sur le kayak de descente ! 400 crédits offerts dès ton inscription 🛶",
+      url: referralLink,
+    };
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else {
+      copyReferralLink();
+    }
+  }
+
   return (
     <>
       <div className="profil-hero">
@@ -1339,6 +1354,14 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
                 <span className="v">{referralCode}</span>
               </span>
               <span className="cp">{referralCopied ? "Copié ✓" : "Copier"}</span>
+            </button>
+
+            <div className="referral-link">
+              <span className="referral-link-label">Mon lien d&apos;invitation</span>
+              <span className="referral-link-url">{referralLink}</span>
+            </div>
+            <button className="referral-share" onClick={shareReferral}>
+              <ShareIcon /> Partager mon lien
             </button>
           </div>
         )}

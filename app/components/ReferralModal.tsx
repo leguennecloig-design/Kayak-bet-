@@ -56,6 +56,20 @@ export default function ReferralModal({ open, onClose, instagramRewardStatus, in
     });
   }
 
+  function shareLink() {
+    if (!link) return;
+    const shareData = {
+      title: "Kayakbet",
+      text: "Rejoins-moi sur Kayakbet, le pronostic 100% gratuit sur le kayak de descente ! 400 crédits offerts dès ton inscription 🛶",
+      url: link,
+    };
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else {
+      copyLink();
+    }
+  }
+
   return (
     <div className="kb-modal-scrim" onClick={onClose}>
       <div
@@ -91,6 +105,15 @@ export default function ReferralModal({ open, onClose, instagramRewardStatus, in
                   <span className="v">{code}</span>
                 </span>
                 <span className="cp">{copied ? "Copié ✓" : "Copier"}</span>
+              </button>
+
+              <div className="referral-link">
+                <span className="referral-link-label">Mon lien d&apos;invitation</span>
+                <span className="referral-link-url">{link}</span>
+              </div>
+              <button className="referral-share" onClick={shareLink}>
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 15V4m0 0 3.5 3.5M12 4 8.5 7.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 11v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
+                Partager mon lien
               </button>
 
               <p className="referral-count">

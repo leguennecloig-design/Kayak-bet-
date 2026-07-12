@@ -26,6 +26,12 @@
 * { box-sizing: border-box; }
 html {
   scroll-behavior: smooth;
+  /* Réserve en permanence la place de la barre de défilement : sinon, quand
+     on passe d'une page longue (avec scrollbar) à une page courte comme
+     l'onglet Compétitions (sans scrollbar), la largeur du viewport change et
+     le contenu centré (.wrap) se décale de quelques pixels. Sans effet sur
+     les scrollbars superposées (macOS/mobile), donc aucune régression. */
+  scrollbar-gutter: stable;
   /* Sans ça, Safari mobile peut agrandir automatiquement le texte après
      coup (accessibilité) — un h1 découpé caractère par caractère par GSAP
      SplitText est alors décalé/mal proportionné car ses positions sont
