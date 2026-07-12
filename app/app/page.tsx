@@ -187,6 +187,8 @@ type Odd = {
   competitionId?: string;
   categorie?:     string;
   codeBateau?:    string | null;
+  targetPlace?:          number; // EXACT_PLACE uniquement
+  predictedTimeSeconds?: number; // EXACT_TIME uniquement
 };
 
 type Competition = {
@@ -1548,9 +1550,11 @@ export default function DashboardPage() {
 
   // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète — en
   // sélectionner un nouveau remplace l'ancien plutôt que de les cumuler.
-  // Place exacte est incompatible avec Vainqueur pour ce même athlète
-  // (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). Temps exact
-  // reste toujours cumulable, sans exclusion.
+  // Place exacte n°1 est incompatible avec Vainqueur pour ce même athlète
+  // (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). Une place
+  // exacte ≥ 2 peut en revanche coexister avec un pari Vainqueur (ce sont
+  // deux paris différents). Temps exact reste toujours cumulable, sans
+  // exclusion.
   const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
 
   function toggle(o: Odd) {
@@ -1560,11 +1564,11 @@ export default function DashboardPage() {
       for (const key of Object.keys(next)) {
         const existing = next[key];
         if (existing.participantId !== o.participantId) continue;
-        const bothRankTiers  = RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
-        const top1VsExactPl  =
-          (o.betType === "TOP_1" && existing.betType === "EXACT_PLACE") ||
-          (o.betType === "EXACT_PLACE" && existing.betType === "TOP_1");
-        if (bothRankTiers || top1VsExactPl) delete next[key];
+        const bothRankTiers   = RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
+        const top1VsExactPl1  =
+          (o.betType === "TOP_1" && existing.betType === "EXACT_PLACE" && existing.targetPlace === 1) ||
+          (o.betType === "EXACT_PLACE" && o.targetPlace === 1 && existing.betType === "TOP_1");
+        if (bothRankTiers || top1VsExactPl1) delete next[key];
       }
       next[o.id] = o;
       return next;
@@ -1912,6 +1916,9 @@ export default function DashboardPage() {
       <ReferralModal
         open={referralModalOpen}
         onClose={() => setReferralModalOpen(false)}
+        instagramRewardClaimed={instagramRewardClaimed}
+        instagramRewardBusy={instagramRewardBusy}
+        onClaimInstagramReward={claimInstagramReward}
       />
 
       {/* ============ TOAST ============ */}

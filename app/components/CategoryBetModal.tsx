@@ -17,6 +17,8 @@ export type BetOdd = {
   competitionId?: string;
   categorie?: string;
   codeBateau?: string | null;
+  targetPlace?: number;
+  predictedTimeSeconds?: number;
 };
 
 type CotesRow = {
@@ -82,6 +84,14 @@ export default function CategoryBetModal({
   const [lockedUntil, setLockedUntil] = useState<string | null>(
     parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null
   );
+
+  // Saisie inline pour "Place exacte" (numéro) et "Temps exact" (valeur au
+  // dixième de seconde) — ces deux types de pari ne s'ajoutent pas au coupon
+  // au premier clic comme les autres, ils ouvrent d'abord un petit champ.
+  const [expandedInput, setExpandedInput] = useState<{ participantId: string; type: "EXACT_PLACE" | "EXACT_TIME" } | null>(null);
+  const [placeValue, setPlaceValue] = useState("");
+  const [timeValue, setTimeValue] = useState("");
+  const [inputError, setInputError] = useState("");
 
   const cats = [...new Set(odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
 
@@ -184,15 +194,33 @@ export default function CategoryBetModal({
                     const val = type === "TOP_1" ? p.val : Number(cotesRow![COTE_FIELD[type]]);
                     const id = `${p.participantId}:${type}`;
                     const sel = !!coupon[id];
+                    const needsInput = type === "EXACT_PLACE" || type === "EXACT_TIME";
                     return (
                       <button
                         key={type}
                         className={`catmodal-bet${sel ? " sel" : ""}`}
-                        onClick={() => toggle({
-                          id, participantId: p.participantId, betType: type, betLabel: label,
-                          nm: p.nm, ctry: p.ctry, note: p.note, val,
-                          competitionId, categorie: selectedCat,
-                        })}
+                        onClick={() => {
+                          if (sel) {
+                            toggle(coupon[id]);
+                            return;
+                          }
+                          if (needsInput) {
+                            setInputError("");
+                            setPlaceValue("");
+                            setTimeValue("");
+                            setExpandedInput(prev =>
+                              prev?.participantId === p.participantId && prev.type === type
+                                ? null
+                                : { participantId: p.participantId, type }
+                            );
+                            return;
+                          }
+                          toggle({
+                            id, participantId: p.participantId, betType: type, betLabel: label,
+                            nm: p.nm, ctry: p.ctry, note: p.note, val,
+                            competitionId, categorie: selectedCat,
+                          });
+                        }}
                       >
                         <span className="lb">{label}</span>
                         <span className="vl">{val.toFixed(2)}</span>
@@ -203,6 +231,77 @@ export default function CategoryBetModal({
                     <span className="catmodal-note">Cotes avancées indisponibles</span>
                   )}
                 </div>
+
+                {expandedInput?.participantId === p.participantId && expandedInput.type === "EXACT_PLACE" && (
+                  <div className="catmodal-inline-input">
+                    <input
+                      type="number"
+                      min={2}
+                      max={50}
+                      placeholder="N° de place (ex: 6)"
+                      value={placeValue}
+                      onChange={(e) => { setPlaceValue(e.target.value); setInputError(""); }}
+                    />
+                    <button
+                      className="catmodal-inline-confirm"
+                      onClick={() => {
+                        const parsed = parseInt(placeValue, 10);
+                        if (!Number.isInteger(parsed) || parsed < 2) {
+                          setInputError("Place 1 = utilise plutôt le pari Vainqueur");
+                          return;
+                        }
+                        if (parsed > 50) {
+                          setInputError("Place invalide");
+                          return;
+                        }
+                        const val = Number(cotesRow![COTE_FIELD.EXACT_PLACE]);
+                        toggle({
+                          id: `${p.participantId}:EXACT_PLACE`, participantId: p.participantId, betType: "EXACT_PLACE",
+                          betLabel: `Place exacte n°${parsed}`, nm: p.nm, ctry: p.ctry, note: p.note, val,
+                          competitionId, categorie: selectedCat, targetPlace: parsed,
+                        });
+                        setExpandedInput(null);
+                      }}
+                    >
+                      Valider
+                    </button>
+                    {inputError && <span className="catmodal-inline-err">{inputError}</span>}
+                  </div>
+                )}
+
+                {expandedInput?.participantId === p.participantId && expandedInput.type === "EXACT_TIME" && (
+                  <div className="catmodal-inline-input">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="Temps en secondes (ex: 83.4)"
+                      value={timeValue}
+                      onChange={(e) => { setTimeValue(e.target.value); setInputError(""); }}
+                    />
+                    <button
+                      className="catmodal-inline-confirm"
+                      onClick={() => {
+                        const parsed = parseFloat(timeValue);
+                        if (!Number.isFinite(parsed) || parsed <= 0) {
+                          setInputError("Temps invalide");
+                          return;
+                        }
+                        const rounded = Math.round(parsed * 10) / 10;
+                        const val = Number(cotesRow![COTE_FIELD.EXACT_TIME]);
+                        toggle({
+                          id: `${p.participantId}:EXACT_TIME`, participantId: p.participantId, betType: "EXACT_TIME",
+                          betLabel: `Temps exact : ${rounded}s`, nm: p.nm, ctry: p.ctry, note: p.note, val,
+                          competitionId, categorie: selectedCat, predictedTimeSeconds: rounded,
+                        });
+                        setExpandedInput(null);
+                      }}
+                    >
+                      Valider
+                    </button>
+                    {inputError && <span className="catmodal-inline-err">{inputError}</span>}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -5,9 +5,14 @@ import { useEffect, useRef, useState } from "react";
 type Props = {
   open: boolean;
   onClose: () => void;
+  instagramRewardClaimed?: boolean;
+  instagramRewardBusy?: boolean;
+  onClaimInstagramReward?: () => void;
 };
 
-export default function ReferralModal({ open, onClose }: Props) {
+const InstaIcon = () => <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.7" /><circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" /></svg>;
+
+export default function ReferralModal({ open, onClose, instagramRewardClaimed, instagramRewardBusy, onClaimInstagramReward }: Props) {
   const [code, setCode] = useState<string | null>(null);
   const [referredUsers, setReferredUsers] = useState<{ name: string; date: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -97,6 +102,38 @@ export default function ReferralModal({ open, onClose }: Props) {
             </>
           ) : (
             <p className="catmodal-status err">Impossible de charger ton code de parrainage.</p>
+          )}
+
+          {onClaimInstagramReward && (
+            <div className="profil-section" style={{ margin: 0 }}>
+              <div className="profil-section-head">
+                <span className="ps-head-ic"><InstaIcon /> Bonus Instagram</span>
+              </div>
+              {instagramRewardClaimed ? (
+                <p style={{ color: "var(--soft)", fontFamily: "var(--font-archivo)", fontSize: "12.5px", margin: 0 }}>
+                  Récompense obtenue · merci de nous suivre ✓
+                </p>
+              ) : (
+                <>
+                  <p style={{ color: "var(--soft)", fontFamily: "var(--font-archivo)", fontSize: "12.5px", margin: "0 0 13px" }}>
+                    Abonne-toi à notre compte Instagram et récupère 500 crédits offerts.
+                  </p>
+                  <div className="profil-actions" style={{ marginTop: 0 }}>
+                    <a
+                      className="profil-edit-btn"
+                      href="https://www.instagram.com/kayakbet/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Suivre @kayakbet
+                    </a>
+                    <button className="profil-edit-btn" disabled={instagramRewardBusy} onClick={onClaimInstagramReward}>
+                      {instagramRewardBusy ? "…" : "Récupérer mes 500 crédits"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>

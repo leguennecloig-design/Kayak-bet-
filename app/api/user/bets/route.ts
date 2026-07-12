@@ -11,6 +11,8 @@ type Selection = {
   competitionId:   string;
   competitionNom:  string;
   categorie:       string;
+  targetPlace?:          number; // EXACT_PLACE uniquement
+  predictedTimeSeconds?: number; // EXACT_TIME uniquement
 };
 
 const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME"];
@@ -112,17 +114,29 @@ export async function POST(req: NextRequest) {
     if (s.betType != null && !VALID_BET_TYPES.includes(s.betType)) {
       return NextResponse.json({ error: "Type de pari invalide" }, { status: 400 });
     }
+    if (s.betType === "EXACT_PLACE") {
+      if (!Number.isInteger(s.targetPlace) || s.targetPlace! < 2 || s.targetPlace! > 50) {
+        return NextResponse.json({ error: "Place exacte invalide (doit être un entier ≥ 2)" }, { status: 400 });
+      }
+    }
+    if (s.betType === "EXACT_TIME") {
+      if (typeof s.predictedTimeSeconds !== "number" || !Number.isFinite(s.predictedTimeSeconds) || s.predictedTimeSeconds <= 0 || s.predictedTimeSeconds > 36000) {
+        return NextResponse.json({ error: "Temps prédit invalide" }, { status: 400 });
+      }
+    }
   }
 
   // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète, et Place
-  // exacte incompatible avec Vainqueur pour ce même athlète (déjà appliqué
-  // côté client dans toggle(), revalidé ici car le client n'est pas fiable).
-  const byParticipant = new Map<string, BetType[]>();
+  // exacte n°1 incompatible avec Vainqueur pour ce même athlète (redondant :
+  // déjà appliqué côté client dans toggle(), revalidé ici car le client
+  // n'est pas fiable — place exacte ≥ 2 peut en revanche coexister avec un
+  // pari Vainqueur, ce sont deux paris différents).
+  const byParticipant = new Map<string, Selection[]>();
   for (const s of selections) {
-    const bt = s.betType ?? "TOP_1";
-    byParticipant.set(s.participantId, [...(byParticipant.get(s.participantId) ?? []), bt]);
+    byParticipant.set(s.participantId, [...(byParticipant.get(s.participantId) ?? []), s]);
   }
-  for (const [, types] of byParticipant) {
+  for (const [, sels] of byParticipant) {
+    const types = sels.map(s => s.betType ?? "TOP_1");
     const rankTiersUsed = types.filter(t => RANK_TIERS.has(t));
     if (rankTiersUsed.length > 1) {
       return NextResponse.json(
@@ -130,9 +144,11 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (types.includes("TOP_1") && types.includes("EXACT_PLACE")) {
+    const hasTop1 = types.includes("TOP_1");
+    const hasExactPlace1 = sels.some(s => (s.betType ?? "TOP_1") === "EXACT_PLACE" && s.targetPlace === 1);
+    if (hasTop1 && hasExactPlace1) {
       return NextResponse.json(
-        { error: "Vainqueur et Place exacte sont incompatibles pour un même athlète" },
+        { error: "Vainqueur et Place exacte n°1 sont incompatibles pour un même athlète" },
         { status: 400 }
       );
     }

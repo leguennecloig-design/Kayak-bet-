@@ -197,8 +197,8 @@ function buildCoteResult(
     prob_top5:  p5,  cote_top5:  probToCote(p5,  ALGO_PARAMS.PLAFOND_TOP5),
     prob_top10: p10, cote_top10: probToCote(p10, ALGO_PARAMS.PLAFOND_TOP10),
     prob_top20: p20, cote_top20: probToCote(p20, ALGO_PARAMS.PLAFOND_TOP20),
-    cote_exact_place: 3.00,
-    cote_exact_time:  10.00,
+    cote_exact_place: 5.00,
+    cote_exact_time:  20.00,
     algo_version:     ALGO_PARAMS.ALGO_VERSION,
   };
 }

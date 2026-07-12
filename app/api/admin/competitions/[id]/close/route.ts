@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { sendPushToUser } from "@/lib/push/send";
+import { parseTempsToSeconds } from "@/lib/utils/time";
+import type { BetType } from "@/lib/algo/types";
 
 type Selection = {
   participantId:  string;
@@ -10,7 +12,66 @@ type Selection = {
   competitionId:  string;
   competitionNom: string;
   categorie:      string;
+  betType?:              BetType;
+  targetPlace?:          number;
+  predictedTimeSeconds?: number;
 };
+
+type ResultEntry = { rang: number; tempsSeconds: number | null };
+
+// Détermine si une sélection est gagnante selon sa vraie règle de pari (et
+// non plus systématiquement "l'athlète a-t-il fini 1er ?", comme avant ce
+// correctif). "void" = athlète absent des résultats importés pour cette
+// catégorie — ne pénalise pas le parieur, comme le comportement déjà en
+// place quand une catégorie entière n'a pas de résultat.
+function selectionWins(
+  sel: Selection,
+  catMap: Map<string, ResultEntry> | undefined
+): "won" | "lost" | "void" {
+  if (!catMap) return "void";
+  const entry = catMap.get(normalize(sel.nom));
+  if (!entry) return "void";
+
+  const betType: BetType = sel.betType ?? "TOP_1";
+  switch (betType) {
+    case "TOP_1":  return entry.rang === 1  ? "won" : "lost";
+    case "TOP_3":  return entry.rang <= 3   ? "won" : "lost";
+    case "TOP_5":  return entry.rang <= 5   ? "won" : "lost";
+    case "TOP_10": return entry.rang <= 10  ? "won" : "lost";
+    case "TOP_20": return entry.rang <= 20  ? "won" : "lost";
+    case "EXACT_PLACE":
+      return sel.targetPlace != null && entry.rang === sel.targetPlace ? "won" : "lost";
+    case "EXACT_TIME":
+      return sel.predictedTimeSeconds != null && entry.tempsSeconds != null
+        && entry.tempsSeconds === sel.predictedTimeSeconds ? "won" : "lost";
+    default: return "lost";
+  }
+}
+
+// Construit, pour une compétition donnée, une map catégorie → (nom normalisé
+// → résultat). Remplace l'ancienne requête filtrée sur rang=1 (qui ne
+// permettait de vérifier que les paris "Vainqueur") par la récupération de
+// TOUS les résultats classés, nécessaire pour évaluer Top 3/5/10/20, place
+// exacte et temps exact.
+async function fetchResultsByCategory(
+  supabase: ReturnType<typeof createAdminSupabase>,
+  competitionId: string
+): Promise<Map<string, Map<string, ResultEntry>>> {
+  const { data } = await supabase
+    .from("resultats")
+    .select("categorie, nom, rang, temps")
+    .eq("competition_id", competitionId)
+    .not("rang", "is", null);
+
+  const resultsByCategory = new Map<string, Map<string, ResultEntry>>();
+  for (const r of (data ?? [])) {
+    if (!r.categorie || !r.nom || r.rang == null) continue;
+    const catMap = resultsByCategory.get(r.categorie) ?? new Map<string, ResultEntry>();
+    catMap.set(normalize(r.nom), { rang: r.rang, tempsSeconds: parseTempsToSeconds(r.temps) });
+    resultsByCategory.set(r.categorie, catMap);
+  }
+  return resultsByCategory;
+}
 
 type BetRow = {
   id:             string;
@@ -60,29 +121,14 @@ export async function POST(
     );
   }
 
-  // ── 2. Récupérer les gagnants par catégorie (rang = 1) ──────────
-  const { data: winners, error: winnersErr } = await supabase
-    .from("resultats")
-    .select("categorie, nom, rang")
-    .eq("competition_id", competitionId)
-    .eq("rang", 1);
+  // ── 2. Récupérer tous les résultats classés par catégorie ────────
+  // (avant ce fix, seul rang=1 était récupéré, ce qui ne permettait de
+  // régler que les paris "Vainqueur" — voir selectionWins() plus haut)
+  const resultsByCategory = await fetchResultsByCategory(supabase, competitionId);
 
-  if (winnersErr) {
+  if (resultsByCategory.size === 0) {
     return NextResponse.json(
-      { error: `Erreur lors de la récupération des vainqueurs : ${winnersErr.message}` },
-      { status: 500 }
-    );
-  }
-
-  // Map : categorie → nom normalisé du gagnant
-  const winnerMap = new Map<string, string>();
-  for (const w of (winners ?? [])) {
-    if (w.categorie && w.nom) winnerMap.set(w.categorie, normalize(w.nom));
-  }
-
-  if (winnerMap.size === 0) {
-    return NextResponse.json(
-      { error: "Aucun vainqueur (rang=1) trouvé dans les résultats. Vérifie l'import." },
+      { error: "Aucun résultat classé (rang) trouvé dans les résultats. Vérifie l'import." },
       { status: 422 }
     );
   }
@@ -133,14 +179,11 @@ export async function POST(
       hasSelFromThisComp = true;
       competitionNom = sel.competitionNom;
 
-      const winner = winnerMap.get(sel.categorie);
-      if (!winner) {
-        // Catégorie sans résultat → sélection void, on considère comme gagnée
-        // (évite de pénaliser pour une catégorie non importée)
-        continue;
-      }
-      const selWon = normalize(sel.nom) === winner;
-      if (!selWon) anyLost = true;
+      const outcome = selectionWins(sel, resultsByCategory.get(sel.categorie));
+      if (outcome === "lost") anyLost = true;
+      // "won" et "void" ne marquent pas anyLost (comportement déjà en place
+      // pour "void" : ne pénalise pas le parieur pour une catégorie/athlète
+      // non trouvé dans l'import des résultats)
     }
 
     if (!hasSelFromThisComp) continue;
@@ -176,20 +219,11 @@ export async function POST(
         // avant ce fix, ne trouvaient jamais ce pari lors de leur propre
         // clôture — on complète donc la vérification ici).
         for (const otherCompId of otherCompIds) {
-          const { data: otherResultats } = await supabase
-            .from("resultats")
-            .select("categorie, nom, rang")
-            .eq("competition_id", otherCompId)
-            .eq("rang", 1);
-          const otherWinnerMap = new Map<string, string>();
-          for (const w of (otherResultats ?? [])) {
-            if (w.categorie && w.nom) otherWinnerMap.set(w.categorie, normalize(w.nom));
-          }
+          const otherResultsByCategory = await fetchResultsByCategory(supabase, otherCompId);
           for (const sel of bet.selections) {
             if (sel.competitionId !== otherCompId) continue;
-            const winner = otherWinnerMap.get(sel.categorie);
-            if (!winner) continue;
-            if (normalize(sel.nom) !== winner) allWon = false;
+            const outcome = selectionWins(sel, otherResultsByCategory.get(sel.categorie));
+            if (outcome === "lost") allWon = false;
           }
         }
       }
@@ -266,7 +300,7 @@ export async function POST(
     won,
     lost,
     deferred,
-    categories:   winnerMap.size,
+    categories:   resultsByCategory.size,
     totalPaid:    Object.values(totalPaid).reduce((a, b) => a + b, 0),
     ...(failedSettlements.length > 0 ? { failedSettlements } : {}),
   });

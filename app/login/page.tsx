@@ -516,13 +516,29 @@ export default function LoginPage() {
     }
 
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: `${location.origin}/auth/callback`, captchaToken: captchaToken || undefined },
       });
-      if (error) { setError(error.message); resetCaptcha(); }
-      else setMode("sent");
+      if (error) {
+        if (/already registered/i.test(error.message)) {
+          setError("Un compte existe déjà avec cette adresse e-mail. Connecte-toi plutôt.");
+        } else {
+          setError(error.message);
+        }
+        resetCaptcha();
+      } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        // Anti-énumération Supabase : un compte existe déjà avec cet email
+        // mais n'a jamais été confirmé — signUp() renvoie un succès obfusqué
+        // (identities vide) au lieu d'une erreur. Sans cette détection,
+        // l'utilisateur se retrouvait sur l'écran "vérifie ton email" comme
+        // si un compte venait d'être créé, sans savoir qu'il en a déjà un.
+        setError("Un compte existe déjà avec cette adresse e-mail. Connecte-toi, ou vérifie ta boîte mail si tu ne l'as jamais confirmé.");
+        resetCaptcha();
+      } else {
+        setMode("sent");
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captchaToken || undefined } });
       if (error) { setError(error.message); resetCaptcha(); }
@@ -555,10 +571,37 @@ export default function LoginPage() {
         <div className="lp-glow g1" /><div className="lp-glow g2" />
         <WelcomeOverlay onDone={() => {
           (async () => {
+            // Lit le profil AVANT d'appliquer un éventuel bonus de parrainage
+            // — sinon l'animation de révélation des crédits affichait le
+            // solde déjà majoré du bonus (ex: 3400 au lieu de 3000 pour un
+            // filleul), puisque le bonus était crédité en premier.
+            let isNewUser = false;
+            let baseBalance = 0;
+            try {
+              const res = await fetch("/api/user/profile");
+              // Ne teste `data.onboarded` que si la requête a réellement
+              // réussi — sinon (ex: session pas encore propagée juste après
+              // la connexion, réponse 401) `data.onboarded` vaut `undefined`,
+              // et `!undefined` est vrai : un compte déjà onboardé se
+              // retrouvait à refaire tout l'onboarding à chaque connexion.
+              if (res.ok) {
+                const data = await res.json();
+                if (!data.onboarded) {
+                  isNewUser = true;
+                  baseBalance = Number(data.balance ?? 0);
+                }
+              }
+            } catch {
+              // en cas d'erreur réseau, on ne bloque pas l'utilisateur derrière
+              // l'onboarding — on le laisse simplement entrer dans l'app.
+            }
+
             // Applique un éventuel code de parrainage capturé à l'arrivée
             // (?ref=CODE) — no-op silencieux côté serveur si absent, déjà
             // utilisé, ou invalide. Retiré du localStorage dans tous les cas
-            // pour ne jamais retenter indéfiniment.
+            // pour ne jamais retenter indéfiniment. Le bonus atterrit
+            // silencieusement sur le vrai solde (visible dans /app), sans
+            // jamais contaminer le montant affiché dans l'animation.
             const refCode = typeof window !== "undefined" ? localStorage.getItem(REFERRAL_CODE_KEY) : null;
             if (refCode) {
               localStorage.removeItem(REFERRAL_CODE_KEY);
@@ -573,25 +616,12 @@ export default function LoginPage() {
               }
             }
 
-            try {
-              const res = await fetch("/api/user/profile");
-              // Ne teste `data.onboarded` que si la requête a réellement
-              // réussi — sinon (ex: session pas encore propagée juste après
-              // la connexion, réponse 401) `data.onboarded` vaut `undefined`,
-              // et `!undefined` est vrai : un compte déjà onboardé se
-              // retrouvait à refaire tout l'onboarding à chaque connexion.
-              if (res.ok) {
-                const data = await res.json();
-                if (!data.onboarded) {
-                  setRevealBalance(Number(data.balance ?? 0));
-                  setMode("credits");
-                  return;
-                }
-              }
-            } catch {
-              // en cas d'erreur réseau, on ne bloque pas l'utilisateur derrière
-              // l'onboarding — on le laisse simplement entrer dans l'app.
+            if (isNewUser) {
+              setRevealBalance(baseBalance);
+              setMode("credits");
+              return;
             }
+
             // Compte existant : proposer les notifs une fois, sauf si déjà
             // refusé/ignoré précédemment (pas de relance à chaque connexion).
             if (typeof window !== "undefined" && !localStorage.getItem(PUSH_PROMPT_DISMISSED_KEY)) {
