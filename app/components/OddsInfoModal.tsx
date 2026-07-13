@@ -62,13 +62,13 @@ export default function OddsInfoModal({ open, onClose }: Props) {
             <div className="odds-info-type"><b>Top 3 / 5</b><span>L&apos;athlète termine dans les 3 ou 5 premiers.</span></div>
             <div className="odds-info-type"><b>Place exacte</b><span>L&apos;athlète termine exactement à la place choisie. Plus la place est improbable, plus la cote est haute.</span></div>
             <div className="odds-info-type"><b>Temps au dixième</b><span>Le temps final correspond au dixième de seconde près (très difficile, cote élevée).</span></div>
-            <div className="odds-info-type"><b>Temps à la seconde</b><span>Le temps final correspond à la seconde près (plus facile, cote plafonnée à 4).</span></div>
+            <div className="odds-info-type"><b>Temps à la seconde</b><span>Le temps final correspond à la seconde près (plus facile, cote plafonnée à 5).</span></div>
           </div>
 
           <p className="odds-info-note">
-            Un seul pari de classement (Vainqueur/Top 3/5) par athlète — et Place exacte n°1
-            ne se combine pas avec Vainqueur pour le même athlète. Maximum 200 cr misés au total
-            sur un même athlète, tous paris en attente confondus.
+            Un seul pari en attente par athlète à la fois. Active le pari combiné dans ton
+            coupon pour miser sur plusieurs pronostics en même temps — les cotes se cumulent
+            et le gain est doublé.
           </p>
         </div>
       </div>

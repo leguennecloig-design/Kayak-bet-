@@ -1099,6 +1099,27 @@
   padding: 18px 22px calc(22px + env(safe-area-inset-bottom));
   background: rgba(7, 31, 45, 0.6);
 }
+.kb-app .combo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  font: 700 12.5px/1 var(--font-archivo);
+  color: var(--idle);
+  cursor: pointer;
+}
+.kb-app .combo-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--cyan);
+  flex: none;
+  cursor: pointer;
+}
+.kb-app .combo-toggle em {
+  color: var(--cyan);
+  font-style: normal;
+  font-weight: 800;
+}
 .kb-app .stake {
   display: flex;
   align-items: center;

@@ -17,9 +17,7 @@ type Selection = {
 };
 
 const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME", "EXACT_TIME_SECOND"];
-const RANK_TIERS: Set<BetType> = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
 const MIN_STAKE = 30;
-const MAX_STAKE_PER_ATHLETE = 200;
 const BALANCE_FLOOR = 200;
 
 // Cotes lues directement dans la table (statiques par athlète). EXACT_PLACE est
@@ -136,29 +134,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète, et Place
-  // exacte n°1 incompatible avec Vainqueur pour ce même athlète (redondant :
-  // déjà appliqué côté client dans toggle(), revalidé ici car le client
-  // n'est pas fiable — place exacte ≥ 2 peut en revanche coexister avec un
-  // pari Vainqueur, ce sont deux paris différents).
-  const byParticipant = new Map<string, Selection[]>();
-  for (const s of selections) {
-    byParticipant.set(s.participantId, [...(byParticipant.get(s.participantId) ?? []), s]);
+  // Un seul pari actif par athlète à la fois — ni deux sélections sur le même
+  // athlète dans ce coupon, ni un nouveau pari sur un athlète qui a déjà un
+  // pari en attente (remplace l'ancien plafond de mise cumulée par athlète).
+  // Déjà appliqué côté client dans toggle(), revalidé ici car le client n'est
+  // pas fiable.
+  const participantIdsInSubmission = selections.map(s => s.participantId);
+  if (new Set(participantIdsInSubmission).size !== participantIdsInSubmission.length) {
+    return NextResponse.json(
+      { error: "Un seul pari par athlète à la fois — retire les doublons de ton coupon" },
+      { status: 400 }
+    );
   }
-  for (const [, sels] of byParticipant) {
-    const types = sels.map(s => s.betType ?? "TOP_1");
-    const rankTiersUsed = types.filter(t => RANK_TIERS.has(t));
-    if (rankTiersUsed.length > 1) {
+
+  const { data: pendingBetsRows } = await adminSb
+    .from("bets")
+    .select("selections")
+    .eq("user_id", user.id)
+    .eq("status", "pending");
+
+  const pendingParticipants = new Map<string, string>(); // participantId -> nom, pour le message d'erreur
+  for (const b of pendingBetsRows ?? []) {
+    const sels: Selection[] = Array.isArray(b.selections) ? b.selections : [];
+    for (const s of sels) pendingParticipants.set(s.participantId, s.nom);
+  }
+  for (const s of selections) {
+    if (pendingParticipants.has(s.participantId)) {
       return NextResponse.json(
-        { error: "Un seul type de classement (Vainqueur/Top 3/5/10/20) par athlète" },
-        { status: 400 }
-      );
-    }
-    const hasTop1 = types.includes("TOP_1");
-    const hasExactPlace1 = sels.some(s => (s.betType ?? "TOP_1") === "EXACT_PLACE" && s.targetPlace === 1);
-    if (hasTop1 && hasExactPlace1) {
-      return NextResponse.json(
-        { error: "Vainqueur et Place exacte n°1 sont incompatibles pour un même athlète" },
+        { error: `Tu as déjà un pari en attente sur ${pendingParticipants.get(s.participantId)} — attends qu'il soit réglé avant d'en placer un autre.` },
         { status: 400 }
       );
     }
@@ -182,35 +185,6 @@ export async function POST(req: NextRequest) {
     if (participantsSet.size > 1) {
       return NextResponse.json(
         { error: "Un seul pari Vainqueur par catégorie (un seul athlète peut gagner une course)" },
-        { status: 400 }
-      );
-    }
-  }
-
-  // Plafond cumulé de 200 cr de mise par athlète, tous paris en attente
-  // confondus (pas seulement celui-ci) — la mise entière d'un pari combiné
-  // compte pour chaque athlète qu'il référence.
-  const uniqueParticipantIds = [...new Set(selections.map(s => s.participantId))];
-  const { data: pendingBetsRows } = await adminSb
-    .from("bets")
-    .select("stake, selections")
-    .eq("user_id", user.id)
-    .eq("status", "pending");
-
-  const existingStakeByParticipant = new Map<string, number>();
-  for (const b of pendingBetsRows ?? []) {
-    const sels: Selection[] = Array.isArray(b.selections) ? b.selections : [];
-    const participantsInBet = new Set(sels.map(s => s.participantId));
-    for (const pid of participantsInBet) {
-      existingStakeByParticipant.set(pid, (existingStakeByParticipant.get(pid) ?? 0) + Number(b.stake));
-    }
-  }
-  for (const pid of uniqueParticipantIds) {
-    const already = existingStakeByParticipant.get(pid) ?? 0;
-    if (already + stake > MAX_STAKE_PER_ATHLETE) {
-      const nom = selections.find(s => s.participantId === pid)?.nom ?? "cet athlète";
-      return NextResponse.json(
-        { error: `${MAX_STAKE_PER_ATHLETE} cr maximum par athlète (déjà ${already} cr en attente sur ${nom})` },
         { status: 400 }
       );
     }
@@ -303,8 +277,11 @@ export async function POST(req: NextRequest) {
     s.cote = serverCote; // jamais la valeur client pour le calcul financier
   }
 
-  const coteTotale    = selections.reduce((t, s) => t * s.cote, 1);
-  const gainPotentiel = Math.round(stake * coteTotale * 100) / 100;
+  const coteTotale = selections.reduce((t, s) => t * s.cote, 1);
+  // Pari combiné (2+ sélections) : gain doublé, en plus des cotes cumulées —
+  // incitation à prendre le risque de combiner plusieurs pronostics.
+  const isCombo       = selections.length > 1;
+  const gainPotentiel = Math.round(stake * coteTotale * (isCombo ? 2 : 1) * 100) / 100;
 
   // competition_id = compétition du 1er sélectionné (ou null si multi-comp)
   const uniqueComps = [...new Set(selections.map(s => s.competitionId))];

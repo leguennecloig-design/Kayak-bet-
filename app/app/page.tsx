@@ -1472,6 +1472,7 @@ export default function DashboardPage() {
   const [view,          setView]          = useState<View>("home");
   const [balance,       setBalance]       = useState(0);
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
+  const [comboMode,     setComboMode]     = useState(false);
   const [stake,         setStake]         = useState(30);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [betLoading,    setBetLoading]    = useState(false);
@@ -1524,8 +1525,10 @@ export default function DashboardPage() {
   /* coupon derived */
   const selected  = Object.values(coupon);
   const count     = selected.length;
+  const isCombo   = count > 1;
   const totalOdds = selected.reduce((t, o) => t * o.val, 1);
-  const gain      = Math.round((stake || 0) * totalOdds);
+  // Pari combiné (2+ sélections) : gain doublé, en plus des cotes cumulées.
+  const gain      = Math.round((stake || 0) * totalOdds * (isCombo ? 2 : 1));
 
   /* profil + solde */
   useEffect(() => {
@@ -1653,15 +1656,11 @@ export default function DashboardPage() {
     toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 2800);
   }
 
-  // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète — en
-  // sélectionner un nouveau remplace l'ancien plutôt que de les cumuler.
-  // Place exacte n°1 est incompatible avec Vainqueur pour ce même athlète
-  // (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). Une place
-  // exacte ≥ 2 peut en revanche coexister avec un pari Vainqueur (ce sont
-  // deux paris différents). Temps exact reste toujours cumulable, sans
-  // exclusion.
-  const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
-
+  // Un seul pari actif par athlète — sélectionner un nouveau pari sur un
+  // athlète déjà dans le coupon remplace l'ancien plutôt que de les cumuler
+  // (revalidé côté serveur : un athlète avec un pari déjà en attente ne peut
+  // de toute façon plus être sélectionné).
+  //
   // Un seul athlète ne peut gagner une catégorie donnée : sélectionner un
   // pari Vainqueur (ou "place exacte n°1", équivalent) remplace tout autre
   // pari Vainqueur/place-exacte-1 déjà pris sur un AUTRE athlète de la même
@@ -1675,18 +1674,21 @@ export default function DashboardPage() {
     setCoupon((prev) => {
       const next = { ...prev };
       if (next[o.id]) { delete next[o.id]; return next; }
+
+      // Pari combiné désactivé : un seul pronostic à la fois dans le coupon.
+      const hasOtherParticipant = Object.values(next).some(x => x.participantId !== o.participantId);
+      if (!comboMode && hasOtherParticipant) {
+        showToast(<XIcon c="#FF7A45" />, "Active le pari combiné pour miser sur plusieurs pronostics à la fois", true);
+        return prev;
+      }
+
       const oIsWinner = isWinnerBet(o);
       for (const key of Object.keys(next)) {
         const existing = next[key];
         const sameParticipant = existing.participantId === o.participantId;
-        const bothRankTiers   = sameParticipant && RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
-        const top1VsExactPl1  = sameParticipant && (
-          (o.betType === "TOP_1" && existing.betType === "EXACT_PLACE" && existing.targetPlace === 1) ||
-          (o.betType === "EXACT_PLACE" && o.targetPlace === 1 && existing.betType === "TOP_1")
-        );
         const rivalWinnerSameCategory =
           oIsWinner && !sameParticipant && isWinnerBet(existing) && existing.categorie === o.categorie;
-        if (bothRankTiers || top1VsExactPl1 || rivalWinnerSameCategory) delete next[key];
+        if (sameParticipant || rivalWinnerSameCategory) delete next[key];
       }
       next[o.id] = o;
       return next;
@@ -1779,6 +1781,7 @@ export default function DashboardPage() {
 
       setBalance(Number(json.newBalance));
       setCoupon({});
+      setComboMode(false);
       setDrawerOpen(false);
       showBetSuccessOverlay(Math.round(json.gainPotentiel));
       void firstComp;
@@ -2002,6 +2005,14 @@ export default function DashboardPage() {
 
         {count > 0 && (
           <div className="drawer-foot">
+            <label className="combo-toggle">
+              <input
+                type="checkbox"
+                checked={comboMode}
+                onChange={(e) => setComboMode(e.target.checked)}
+              />
+              <span>Pari combiné{isCombo && <em> · gain x2</em>}</span>
+            </label>
             <div className="stake">
               <label>Mise</label>
               <div className="field">
