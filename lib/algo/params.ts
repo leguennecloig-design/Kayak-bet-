@@ -90,11 +90,15 @@ export const ALGO_PARAMS = {
 
   // Heuristique "temps exact" (pas de modèle de temps absolu) : proba de toucher
   // le temps ≈ prob d'être la performance de référence × facteur de précision.
-  K_EXACT_TIME_TENTH:  0.06,   // dixième : très difficile → cote proche du plafond
-  K_EXACT_TIME_SECOND: 0.90,   // seconde : bien plus facile → cote basse (≤ 4)
+  // v4.3.1 — K_EXACT_TIME_TENTH recalibré (0.06 → 0.25) : calibré à l'origine
+  // pour un plafond de 30, il faisait toujours plafonner la cote à 15 (v4.3),
+  // y compris pour le favori le plus net — une cote de facto fixe, plus du
+  // tout différenciée par athlète.
+  K_EXACT_TIME_TENTH:  0.25,   // dixième : très difficile → cote proche du plafond
+  K_EXACT_TIME_SECOND: 0.90,   // seconde : bien plus facile → cote basse (≤ 5)
 
   // Décroissance exponentielle de la force selon le rang (Sprint Finale / Mass Start)
   K_FORCE: 0.20,
 
-  ALGO_VERSION: 'v4.3',
+  ALGO_VERSION: 'v4.3.1',
 } as const;

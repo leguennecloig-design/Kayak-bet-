@@ -4,10 +4,13 @@ import { createAdminSupabase } from "@/lib/supabase-server";
 import { deriveExactMarketsFromCoteTop1 } from "@/lib/algo/bradley-terry";
 
 // POST /api/admin/competitions/[id]/backfill-exact-cotes
-// Complète rang_espere/sigma + cote_exact_place/temps pour les lignes `cotes`
-// de cette compétition qui en sont dépourvues (ex : cotes importées depuis un
-// fichier externe Top1/3/5/10 seulement, voir import-cotes-file). Sans effet
-// sur les lignes déjà complètes.
+// (Re)calcule rang_espere/sigma + cote_exact_place/temps pour les lignes
+// `cotes` de cette compétition depuis leur cote_top1 — ex : cotes importées
+// depuis un fichier externe Top1/3/5/10 seulement (voir import-cotes-file),
+// ou cotes déjà backfillées mais calculées avec d'anciennes constantes
+// (K_EXACT_TIME_TENTH etc.) depuis recalibrées. Recalcule TOUJOURS (pas
+// seulement les lignes vides) pour rester utilisable après un futur
+// changement de calibration.
 export async function POST(
   _req: Request,
   { params }: { params: { id: string } }
@@ -25,7 +28,7 @@ export async function POST(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const toFix = (rows ?? []).filter(
-    r => r.rang_espere == null && r.cote_top1 != null && Number(r.cote_top1) > 1
+    r => r.cote_top1 != null && Number(r.cote_top1) > 1
   );
 
   let updated = 0;

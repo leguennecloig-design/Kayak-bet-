@@ -1597,11 +1597,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchComps() {
-      const { data } = await supabase
-        .from("competitions")
-        .select("id, nom, date, discipline, lieu, type_competition, paris_ouverts_a, participants(id, nom, pays, cote, categorie, code_bateau)")
-        .eq("status", "published")
-        .order("date", { ascending: true });
+      const [{ data }, bettorsRes] = await Promise.all([
+        supabase
+          .from("competitions")
+          .select("id, nom, date, discipline, lieu, type_competition, paris_ouverts_a, participants(id, nom, pays, cote, categorie, code_bateau)")
+          .eq("status", "published")
+          .order("date", { ascending: true }),
+        fetch("/api/competitions/bettors-count").then(r => r.ok ? r.json() : {}).catch(() => ({})),
+      ]);
+      const bettorsByComp: Record<string, number> = bettorsRes ?? {};
       if (!data || data.length === 0) return;
       const mapped: Competition[] = data.map((c: any, i: number) => {
         const parts: any[] = c.participants ?? [];
@@ -1614,7 +1618,7 @@ export default function DashboardPage() {
           flag: "FR",
           date: c.date ?? "",
           category: c.discipline ?? "",
-          bettors: 0,
+          bettors: bettorsByComp[c.id] ?? 0,
           featured: i === 0,
           typeCompetition: c.type_competition ?? null,
           parisOuvertsA: c.paris_ouverts_a ?? null,
