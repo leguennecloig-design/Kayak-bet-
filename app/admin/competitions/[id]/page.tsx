@@ -25,12 +25,36 @@ export default async function EditCompetition({
 
   if (error || !comp) notFound();
 
-  const { data: participants } = await supabase
+  const { data: participantsRaw } = await supabase
     .from("participants")
-    .select("id, nom, pays, cote, categorie")
+    .select("id, nom, pays, cote, categorie, code_bateau")
     .eq("competition_id", params.id)
     .order("categorie", { ascending: true })
     .order("cote",      { ascending: true });
+
+  // Cotes avancées (Top3/Top5) — jointure manuelle par code_bateau pour les
+  // afficher directement dans la startlist admin, sans ouvrir une modale.
+  const codesBateaux = (participantsRaw ?? [])
+    .map((p) => p.code_bateau as string | null)
+    .filter((c): c is string => !!c);
+  const { data: cotesRows } = codesBateaux.length > 0
+    ? await supabase
+        .from("cotes")
+        .select("code_bateau, cote_top3, cote_top5")
+        .eq("competition_id", params.id)
+        .in("code_bateau", codesBateaux)
+    : { data: [] };
+  const cotesByCode = new Map(
+    (cotesRows ?? []).map((c) => [c.code_bateau as string, c])
+  );
+  const participants = (participantsRaw ?? []).map((p) => {
+    const extra = p.code_bateau ? cotesByCode.get(p.code_bateau as string) : undefined;
+    return {
+      ...p,
+      cote_top3: (extra?.cote_top3 as number | null) ?? null,
+      cote_top5: (extra?.cote_top5 as number | null) ?? null,
+    };
+  });
 
   // Partants FFCK scrapés (uniquement si discipline = Descente et inscriptions présentes)
   const isDescente = (comp.discipline as string | null)?.toLowerCase().includes("descente") ?? false;
@@ -69,7 +93,7 @@ export default async function EditCompetition({
         type_epreuve:          comp.type_epreuve as string | null,
         paris_ouverts_a:       comp.paris_ouverts_a as string | null,
       }}
-      initialParticipants={participants ?? []}
+      initialParticipants={participants}
       inscriptions={inscriptions}
     />
   );

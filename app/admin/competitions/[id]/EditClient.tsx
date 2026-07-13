@@ -43,6 +43,9 @@ type Participant = {
   pays: string | null;
   cote: number | null;
   categorie: string | null;
+  code_bateau?: string | null;
+  cote_top3?: number | null;
+  cote_top5?: number | null;
 };
 
 type AthleteResult = {
@@ -529,6 +532,22 @@ export default function EditClient({
                     <div className="font-grotesk font-bold text-[9px] tracking-[.1em] text-[#7c9aaa] mt-0.5 uppercase truncate">{p.pays}</div>
                   )}
                 </div>
+
+                {/* Cotes avancées Top3 / Top5 (calculées par l'algo) */}
+                {(p.cote_top3 != null || p.cote_top5 != null) && (
+                  <div className="flex items-center gap-1.5 flex-none">
+                    {p.cote_top3 != null && (
+                      <span className="font-grotesk font-bold text-[10px] text-[#9fbac6] bg-[rgba(255,255,255,.04)] border border-[var(--border-2)] rounded-[7px] px-2 py-1" title="Cote Top 3">
+                        T3 <span className="text-white">{p.cote_top3.toFixed(2)}</span>
+                      </span>
+                    )}
+                    {p.cote_top5 != null && (
+                      <span className="font-grotesk font-bold text-[10px] text-[#9fbac6] bg-[rgba(255,255,255,.04)] border border-[var(--border-2)] rounded-[7px] px-2 py-1" title="Cote Top 5">
+                        T5 <span className="text-white">{p.cote_top5.toFixed(2)}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Supprimer */}
                 <button
