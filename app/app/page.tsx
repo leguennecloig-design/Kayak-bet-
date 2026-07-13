@@ -1662,18 +1662,31 @@ export default function DashboardPage() {
   // exclusion.
   const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
 
+  // Un seul athlète ne peut gagner une catégorie donnée : sélectionner un
+  // pari Vainqueur (ou "place exacte n°1", équivalent) remplace tout autre
+  // pari Vainqueur/place-exacte-1 déjà pris sur un AUTRE athlète de la même
+  // catégorie — sinon on pourrait cumuler plusieurs "vainqueurs" mutuellement
+  // exclusifs dans un même coupon.
+  function isWinnerBet(o: Odd): boolean {
+    return o.betType === "TOP_1" || (o.betType === "EXACT_PLACE" && o.targetPlace === 1);
+  }
+
   function toggle(o: Odd) {
     setCoupon((prev) => {
       const next = { ...prev };
       if (next[o.id]) { delete next[o.id]; return next; }
+      const oIsWinner = isWinnerBet(o);
       for (const key of Object.keys(next)) {
         const existing = next[key];
-        if (existing.participantId !== o.participantId) continue;
-        const bothRankTiers   = RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
-        const top1VsExactPl1  =
+        const sameParticipant = existing.participantId === o.participantId;
+        const bothRankTiers   = sameParticipant && RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
+        const top1VsExactPl1  = sameParticipant && (
           (o.betType === "TOP_1" && existing.betType === "EXACT_PLACE" && existing.targetPlace === 1) ||
-          (o.betType === "EXACT_PLACE" && o.targetPlace === 1 && existing.betType === "TOP_1");
-        if (bothRankTiers || top1VsExactPl1) delete next[key];
+          (o.betType === "EXACT_PLACE" && o.targetPlace === 1 && existing.betType === "TOP_1")
+        );
+        const rivalWinnerSameCategory =
+          oIsWinner && !sameParticipant && isWinnerBet(existing) && existing.categorie === o.categorie;
+        if (bothRankTiers || top1VsExactPl1 || rivalWinnerSameCategory) delete next[key];
       }
       next[o.id] = o;
       return next;

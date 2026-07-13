@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import type { BetType } from "@/lib/algo/types";
 import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
 import OddsInfoModal from "./OddsInfoModal";
+import AlgoBetaInfoModal from "./AlgoBetaInfoModal";
+
+const BETA_INFO_SEEN_KEY = "kb_algo_beta_seen_v1";
 
 // Cote "place exacte" DYNAMIQUE : recalculée selon la place choisie et la
 // distribution de l'athlète (rang espéré + sigma), même formule que le serveur.
@@ -95,9 +98,20 @@ export default function CategoryBetModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
+  const [betaInfoOpen, setBetaInfoOpen] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<string | null>(
     parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null
   );
+
+  // Pop-up bêta/algo : affiché une seule fois, la première fois qu'un joueur
+  // ouvre une compétition pour parier (mémorisé en localStorage).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.localStorage.getItem(BETA_INFO_SEEN_KEY)) {
+      setBetaInfoOpen(true);
+      window.localStorage.setItem(BETA_INFO_SEEN_KEY, "1");
+    }
+  }, []);
 
   // Saisie inline pour Place exacte (n°), Temps au dixième et Temps à la
   // seconde — ces types ne s'ajoutent pas au coupon au 1er clic, ils ouvrent
@@ -394,6 +408,7 @@ export default function CategoryBetModal({
       )}
 
       <OddsInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <AlgoBetaInfoModal open={betaInfoOpen} onClose={() => setBetaInfoOpen(false)} />
     </>
   );
 }

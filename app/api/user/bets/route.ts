@@ -164,6 +164,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Un seul athlète peut gagner une catégorie donnée : rejette un même coupon
+  // qui contiendrait deux paris "vainqueur" (Top1 ou place exacte n°1,
+  // équivalent) sur deux athlètes différents de la même catégorie — déjà
+  // empêché côté client dans toggle(), revalidé ici.
+  const isWinnerSelection = (s: Selection) =>
+    (s.betType ?? "TOP_1") === "TOP_1" || ((s.betType ?? "TOP_1") === "EXACT_PLACE" && s.targetPlace === 1);
+  const winnersByCategory = new Map<string, Set<string>>();
+  for (const s of selections) {
+    if (!isWinnerSelection(s)) continue;
+    const key = `${s.competitionId}:${s.categorie}`;
+    const set = winnersByCategory.get(key) ?? new Set<string>();
+    set.add(s.participantId);
+    winnersByCategory.set(key, set);
+  }
+  for (const participantsSet of winnersByCategory.values()) {
+    if (participantsSet.size > 1) {
+      return NextResponse.json(
+        { error: "Un seul pari Vainqueur par catégorie (un seul athlète peut gagner une course)" },
+        { status: 400 }
+      );
+    }
+  }
+
   // Plafond cumulé de 200 cr de mise par athlète, tous paris en attente
   // confondus (pas seulement celui-ci) — la mise entière d'un pari combiné
   // compte pour chaque athlète qu'il référence.
