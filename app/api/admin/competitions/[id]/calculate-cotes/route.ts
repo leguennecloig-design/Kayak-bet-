@@ -39,14 +39,25 @@ export async function POST(
   const competitionId = params.id;
   const supabase = createAdminSupabase();
 
-  // ── Format demandé + fichier de résultats éventuel ──────────────────────
-  let raceType = "standard";
+  // ── Algo choisi à la création (v4) + fichier de résultats éventuel ──────
+  // Source de vérité : `algo_type` sur la compétition. On accepte un override
+  // `algo_type` dans le FormData (sélection admin pas encore enregistrée) qui
+  // gagne, sinon la valeur en base, sinon repli sur `race_type`/`discipline`.
+  const { data: comp } = await supabase
+    .from("competitions")
+    .select("discipline, algo_type")
+    .eq("id", competitionId)
+    .single();
+
   let priorRoundResults: ReturnType<typeof parseResultatsPDF> = [];
+  let formAlgoOverride: string | null = null;
+  let formRaceType: string | null = null;
 
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data")) {
     const formData = await req.formData();
-    raceType = (formData.get("race_type") as string | null) ?? "standard";
+    formAlgoOverride = (formData.get("algo_type") as string | null) || null;
+    formRaceType     = (formData.get("race_type") as string | null) || null;
     const file = formData.get("file") as File | null;
 
     if (file) {
@@ -76,15 +87,19 @@ export async function POST(
     }
   }
 
-  // Discipline (sprint vs descente pour l'historique)
-  const { data: comp } = await supabase
-    .from("competitions")
-    .select("discipline")
-    .eq("id", competitionId)
-    .single();
-
-  const disciplineEstSprint =
-    comp?.discipline?.toLowerCase().includes("sprint") ?? false;
+  // Algo effectif : override formulaire > base > repli. Map algo → format + sprint :
+  //   classique → standard/descente · sprint → standard/sprint
+  //   mass_start → mass_start/descente · sprint_finale → sprint_finale/sprint
+  const algoType = (formAlgoOverride || (comp?.algo_type as string | null) || null);
+  function raceTypeFromAlgo(a: string): string {
+    return (a === "mass_start" || a === "sprint_finale") ? a : "standard";
+  }
+  const raceType = algoType
+    ? raceTypeFromAlgo(algoType)
+    : (formRaceType ?? "standard");
+  const disciplineEstSprint = algoType
+    ? (algoType === "sprint" || algoType === "sprint_finale")
+    : (comp?.discipline?.toLowerCase().includes("sprint") ?? false);
 
   // Récupère TOUTES les inscriptions en une seule requête
   const { data: rawInscs, error: inscErr } = await supabase

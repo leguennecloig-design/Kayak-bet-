@@ -110,6 +110,10 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
 
   async function handleImport(force = false) {
     if (!result) return;
+    if (!typeCompetition) {
+      setError("Choisis l'algo de cotes (Classique / Sprint / Mass start / Sprint finale) avant d'importer.");
+      return;
+    }
     setImporting(true);
     setError(null);
     try {
@@ -124,6 +128,7 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
           date_fin: editDateFin.trim() || null,
           type_epreuve: editTypeEpreuve.trim() || result.type_epreuve,
           type_competition: typeCompetition || null,
+          algo_type: typeCompetition || null,
           special_results: specialPreview?.data ?? null,
           paris_ouverts_a: parisOuvertsA ? new Date(parisOuvertsA).toISOString() : null,
           force,
@@ -286,15 +291,15 @@ export default function ManualCreationClient({ onBack }: { onBack: () => void })
               />
             </div>
             <div>
-              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Type</p>
+              <p className="text-[10px] text-[#7c9aaa] uppercase tracking-[.1em] mb-1.5">Algo de cotes *</p>
               <select
                 value={typeCompetition}
                 onChange={(e) => setTypeCompetition(e.target.value)}
-                className="bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none appearance-none w-full"
+                className={`bg-[rgba(255,255,255,.05)] border rounded-lg px-2 py-1.5 text-white font-grotesk font-semibold text-[13px] outline-none appearance-none w-full ${typeCompetition ? "border-[var(--border-2)]" : "border-[rgba(255,122,69,.5)]"}`}
               >
                 <option value="" className="bg-[#0a2a3d]">— Choisir —</option>
-                <option value="sprint" className="bg-[#0a2a3d]">Sprint normal</option>
                 <option value="classique" className="bg-[#0a2a3d]">Classique</option>
+                <option value="sprint" className="bg-[#0a2a3d]">Sprint</option>
                 <option value="mass_start" className="bg-[#0a2a3d]">Mass start</option>
                 <option value="sprint_finale" className="bg-[#0a2a3d]">Sprint finale</option>
               </select>

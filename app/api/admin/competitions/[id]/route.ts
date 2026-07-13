@@ -22,6 +22,7 @@ export async function PATCH(
   if (body.lieu       !== undefined) allowed.lieu       = body.lieu || null;
   if (body.status     !== undefined) allowed.status     = body.status;
   if (body.type_competition !== undefined) allowed.type_competition = body.type_competition || null;
+  if (body.algo_type !== undefined) allowed.algo_type = body.algo_type || null;
   if (body.paris_ouverts_a !== undefined) allowed.paris_ouverts_a = body.paris_ouverts_a || null;
 
   const supabase = createAdminSupabase();

@@ -40,6 +40,7 @@ type ImportBody = {
   type_epreuve: string;
   categories: ImportedCategory[];
   type_competition?: string | null;
+  algo_type?: string | null;
   force?: boolean;
   special_results?: ParsedResult[] | null;
   paris_ouverts_a?: string | null;
@@ -235,6 +236,7 @@ export async function POST(req: NextRequest) {
         lieu: body.lieu,
         discipline: "Descente",
         type_competition: body.type_competition ?? null,
+        algo_type: body.algo_type ?? body.type_competition ?? null,
         type_epreuve: body.type_epreuve || null,
         paris_ouverts_a: body.paris_ouverts_a || null,
       })

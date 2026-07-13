@@ -84,7 +84,7 @@ async function fetchAllV3History(
   disciplineEstSprint: boolean,
   supabase: SupabaseAny
 ): Promise<Map<string, V3History>> {
-  const annee = new Date().getFullYear();
+  const annee = ALGO_PARAMS.SAISON_COTES; // v4 : saison figée 2026, pas l'horloge murale
 
   const result = new Map<string, V3History>();
   for (const cb of codeBateaux) {

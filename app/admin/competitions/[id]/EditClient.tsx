@@ -14,6 +14,7 @@ type Competition = {
   ffck_inscription_code: number | null;
   ffck_match_status: string;
   type_competition: string | null;
+  algo_type: string | null;
   type_epreuve: string | null;
   paris_ouverts_a: string | null;
 };
@@ -92,6 +93,7 @@ export default function EditClient({
   const [date,       setDate]       = useState(competition.date ?? "");
   const [discipline, setDiscipline] = useState(competition.discipline ?? "");
   const [typeCompetition, setTypeCompetition] = useState(competition.type_competition ?? "");
+  const [algoType, setAlgoType] = useState(competition.algo_type ?? competition.type_competition ?? "");
   const [lieu,       setLieu]       = useState(competition.lieu ?? "");
   const [parisOuvertsA, setParisOuvertsA] = useState(toDatetimeLocal(competition.paris_ouverts_a));
   const [status,     setStatus]     = useState(competition.status);
@@ -150,6 +152,7 @@ export default function EditClient({
       body: JSON.stringify({
         nom, date, discipline, lieu,
         type_competition: typeCompetition || null,
+        algo_type: algoType || null,
         paris_ouverts_a: parisOuvertsA ? new Date(parisOuvertsA).toISOString() : null,
       }),
     });
@@ -274,11 +277,16 @@ export default function EditClient({
   }
 
   async function calculateCotes() {
-    const needsFile = RACE_TYPES_WITH_FILE.has(typeCompetition);
+    if (!algoType) {
+      setCotesState("error");
+      setCotesMsg("Choisis l'algo de cotes (Classique / Sprint / Mass start / Sprint finale) puis enregistre avant de calculer.");
+      return;
+    }
+    const needsFile = RACE_TYPES_WITH_FILE.has(algoType);
     if (needsFile && !priorRoundFile) {
       setCotesState("error");
       setCotesMsg(
-        typeCompetition === "mass_start"
+        algoType === "mass_start"
           ? "Joins les résultats de la classique pour calculer les cotes mass start."
           : "Joins les résultats du sprint normal pour calculer les cotes sprint finale."
       );
@@ -288,7 +296,7 @@ export default function EditClient({
     setCotesMsg("");
     try {
       const fd = new FormData();
-      fd.append("race_type", typeCompetition || "standard");
+      fd.append("algo_type", algoType);
       if (needsFile && priorRoundFile) fd.append("file", priorRoundFile);
       const res  = await fetch(`/api/admin/competitions/${compId}/calculate-cotes`, { method: "POST", body: fd });
       const text = await res.text();
@@ -415,12 +423,14 @@ export default function EditClient({
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>Type</label>
-            <select value={typeCompetition} onChange={(e) => setTypeCompetition(e.target.value)}
-              className={`${inputCls} appearance-none`}>
+            <label className={labelCls}>Algo de cotes *</label>
+            <select
+              value={algoType}
+              onChange={(e) => { setAlgoType(e.target.value); setTypeCompetition(e.target.value); }}
+              className={`${inputCls} appearance-none ${algoType ? "" : "!border-[rgba(255,122,69,.5)]"}`}>
               <option value="" className="bg-[#0a2a3d]">— Choisir —</option>
-              <option value="sprint" className="bg-[#0a2a3d]">Sprint normal</option>
               <option value="classique" className="bg-[#0a2a3d]">Classique</option>
+              <option value="sprint" className="bg-[#0a2a3d]">Sprint</option>
               <option value="mass_start" className="bg-[#0a2a3d]">Mass start</option>
               <option value="sprint_finale" className="bg-[#0a2a3d]">Sprint finale</option>
             </select>
@@ -788,14 +798,14 @@ export default function EditClient({
           </div>
 
           {/* Fichier de résultats de la manche précédente (mass start / sprint finale) */}
-          {inscriptions.length > 0 && RACE_TYPES_WITH_FILE.has(typeCompetition) && (
+          {inscriptions.length > 0 && RACE_TYPES_WITH_FILE.has(algoType) && (
             <div className="mb-4 bg-[rgba(40,215,230,.04)] border border-[rgba(40,215,230,.2)] rounded-[12px] p-4">
               <p className="font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#28D7E6] mb-2">
-                {typeCompetition === "mass_start" ? "Résultats de la classique" : "Résultats du sprint normal"}
+                {algoType === "mass_start" ? "Résultats de la classique" : "Résultats du sprint normal"}
               </p>
               <p className="font-archivo text-[12px] text-[#7c9aaa] mb-3">
                 Fichier PDF ou TXT (même format que l&apos;import de résultats) — requis pour calculer les
-                cotes {typeCompetition === "mass_start" ? "mass start" : "sprint finale"}.
+                cotes {algoType === "mass_start" ? "mass start" : "sprint finale"}.
               </p>
               <input
                 type="file"

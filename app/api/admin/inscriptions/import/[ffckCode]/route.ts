@@ -48,6 +48,7 @@ export async function POST(
         date:                  body.dateDebut,
         lieu:                  body.ville.replace(/^\d{5}\s+/, "").trim(),
         discipline:            "Descente",
+        algo_type:             "classique", // défaut descente ; modifiable dans l'édition
         ffck_inscription_code: ffckCode,
         ffck_match_status:     "matche_manuel",
       })

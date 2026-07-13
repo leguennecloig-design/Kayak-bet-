@@ -1,4 +1,9 @@
 export const ALGO_PARAMS = {
+  // Saison prise en compte pour les cotes (v4 : uniquement 2026).
+  // Explicite, pas basé sur l'horloge murale (getFullYear) — évite qu'un
+  // recalcul en janvier suivant vide tout l'historique.
+  SAISON_COTES: 2026,
+
   // Poids sources (somme = 1.0) — NUM secondaire, résultats de course prioritaires
   W_SEF: 0.40,
   W_NAT: 0.35,
