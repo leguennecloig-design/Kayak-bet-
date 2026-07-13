@@ -3307,6 +3307,73 @@
 }
 .kb-app .update-popup-cta:hover { text-decoration: underline; }
 
+/* ============ POP-UPS DE RELANCE (notifs / photo / insta / parrainage) ============ */
+.kb-app .nudge-modal .kb-modal-head { border-bottom: none; padding-bottom: 0; }
+.kb-app .nudge-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding-top: 0;
+}
+.kb-app .nudge-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(40, 215, 230, 0.12);
+  color: var(--cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.kb-app .nudge-icon svg { width: 28px; height: 28px; }
+.kb-app .nudge-icon-insta {
+  background: linear-gradient(135deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5);
+  color: #fff;
+}
+.kb-app .nudge-title {
+  font: 800 17px/1.25 var(--font-archivo);
+  color: #fff;
+  margin: 0;
+}
+.kb-app .nudge-text {
+  font: 600 13px/1.55 var(--font-archivo);
+  color: var(--soft);
+  margin: 0 0 8px;
+}
+.kb-app .nudge-cta {
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(95deg, var(--accent2), var(--accent));
+  color: var(--accent-ink);
+  border-radius: 12px;
+  padding: 13px 18px;
+  font: 800 13.5px/1 var(--font-archivo);
+}
+.kb-app .nudge-later {
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--sub);
+  font: 700 12.5px/1 var(--font-archivo);
+  padding: 10px;
+}
+.kb-app .nudge-later:hover { color: #fff; }
+.kb-app .nudge-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font: 600 12px/1 var(--font-archivo);
+  color: var(--sub);
+  cursor: pointer;
+}
+.kb-app .nudge-checkbox input { width: 16px; height: 16px; accent-color: var(--cyan); cursor: pointer; }
+
 /* ============ MODALE GÉNÉRIQUE (scrim + carte centrée) ============ */
 /* Utilisée par Modifier le profil, Lier mon profil athlète, Parrainage. */
 .kb-app .kb-modal-scrim {

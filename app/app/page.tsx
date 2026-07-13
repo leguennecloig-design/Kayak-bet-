@@ -12,6 +12,9 @@ import InstagramRewardCard, { type IgRewardStatus } from "@/app/components/Insta
 import NotificationBell from "@/app/components/NotificationBell";
 import CouponInfoModal from "@/app/components/CouponInfoModal";
 import AppUpdatePopup from "@/app/components/AppUpdatePopup";
+import SimpleNudgeModal from "@/app/components/SimpleNudgeModal";
+import InstagramNudgeModal from "@/app/components/InstagramNudgeModal";
+import ReferralNudgeModal from "@/app/components/ReferralNudgeModal";
 import { comboBonusFor } from "@/lib/bets/combo";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
@@ -1682,6 +1685,7 @@ export default function DashboardPage() {
   const [userId,        setUserId]        = useState("");
   const [username,      setUsername]     = useState("");
   const [avatarUrl,     setAvatarUrl]     = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [bio,           setBio]           = useState("");
   const [instagram,     setInstagram]     = useState<string | null>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
@@ -1753,7 +1757,10 @@ export default function DashboardPage() {
           setInstagram(prof.instagram ?? null);
           setLinkedAthlete(prof.linkedAthlete ?? null);
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore */
+      } finally {
+        setProfileLoaded(true);
+      }
     }
     loadProfile();
   }, [supabase]);
@@ -1765,6 +1772,53 @@ export default function DashboardPage() {
       .then((data) => setInstagramRewardStatus(data.status ?? "none"))
       .catch(() => setInstagramRewardStatus("unavailable"));
   }, []);
+
+  // ── Pop-ups de relance au lancement de la PWA ────────────────────────────
+  // Une seule à la fois par lancement, dans cet ordre de priorité : Instagram
+  // (toujours la 1re fois, puis aléatoirement) > parrainage (jusqu'à cocher
+  // "ne plus afficher") > notifications désactivées > pas de photo de profil.
+  const [activeNudge, setActiveNudge] = useState<null | "instagram" | "referral" | "notifications" | "photo">(null);
+  const nudgeCheckedRef = useRef(false);
+  const pushNudge = usePushNotifications();
+
+  useEffect(() => {
+    if (nudgeCheckedRef.current) return;
+    if (!profileLoaded) return;
+    if (instagramRewardStatus === "loading") return;
+    if (!pushNudge.checked) return; // attend de savoir si les notifs sont déjà actives
+    nudgeCheckedRef.current = true;
+
+    const INSTA_MIN_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 jours
+    function instagramEligible(): boolean {
+      if (instagramRewardStatus !== "none") return false; // déjà demandé/validé côté serveur
+      if (typeof window === "undefined") return false;
+      if (window.localStorage.getItem("kb_insta_nudge_confirmed")) return false;
+      const everShown = window.localStorage.getItem("kb_insta_nudge_shown");
+      if (!everShown) return true; // toujours affiché la toute première fois
+      const last = Number(window.localStorage.getItem("kb_insta_nudge_last") ?? 0);
+      if (Date.now() - last < INSTA_MIN_INTERVAL_MS) return false;
+      return Math.random() < 0.35; // ensuite, aléatoirement de temps en temps
+    }
+
+    if (instagramEligible()) {
+      window.localStorage.setItem("kb_insta_nudge_shown", "1");
+      window.localStorage.setItem("kb_insta_nudge_last", String(Date.now()));
+      setActiveNudge("instagram");
+      return;
+    }
+    if (typeof window !== "undefined" && !window.localStorage.getItem("kb_referral_nudge_dismissed")) {
+      setActiveNudge("referral");
+      return;
+    }
+    if (pushNudge.supported && !pushNudge.subscribed) {
+      setActiveNudge("notifications");
+      return;
+    }
+    if (!avatarUrl) {
+      setActiveNudge("photo");
+      return;
+    }
+  }, [profileLoaded, instagramRewardStatus, pushNudge.checked, pushNudge.supported, pushNudge.subscribed, avatarUrl]);
 
   async function fetchBetHistory() {
     try {
@@ -1935,6 +1989,28 @@ export default function DashboardPage() {
     setViewedLeagueId(id);
     setLeagueFrom(view === "classement" ? "classement" : "profil");
     navigate("ligue");
+  }
+
+  function handleInstagramNudgeYes() {
+    window.localStorage.setItem("kb_insta_nudge_confirmed", "1");
+    setActiveNudge(null);
+    setReferralModalOpen(true); // le claim du bonus vit dans la modale Parrainage
+  }
+  function handleInstagramNudgeNo() {
+    setActiveNudge(null);
+  }
+  function handleReferralNudgeClose(dontShowAgain: boolean) {
+    if (dontShowAgain) window.localStorage.setItem("kb_referral_nudge_dismissed", "1");
+    setActiveNudge(null);
+  }
+  function handleReferralNudgeShare(dontShowAgain: boolean) {
+    if (dontShowAgain) window.localStorage.setItem("kb_referral_nudge_dismissed", "1");
+    setActiveNudge(null);
+    setReferralModalOpen(true);
+  }
+  async function handleNotificationsNudgeCta() {
+    const ok = await pushNudge.subscribe();
+    if (ok) setActiveNudge(null);
   }
 
   async function requestInstagramReward(handle: string) {
@@ -2269,6 +2345,37 @@ export default function DashboardPage() {
 
       <CouponInfoModal open={couponInfoOpen} onClose={() => setCouponInfoOpen(false)} />
       <AppUpdatePopup />
+
+      <InstagramNudgeModal
+        open={activeNudge === "instagram"}
+        onClose={() => setActiveNudge(null)}
+        onYes={handleInstagramNudgeYes}
+        onNo={handleInstagramNudgeNo}
+      />
+      <ReferralNudgeModal
+        open={activeNudge === "referral"}
+        onClose={handleReferralNudgeClose}
+        onShare={handleReferralNudgeShare}
+      />
+      <SimpleNudgeModal
+        open={activeNudge === "notifications"}
+        onClose={() => setActiveNudge(null)}
+        icon={<svg viewBox="0 0 24 24" fill="none"><path d="M6 10.5a6 6 0 0 1 12 0c0 3.6 1 5 2 6H4c1-1 2-2.4 2-6Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><path d="M9.7 19.5a2.3 2.3 0 0 0 4.6 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>}
+        title="Active les notifications"
+        body="Ne rate plus jamais l'ouverture des paris, un résultat qui tombe, ou une demande d'ami — active les notifications push."
+        ctaLabel="Activer les notifications"
+        onCta={handleNotificationsNudgeCta}
+        ctaBusy={pushNudge.busy}
+      />
+      <SimpleNudgeModal
+        open={activeNudge === "photo"}
+        onClose={() => setActiveNudge(null)}
+        icon={<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" /><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>}
+        title="Ajoute une photo de profil"
+        body="Un profil avec une photo, c'est plus sympa pour tes amis et dans le classement !"
+        ctaLabel="Ajouter une photo"
+        onCta={() => { setActiveNudge(null); setEditProfileOpen(true); }}
+      />
 
       <EditProfileModal
         open={editProfileOpen}
