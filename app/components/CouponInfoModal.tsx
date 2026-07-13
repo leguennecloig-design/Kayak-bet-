@@ -53,16 +53,16 @@ export default function CouponInfoModal({ open, onClose }: Props) {
 
           <h4>2. Pari simple</h4>
           <p>
-            Par défaut, ton coupon ne garde qu&apos;un seul pronostic à la fois. Tu mises un
-            montant, et si ton pronostic est juste, tu remportes <b>mise × cote</b>.
+            Un seul pronostic dans le coupon. Tu mises un montant, et si ton pronostic est
+            juste, tu remportes <b>mise × cote</b>.
           </p>
 
           <h4>3. Pari combiné</h4>
           <p>
-            Active la case <b>« Pari combiné »</b> dans le coupon pour ajouter plusieurs
-            pronostics à la fois (sur des athlètes différents). Leurs cotes se multiplient
-            entre elles, <b>et le gain final est doublé (×2)</b> en plus — la récompense du
-            risque pris.
+            Ajoute plusieurs pronostics (sur des athlètes différents) puis active la case
+            <b> « Pari combiné »</b> avant de valider. Leurs cotes se multiplient entre elles,
+            <b> et un bonus s&apos;ajoute au gain</b> selon le nombre de sélections (plafonné,
+            pour que ça reste raisonnable) — la récompense du risque pris.
           </p>
           <p>
             Attention : dans un combiné, <b>tous les pronostics doivent être justes</b> pour

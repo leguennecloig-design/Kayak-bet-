@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import type { BetType } from "@/lib/algo/types";
 import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
+import { comboBonusFor } from "@/lib/bets/combo";
 
 type Selection = {
   participantId:   string;
@@ -278,10 +279,9 @@ export async function POST(req: NextRequest) {
   }
 
   const coteTotale = selections.reduce((t, s) => t * s.cote, 1);
-  // Pari combiné (2+ sélections) : gain doublé, en plus des cotes cumulées —
-  // incitation à prendre le risque de combiner plusieurs pronostics.
-  const isCombo       = selections.length > 1;
-  const gainPotentiel = Math.round(stake * coteTotale * (isCombo ? 2 : 1) * 100) / 100;
+  // Pari combiné (2+ sélections) : bonus croissant plafonné (voir lib/bets/combo.ts),
+  // en plus des cotes cumulées — incitation mesurée à combiner plusieurs pronostics.
+  const gainPotentiel = Math.round(stake * coteTotale * comboBonusFor(selections.length) * 100) / 100;
 
   // competition_id = compétition du 1er sélectionné (ou null si multi-comp)
   const uniqueComps = [...new Set(selections.map(s => s.competitionId))];

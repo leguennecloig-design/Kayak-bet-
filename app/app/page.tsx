@@ -11,6 +11,7 @@ import ReferralModal from "@/app/components/ReferralModal";
 import InstagramRewardCard, { type IgRewardStatus } from "@/app/components/InstagramRewardCard";
 import NotificationBell from "@/app/components/NotificationBell";
 import CouponInfoModal from "@/app/components/CouponInfoModal";
+import { comboBonusFor } from "@/lib/bets/combo";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
 
@@ -1525,12 +1526,13 @@ export default function DashboardPage() {
   })();
 
   /* coupon derived */
-  const selected  = Object.values(coupon);
-  const count     = selected.length;
-  const isCombo   = count > 1;
-  const totalOdds = selected.reduce((t, o) => t * o.val, 1);
-  // Pari combiné (2+ sélections) : gain doublé, en plus des cotes cumulées.
-  const gain      = Math.round((stake || 0) * totalOdds * (isCombo ? 2 : 1));
+  const selected    = Object.values(coupon);
+  const count       = selected.length;
+  const isCombo     = count > 1;
+  const totalOdds   = selected.reduce((t, o) => t * o.val, 1);
+  const comboBonus  = comboBonusFor(count);
+  // Pari combiné (2+ sélections) : bonus croissant plafonné, en plus des cotes cumulées.
+  const gain        = Math.round((stake || 0) * totalOdds * comboBonus);
 
   /* profil + solde */
   useEffect(() => {
@@ -1672,17 +1674,13 @@ export default function DashboardPage() {
     return o.betType === "TOP_1" || (o.betType === "EXACT_PLACE" && o.targetPlace === 1);
   }
 
+  // L'ajout au coupon n'est jamais bloqué par "Pari combiné" — la case n'est
+  // vérifiée qu'au moment de valider (voir validate()), pour ne jamais
+  // dépendre d'un état React capturé au mauvais moment lors d'un clic rapide.
   function toggle(o: Odd) {
     setCoupon((prev) => {
       const next = { ...prev };
       if (next[o.id]) { delete next[o.id]; return next; }
-
-      // Pari combiné désactivé : un seul pronostic à la fois dans le coupon.
-      const hasOtherParticipant = Object.values(next).some(x => x.participantId !== o.participantId);
-      if (!comboMode && hasOtherParticipant) {
-        showToast(<XIcon c="#FF7A45" />, "Active le pari combiné pour miser sur plusieurs pronostics à la fois", true);
-        return prev;
-      }
 
       const oIsWinner = isWinnerBet(o);
       for (const key of Object.keys(next)) {
@@ -1745,6 +1743,10 @@ export default function DashboardPage() {
   async function validate() {
     const s = Math.max(0, stake || 0);
     if (count === 0) return;
+    if (isCombo && !comboMode) {
+      showToast(<XIcon c="#FF7A45" />, "Active « Pari combiné » pour valider plusieurs sélections à la fois", true);
+      return;
+    }
     if (s < 30) { showToast(<XIcon c="#FF7A45" />, "Mise minimum : 30 cr", true); return; }
     if (s > balance - 200) { showToast(<XIcon c="#FF7A45" />, "Il doit te rester au moins 200 cr après la mise", true); return; }
     if (betLoading) return;
@@ -2018,7 +2020,7 @@ export default function DashboardPage() {
                 checked={comboMode}
                 onChange={(e) => setComboMode(e.target.checked)}
               />
-              <span>Pari combiné{isCombo && <em> · gain x2</em>}</span>
+              <span>Pari combiné{isCombo && <em> · bonus +{Math.round((comboBonus - 1) * 100)}%</em>}</span>
             </label>
             <div className="stake">
               <label>Mise</label>
