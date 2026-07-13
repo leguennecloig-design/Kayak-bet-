@@ -348,6 +348,26 @@ export default function EditClient({
     }
   }
 
+  /* ---- Compléter place exacte / temps pour les cotes importées (.txt) qui
+     n'ont pas de rang_espere/sigma — voir backfill-exact-cotes ---- */
+  const [backfillState, setBackfillState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [backfillMsg,   setBackfillMsg]   = useState("");
+
+  async function backfillExactCotes() {
+    setBackfillState("loading");
+    setBackfillMsg("");
+    try {
+      const res  = await fetch(`/api/admin/competitions/${compId}/backfill-exact-cotes`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
+      setBackfillMsg(`${json.updated} cote(s) complétée(s) sur ${json.checked} vérifiée(s).`);
+      setBackfillState("ok");
+    } catch (e) {
+      setBackfillMsg(e instanceof Error ? e.message : "Erreur inconnue");
+      setBackfillState("error");
+    }
+  }
+
   const inputCls = "bg-[rgba(255,255,255,.05)] border border-[var(--border-2)] rounded-[11px] px-4 py-3 text-white font-archivo text-[13.5px] placeholder:text-[#4a6a7a] outline-none focus:border-[rgba(40,215,230,.5)] focus:bg-[rgba(40,215,230,.04)] transition-colors";
   const labelCls = "font-grotesk font-bold text-[9.5px] tracking-[.14em] uppercase text-[#7c9aaa] mb-1.5";
   const isDescente = competition.discipline?.toLowerCase().includes("descente") ?? false;
@@ -513,6 +533,32 @@ export default function EditClient({
             {participants.length} au départ
           </span>
         </div>
+
+        {/* Complète place exacte / temps pour les cotes importées depuis un
+            fichier externe (Top1/3/5/10 seulement, sans rang_espere/sigma) */}
+        {participants.length > 0 && (
+          <div className="mb-5 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={backfillExactCotes}
+              disabled={backfillState === "loading"}
+              className={`inline-flex items-center gap-2 font-archivo font-bold text-[12.5px] px-4 py-2 rounded-[9px] border transition-colors disabled:opacity-50 ${
+                backfillState === "ok"
+                  ? "text-[#a0f0a0] border-[rgba(160,240,160,.3)] bg-[rgba(160,240,160,.08)]"
+                  : backfillState === "error"
+                    ? "text-red-400 border-red-500/30 bg-red-500/10"
+                    : "text-[#9fbac6] border-[var(--border-2)] hover:border-[rgba(40,215,230,.4)] hover:text-white"
+              }`}
+              title="Calcule place exacte / temps pour les participants qui n'en ont pas (ex : cotes importées via un fichier .txt externe)"
+            >
+              {backfillState === "loading" ? "Calcul…" : "Compléter place exacte / temps"}
+            </button>
+            {backfillMsg && (
+              <span className={`font-archivo text-[12px] ${backfillState === "error" ? "text-red-400" : "text-[#a0f0a0]"}`}>
+                {backfillMsg}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Liste */}
         {participants.length > 0 ? (

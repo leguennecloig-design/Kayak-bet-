@@ -135,6 +135,22 @@ export function sigmaFor(rangEspere: number): number {
   return Math.max(SIGMA_MIN, SIGMA_FACTOR * Math.sqrt(rangEspere));
 }
 
+// v4.3 — reconstruit un rang_espere plausible à partir d'une cote_top1 SEULE
+// (recherche par dichotomie sur probTopN, strictement décroissante en
+// rangEspere). Sert quand la source ne fournit que Top1/3/5/10 (import de
+// cotes précalculées en externe, sans le détail Bradley-Terry) mais qu'on
+// veut quand même activer les marchés place exacte / temps exact, qui ont
+// besoin d'un rang_espere + sigma.
+export function estimateRangEspereFromProb(targetP1: number, n: number): number {
+  let lo = 1, hi = Math.max(n, 1);
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const p = probTopN(mid, sigmaFor(mid), 1);
+    if (p > targetP1) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 // v4 : conversion proba → cote, bornée [min, max] par type de pari.
 // L'ancrage (min) fait qu'un favori évident tombe au plancher (Top1 ≈ 1.68).
 export function probToCote(prob: number, min: number, max: number): number {
@@ -162,4 +178,33 @@ export function probExactPlace(rangEspere: number, sigma: number, place: number)
   const zLo = (place - 0.5 - rangEspere) / sigma;
   const p = cumulativeNormal(zHi) - cumulativeNormal(zLo);
   return Math.min(Math.max(p, 0.005), 0.999);
+}
+
+export type DerivedExactMarkets = {
+  rang_espere: number;
+  sigma: number;
+  cote_exact_place: number;
+  cote_exact_time: number;
+  cote_exact_time_second: number;
+};
+
+// v4.3 — dérive rang_espere/sigma + cote_exact_place/temps à partir d'une
+// cote_top1 SEULE (voir estimateRangEspereFromProb) — utilisé pour les
+// compétitions dont les cotes viennent d'un import externe (Top1/3/5/10
+// seulement, pas de détail Bradley-Terry).
+export function deriveExactMarketsFromCoteTop1(coteTop1: number, n: number): DerivedExactMarkets {
+  const P = ALGO_PARAMS;
+  const targetP1   = Math.min(0.999, Math.max(0.005, P.MARGE / coteTop1));
+  const rangEspere = estimateRangEspereFromProb(targetP1, n);
+  const sigma      = sigmaFor(rangEspere);
+  const p1         = probTopN(rangEspere, sigma, 1);
+  const placeProbable = Math.max(1, Math.round(rangEspere));
+  const pPlace     = probExactPlace(rangEspere, sigma, placeProbable);
+  return {
+    rang_espere: rangEspere,
+    sigma,
+    cote_exact_place:       probToCote(pPlace, P.COTE_MIN_EXACT, P.COTE_MAX_EXACT_PLACE),
+    cote_exact_time:        probToCote(p1 * P.K_EXACT_TIME_TENTH,  P.COTE_MIN_EXACT, P.COTE_MAX_EXACT_TIME),
+    cote_exact_time_second: probToCote(p1 * P.K_EXACT_TIME_SECOND, P.COTE_MIN_EXACT_TIME_SECOND, P.COTE_MAX_EXACT_TIME_SECOND),
+  };
 }

@@ -999,7 +999,13 @@
   width: 19px;
   height: 19px;
 }
-.kb-app .drawer-head .close {
+.kb-app .drawer-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kb-app .drawer-head .close,
+.kb-app .drawer-head .drawer-info {
   width: 32px;
   height: 32px;
   border-radius: 9px;
@@ -1009,10 +1015,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #9fbac6;
 }
-.kb-app .drawer-head .close svg {
+.kb-app .drawer-head .close svg,
+.kb-app .drawer-head .drawer-info svg {
   width: 14px;
   height: 14px;
+}
+.kb-app .drawer-head .drawer-info:hover {
+  color: #fff;
+  border-color: rgba(40, 215, 230, 0.4);
 }
 .kb-app .drawer-body {
   flex: 1;

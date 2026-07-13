@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import { deriveExactMarketsFromCoteTop1 } from "@/lib/algo/bradley-terry";
 
 type ImportedAthlete = {
   dossard: number;
@@ -94,6 +95,13 @@ export async function POST(req: NextRequest) {
         categorie:      cat.code,
         code_bateau:    codeBateau,
       });
+      // Place exacte / temps exact ont besoin de rang_espere + sigma, absents
+      // du fichier externe (qui ne fournit que Top1/3/5/10) — dérivés depuis
+      // cote_top1 seule pour que ces marchés restent utilisables.
+      const derived = a.cote_top1 && a.cote_top1 > 1
+        ? deriveExactMarketsFromCoteTop1(a.cote_top1, cat.athletes.length)
+        : null;
+
       coteRows.push({
         competition_id:        competitionId,
         code_bateau:           codeBateau,
@@ -104,6 +112,11 @@ export async function POST(req: NextRequest) {
         cote_top3:             a.cote_top3,
         cote_top5:             a.cote_top5,
         cote_top10:            a.cote_top10,
+        rang_espere:            derived?.rang_espere ?? null,
+        sigma:                  derived?.sigma ?? null,
+        cote_exact_place:       derived?.cote_exact_place ?? null,
+        cote_exact_time:        derived?.cote_exact_time ?? null,
+        cote_exact_time_second: derived?.cote_exact_time_second ?? null,
         fallback_type:         "national_only",
         sources_utilisees:     "IMPORT_TXT",
         algo_version:          "import_txt_v1",

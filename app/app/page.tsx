@@ -10,6 +10,7 @@ import LinkAthleteModal from "@/app/components/LinkAthleteModal";
 import ReferralModal from "@/app/components/ReferralModal";
 import InstagramRewardCard, { type IgRewardStatus } from "@/app/components/InstagramRewardCard";
 import NotificationBell from "@/app/components/NotificationBell";
+import CouponInfoModal from "@/app/components/CouponInfoModal";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
 
@@ -1473,6 +1474,7 @@ export default function DashboardPage() {
   const [balance,       setBalance]       = useState(0);
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
   const [comboMode,     setComboMode]     = useState(false);
+  const [couponInfoOpen, setCouponInfoOpen] = useState(false);
   const [stake,         setStake]         = useState(30);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [betLoading,    setBetLoading]    = useState(false);
@@ -1980,7 +1982,12 @@ export default function DashboardPage() {
       <aside className={`drawer${drawerOpen ? " open" : ""}`}>
         <div className="drawer-head">
           <div className="ttl"><TicketStroke c="#fff" /> Mon coupon</div>
-          <button className="close" onClick={() => setDrawerOpen(false)}><XIcon c="#9FBAC6" /></button>
+          <div className="drawer-head-actions">
+            <button className="drawer-info" aria-label="Comment parier" onClick={() => setCouponInfoOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
+            </button>
+            <button className="close" onClick={() => setDrawerOpen(false)}><XIcon c="#9FBAC6" /></button>
+          </div>
         </div>
 
         <div className="drawer-body">
@@ -2034,6 +2041,8 @@ export default function DashboardPage() {
           </div>
         )}
       </aside>
+
+      <CouponInfoModal open={couponInfoOpen} onClose={() => setCouponInfoOpen(false)} />
 
       <EditProfileModal
         open={editProfileOpen}
