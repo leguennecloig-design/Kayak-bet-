@@ -1,23 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { displayName, initials } from "@/lib/display-name";
 
-// GET /api/user/leaderboard
-// Retourne le top 10 des joueurs par solde + la position de l'utilisateur connecté.
-export async function GET() {
+// GET /api/user/leaderboard[?all=1]
+// Par défaut : top 10 des joueurs par solde + la position de l'utilisateur
+// connecté. Avec ?all=1 : classement complet (option "voir tout").
+export async function GET(req: NextRequest) {
   const supabase = createServerSupabase();
   const adminSb  = createAdminSupabase();
 
   const { data: { user } } = await supabase.auth.getUser();
   const currentUserId = user?.id ?? null;
+  const showAll = req.nextUrl.searchParams.get("all") === "1";
 
-  // Top 10 par solde
-  const { data: top, error } = await adminSb
+  let query = adminSb
     .from("users")
     .select("id, username, email, balance, avatar_url, instagram_handle")
-    .order("balance", { ascending: false })
-    .limit(10);
+    .order("balance", { ascending: false });
+  if (!showAll) query = query.limit(10);
+  const { data: top, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

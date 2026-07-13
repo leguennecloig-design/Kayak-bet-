@@ -90,6 +90,7 @@ export default function CategoryBetModal({
   onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
+  const [search, setSearch] = useState("");
   const [cotes, setCotes] = useState<CotesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -143,7 +144,10 @@ export default function CategoryBetModal({
   }, [competitionId, selectedCat, lockedUntil]);
 
   const cotesByCode = new Map((cotes ?? []).map(c => [c.code_bateau, c]));
-  const participants = odds.filter(o => o.categorie === selectedCat);
+  const q = search.trim().toLowerCase();
+  const participants = odds
+    .filter(o => o.categorie === selectedCat)
+    .filter(p => !q || p.nm.toLowerCase().includes(q) || p.ctry.toLowerCase().includes(q));
 
   return (
     <>
@@ -186,11 +190,28 @@ export default function CategoryBetModal({
           </div>
         )}
 
+        {!lockedUntil && (
+          <div className="catmodal-search">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" /><path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+            <input
+              type="text"
+              placeholder="Chercher un participant…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button aria-label="Effacer" onClick={() => setSearch("")}>
+                <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              </button>
+            )}
+          </div>
+        )}
+
         {!lockedUntil && <div className="catmodal-body">
           {loading && <p className="catmodal-status">Chargement des cotes…</p>}
           {!loading && error && <p className="catmodal-status err">{error}</p>}
           {!loading && !error && participants.length === 0 && (
-            <p className="catmodal-status">Aucun participant dans cette catégorie.</p>
+            <p className="catmodal-status">{q ? "Aucun participant ne correspond à ta recherche." : "Aucun participant dans cette catégorie."}</p>
           )}
 
           {!loading && !error && participants.map((p) => {

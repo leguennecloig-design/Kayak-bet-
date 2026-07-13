@@ -626,9 +626,16 @@ function CompetitionsView({
 }
 
 function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel }: ClassementViewProps) {
-  const top3 = effectiveLb.filter((p) => p.rank <= 3);
-  const rest = effectiveLb.filter((p) => p.rank > 3 && !p.isMe);
-  const me   = effectiveLb.find((p) => p.isMe);
+  const [showAll, setShowAll] = useState(false);
+  const [allLb, setAllLb] = useState<Player[] | null>(null);
+  const [loadingAll, setLoadingAll] = useState(false);
+
+  const lb   = showAll && allLb ? allLb : effectiveLb;
+  const top3 = lb.filter((p) => p.rank <= 3);
+  // En vue complète, tout le monde est déjà dans l'ordre naturel — pas besoin
+  // de sortir "moi" avec un séparateur "···" comme dans le top 10 tronqué.
+  const rest = lb.filter((p) => p.rank > 3 && (showAll || !p.isMe));
+  const me   = showAll ? undefined : lb.find((p) => p.isMe);
 
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   useEffect(() => {
@@ -637,6 +644,20 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
       .then((data) => setLeagues(data.leagues ?? []))
       .catch(() => {});
   }, []);
+
+  async function handleToggleAll() {
+    if (showAll) { setShowAll(false); return; }
+    setShowAll(true);
+    if (!allLb) {
+      setLoadingAll(true);
+      try {
+        const res = await fetch("/api/user/leaderboard?all=1");
+        if (res.ok) setAllLb(await res.json());
+      } finally {
+        setLoadingAll(false);
+      }
+    }
+  }
 
   function openProfile(p: Player) {
     if (p.id) onOpenProfile(p.id);
@@ -649,7 +670,7 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
     <>
       <div className="view-header">
         <h1>Classement</h1>
-        <p>{seasonLabel} · {effectiveLb.length} joueurs</p>
+        <p>{seasonLabel} · {lb.length} joueur{lb.length > 1 ? "s" : ""}{showAll ? "" : " (top 10)"}</p>
       </div>
 
       {leagues.length > 0 && (
@@ -703,15 +724,15 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
         {rest.map((p) => (
           <div
             key={p.id}
-            className="lb-row"
+            className={`lb-row${p.isMe ? " lb-me" : ""}`}
             role="button"
             tabIndex={0}
             onClick={() => openProfile(p)}
             onKeyDown={(e) => onProfileKeyDown(e, p)}
           >
             <span className="lb-rank">{p.rank}</span>
-            <div className="lb-avatar">{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
-            <span className="lb-name">{p.name}<InstaLink handle={p.instagram} /></span>
+            <div className={`lb-avatar${p.isMe ? " lb-avatar-me" : ""}`}>{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
+            <span className="lb-name">{p.name}{p.isMe && <span className="me-tag">Moi</span>}<InstaLink handle={p.instagram} /></span>
             <span className="lb-wins">{p.wins} victoires</span>
             <span className="lb-bal">{p.balance.toLocaleString("fr-FR")} cr.</span>
             {p.streak > 0 && <span className="lb-streak"><ColFlame />{p.streak}</span>}
@@ -738,6 +759,15 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
           </>
         )}
       </div>
+
+      <button
+        type="button"
+        className="cls-show-all"
+        onClick={handleToggleAll}
+        disabled={loadingAll}
+      >
+        {loadingAll ? "Chargement…" : showAll ? "Réduire au top 10" : "Voir le classement complet"}
+      </button>
     </>
   );
 }

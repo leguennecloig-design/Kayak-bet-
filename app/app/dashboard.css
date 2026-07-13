@@ -1827,6 +1827,23 @@
   flex-direction: column;
   gap: 6px;
 }
+.kb-app .cls-show-all {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-2);
+  border-radius: 13px;
+  padding: 13px 16px;
+  color: var(--idle);
+  font: 700 12.5px/1 var(--font-archivo);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.kb-app .cls-show-all:hover { color: #fff; border-color: rgba(40,215,230,.4); }
+.kb-app .cls-show-all:disabled { opacity: .5; cursor: default; }
 .kb-app .lb-row {
   display: flex;
   align-items: center;
@@ -2785,6 +2802,51 @@
   justify-content: center;
   margin-bottom: 18px;
 }
+.kb-app .catmodal-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  padding: 11px 14px;
+  margin-bottom: 16px;
+}
+.kb-app .catmodal-search svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--sub);
+}
+.kb-app .catmodal-search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: #fff;
+  font: 600 13.5px/1 var(--font-archivo);
+}
+.kb-app .catmodal-search input::placeholder {
+  color: var(--sub);
+}
+.kb-app .catmodal-search button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--sub);
+}
+.kb-app .catmodal-search button svg {
+  width: 13px;
+  height: 13px;
+}
+.kb-app .catmodal-search button:hover { color: #fff; }
 .kb-app .catmodal-head h3 {
   font: 400 italic 19px/1.05 var(--font-anton), sans-serif;
   text-transform: uppercase;
