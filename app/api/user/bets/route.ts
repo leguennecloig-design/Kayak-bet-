@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import type { BetType } from "@/lib/algo/types";
+import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
 
 type Selection = {
   participantId:   string;
@@ -15,21 +16,24 @@ type Selection = {
   predictedTimeSeconds?: number; // EXACT_TIME uniquement
 };
 
-const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME"];
+const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME", "EXACT_TIME_SECOND"];
 const RANK_TIERS: Set<BetType> = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
 const MIN_STAKE = 30;
 const MAX_STAKE_PER_ATHLETE = 200;
 const BALANCE_FLOOR = 200;
 
+// Cotes lues directement dans la table (statiques par athlète). EXACT_PLACE est
+// traité à part (cote DYNAMIQUE selon la place choisie — voir plus bas).
 function coteColumn(betType: BetType, row: Record<string, unknown>): number {
   switch (betType) {
-    case "TOP_1":        return Number(row.cote_top1);
-    case "TOP_3":        return Number(row.cote_top3);
-    case "TOP_5":        return Number(row.cote_top5);
-    case "TOP_10":       return Number(row.cote_top10);
-    case "TOP_20":       return Number(row.cote_top20);
-    case "EXACT_PLACE":  return Number(row.cote_exact_place);
-    case "EXACT_TIME":   return Number(row.cote_exact_time);
+    case "TOP_1":              return Number(row.cote_top1);
+    case "TOP_3":              return Number(row.cote_top3);
+    case "TOP_5":              return Number(row.cote_top5);
+    case "TOP_10":             return Number(row.cote_top10);
+    case "TOP_20":             return Number(row.cote_top20);
+    case "EXACT_PLACE":        return Number(row.cote_exact_place); // repli, normalement dynamique
+    case "EXACT_TIME":         return Number(row.cote_exact_time);
+    case "EXACT_TIME_SECOND":  return Number(row.cote_exact_time_second);
   }
 }
 
@@ -124,6 +128,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Temps prédit invalide" }, { status: 400 });
       }
     }
+    if (s.betType === "EXACT_TIME_SECOND") {
+      // Temps à la seconde : entier de secondes
+      if (!Number.isInteger(s.predictedTimeSeconds) || s.predictedTimeSeconds! <= 0 || s.predictedTimeSeconds! > 36000) {
+        return NextResponse.json({ error: "Temps prédit (à la seconde) invalide" }, { status: 400 });
+      }
+    }
   }
 
   // Un seul pari "classement" (Vainqueur/Top3/5/10/20) par athlète, et Place
@@ -205,7 +215,7 @@ export async function POST(req: NextRequest) {
 
   const { data: cotesRows } = await adminSb
     .from("cotes")
-    .select("competition_id, code_bateau, cote_top1, cote_top3, cote_top5, cote_top10, cote_top20, cote_exact_place, cote_exact_time")
+    .select("competition_id, code_bateau, rang_espere, sigma, cote_top1, cote_top3, cote_top5, cote_top10, cote_top20, cote_exact_place, cote_exact_time, cote_exact_time_second")
     .in("competition_id", compIds);
   const cotesByKey = new Map(
     (cotesRows ?? []).map(c => [`${c.competition_id}:${c.code_bateau}`, c])
@@ -244,7 +254,21 @@ export async function POST(req: NextRequest) {
       if (!cotesRow) {
         return NextResponse.json({ error: "Cotes indisponibles pour cette sélection" }, { status: 400 });
       }
-      serverCote = coteColumn(betType, cotesRow);
+      if (betType === "EXACT_PLACE") {
+        // Cote DYNAMIQUE : recalcul serveur à partir de la place choisie et de
+        // la distribution de l'athlète (rang espéré + sigma). Jamais la valeur
+        // client, jamais la colonne figée.
+        const place = Number(s.targetPlace);
+        const rang  = Number((cotesRow as Record<string, unknown>).rang_espere);
+        const sig   = Number((cotesRow as Record<string, unknown>).sigma);
+        if (!Number.isFinite(rang) || !Number.isFinite(sig) || sig <= 0) {
+          return NextResponse.json({ error: "Cotes indisponibles pour cette sélection" }, { status: 400 });
+        }
+        const p = probExactPlace(rang, sig, place);
+        serverCote = probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_GLOBAL);
+      } else {
+        serverCote = coteColumn(betType, cotesRow);
+      }
     }
 
     if (!Number.isFinite(serverCote) || serverCote <= 1) {

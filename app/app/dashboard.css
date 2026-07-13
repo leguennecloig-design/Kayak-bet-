@@ -2894,6 +2894,13 @@
   font: 600 11.5px/1.3 var(--font-archivo);
   color: #FF7A45;
 }
+/* Cote "place exacte" calculée en direct pendant la saisie */
+.kb-app .catmodal-inline-cote {
+  font: 800 13px/1 var(--font-archivo);
+  color: var(--cyan);
+  white-space: nowrap;
+  align-self: center;
+}
 
 @media (max-width: 480px) {
   .kb-app .catmodal-bets {

@@ -42,8 +42,13 @@ function selectionWins(
     case "EXACT_PLACE":
       return sel.targetPlace != null && entry.rang === sel.targetPlace ? "won" : "lost";
     case "EXACT_TIME":
+      // au dixième : les deux côtés sont arrondis au dixième (voir parseTempsToSeconds)
       return sel.predictedTimeSeconds != null && entry.tempsSeconds != null
         && entry.tempsSeconds === sel.predictedTimeSeconds ? "won" : "lost";
+    case "EXACT_TIME_SECOND":
+      // à la seconde : on compare les temps arrondis à la seconde entière
+      return sel.predictedTimeSeconds != null && entry.tempsSeconds != null
+        && Math.round(entry.tempsSeconds) === Math.round(sel.predictedTimeSeconds) ? "won" : "lost";
     default: return "lost";
   }
 }

@@ -30,10 +30,12 @@ export async function GET(
     );
   }
 
+  // rang_espere + sigma sont exposés pour permettre le calcul DYNAMIQUE de la
+  // cote "place exacte" côté client selon la place choisie (revalidé serveur).
   let query = supabase
     .from("cotes")
     .select(
-      "code_bateau, athlete_id, nom, categorie, prob_top1, cote_top1, cote_top3, cote_top5, cote_top10, cote_top20, cote_exact_place, cote_exact_time"
+      "code_bateau, athlete_id, nom, categorie, rang_espere, sigma, prob_top1, cote_top1, cote_top3, cote_top5, cote_top10, cote_top20, cote_exact_place, cote_exact_time, cote_exact_time_second"
     )
     .eq("competition_id", competitionId);
 

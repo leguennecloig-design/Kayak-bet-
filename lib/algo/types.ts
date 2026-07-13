@@ -55,7 +55,8 @@ export type BetType =
   | "TOP_1"
   | "TOP_3"
   | "TOP_5"
-  | "TOP_10"
-  | "TOP_20"
+  | "TOP_10"          // legacy — retiré de l'UI v4, conservé pour les paris déjà placés
+  | "TOP_20"          // legacy — idem
   | "EXACT_PLACE"
-  | "EXACT_TIME";
+  | "EXACT_TIME"           // temps au dixième
+  | "EXACT_TIME_SECOND";   // temps à la seconde (v4, plafond 4)

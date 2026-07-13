@@ -21,6 +21,7 @@ const BET_LABELS: Record<BetType, string> = {
   TOP_20: "Top 20",
   EXACT_PLACE: "Place exacte",
   EXACT_TIME: "Temps exact",
+  EXACT_TIME_SECOND: "Temps à la seconde",
 };
 
 const LiveSection = dynamic(() => import("./LiveSection"), { ssr: false });

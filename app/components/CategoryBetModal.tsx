@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import type { BetType } from "@/lib/algo/types";
+import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
 import OddsInfoModal from "./OddsInfoModal";
+
+// Cote "place exacte" DYNAMIQUE : recalculée selon la place choisie et la
+// distribution de l'athlète (rang espéré + sigma), même formule que le serveur.
+function dynamicPlaceCote(row: { rang_espere: number; sigma: number }, place: number): number {
+  const p = probExactPlace(Number(row.rang_espere), Number(row.sigma), place);
+  return probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_GLOBAL);
+}
 
 export type BetOdd = {
   id: string;
@@ -25,6 +33,8 @@ type CotesRow = {
   code_bateau: string;
   nom: string;
   categorie: string;
+  rang_espere: number;
+  sigma: number;
   cote_top1: number;
   cote_top3: number;
   cote_top5: number;
@@ -32,18 +42,20 @@ type CotesRow = {
   cote_top20: number;
   cote_exact_place: number;
   cote_exact_time: number;
+  cote_exact_time_second: number;
 };
 
+// Types affichés en v4 (Top 10 / Top 20 retirés).
 const BET_TYPES: { type: BetType; label: string }[] = [
   { type: "TOP_1", label: "Vainqueur" },
   { type: "TOP_3", label: "Top 3" },
   { type: "TOP_5", label: "Top 5" },
-  { type: "TOP_10", label: "Top 10" },
-  { type: "TOP_20", label: "Top 20" },
   { type: "EXACT_PLACE", label: "Place exacte" },
-  { type: "EXACT_TIME", label: "Temps exact" },
+  { type: "EXACT_TIME", label: "Temps au dixième" },
+  { type: "EXACT_TIME_SECOND", label: "Temps à la seconde" },
 ];
 
+// Exhaustif sur BetType (Top10/20 conservés pour compat même si non affichés).
 const COTE_FIELD: Record<BetType, keyof CotesRow> = {
   TOP_1: "cote_top1",
   TOP_3: "cote_top3",
@@ -52,6 +64,7 @@ const COTE_FIELD: Record<BetType, keyof CotesRow> = {
   TOP_20: "cote_top20",
   EXACT_PLACE: "cote_exact_place",
   EXACT_TIME: "cote_exact_time",
+  EXACT_TIME_SECOND: "cote_exact_time_second",
 };
 
 const TYPE_LABEL: Record<string, string> = { sprint: "Sprint", classique: "Classique" };
@@ -85,12 +98,13 @@ export default function CategoryBetModal({
     parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null
   );
 
-  // Saisie inline pour "Place exacte" (numéro) et "Temps exact" (valeur au
-  // dixième de seconde) — ces deux types de pari ne s'ajoutent pas au coupon
-  // au premier clic comme les autres, ils ouvrent d'abord un petit champ.
-  const [expandedInput, setExpandedInput] = useState<{ participantId: string; type: "EXACT_PLACE" | "EXACT_TIME" } | null>(null);
+  // Saisie inline pour Place exacte (n°), Temps au dixième et Temps à la
+  // seconde — ces types ne s'ajoutent pas au coupon au 1er clic, ils ouvrent
+  // d'abord un champ. Place exacte : cote DYNAMIQUE calculée en direct.
+  const [expandedInput, setExpandedInput] = useState<{ participantId: string; type: "EXACT_PLACE" | "EXACT_TIME" | "EXACT_TIME_SECOND" } | null>(null);
   const [placeValue, setPlaceValue] = useState("");
   const [timeValue, setTimeValue] = useState("");
+  const [timeSecondValue, setTimeSecondValue] = useState("");
   const [inputError, setInputError] = useState("");
 
   const cats = [...new Set(odds.map(o => o.categorie).filter(Boolean))].sort() as string[];
@@ -194,7 +208,7 @@ export default function CategoryBetModal({
                     const val = type === "TOP_1" ? p.val : Number(cotesRow![COTE_FIELD[type]]);
                     const id = `${p.participantId}:${type}`;
                     const sel = !!coupon[id];
-                    const needsInput = type === "EXACT_PLACE" || type === "EXACT_TIME";
+                    const needsInput = type === "EXACT_PLACE" || type === "EXACT_TIME" || type === "EXACT_TIME_SECOND";
                     return (
                       <button
                         key={type}
@@ -208,6 +222,7 @@ export default function CategoryBetModal({
                             setInputError("");
                             setPlaceValue("");
                             setTimeValue("");
+                            setTimeSecondValue("");
                             setExpandedInput(prev =>
                               prev?.participantId === p.participantId && prev.type === type
                                 ? null
@@ -232,7 +247,7 @@ export default function CategoryBetModal({
                   )}
                 </div>
 
-                {expandedInput?.participantId === p.participantId && expandedInput.type === "EXACT_PLACE" && (
+                {expandedInput?.participantId === p.participantId && expandedInput.type === "EXACT_PLACE" && cotesRow && (
                   <div className="catmodal-inline-input">
                     <input
                       type="number"
@@ -242,6 +257,13 @@ export default function CategoryBetModal({
                       value={placeValue}
                       onChange={(e) => { setPlaceValue(e.target.value); setInputError(""); }}
                     />
+                    {(() => {
+                      const parsed = parseInt(placeValue, 10);
+                      if (Number.isInteger(parsed) && parsed >= 2 && parsed <= 50) {
+                        return <span className="catmodal-inline-cote">cote {dynamicPlaceCote(cotesRow, parsed).toFixed(2)}</span>;
+                      }
+                      return null;
+                    })()}
                     <button
                       className="catmodal-inline-confirm"
                       onClick={() => {
@@ -254,7 +276,7 @@ export default function CategoryBetModal({
                           setInputError("Place invalide");
                           return;
                         }
-                        const val = Number(cotesRow![COTE_FIELD.EXACT_PLACE]);
+                        const val = dynamicPlaceCote(cotesRow, parsed);
                         toggle({
                           id: `${p.participantId}:EXACT_PLACE`, participantId: p.participantId, betType: "EXACT_PLACE",
                           betLabel: `Place exacte n°${parsed}`, nm: p.nm, ctry: p.ctry, note: p.note, val,
@@ -291,8 +313,41 @@ export default function CategoryBetModal({
                         const val = Number(cotesRow![COTE_FIELD.EXACT_TIME]);
                         toggle({
                           id: `${p.participantId}:EXACT_TIME`, participantId: p.participantId, betType: "EXACT_TIME",
-                          betLabel: `Temps exact : ${rounded}s`, nm: p.nm, ctry: p.ctry, note: p.note, val,
+                          betLabel: `Temps au dixième : ${rounded}s`, nm: p.nm, ctry: p.ctry, note: p.note, val,
                           competitionId, categorie: selectedCat, predictedTimeSeconds: rounded,
+                        });
+                        setExpandedInput(null);
+                      }}
+                    >
+                      Valider
+                    </button>
+                    {inputError && <span className="catmodal-inline-err">{inputError}</span>}
+                  </div>
+                )}
+
+                {expandedInput?.participantId === p.participantId && expandedInput.type === "EXACT_TIME_SECOND" && (
+                  <div className="catmodal-inline-input">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="Temps en secondes entières (ex: 83)"
+                      value={timeSecondValue}
+                      onChange={(e) => { setTimeSecondValue(e.target.value); setInputError(""); }}
+                    />
+                    <button
+                      className="catmodal-inline-confirm"
+                      onClick={() => {
+                        const parsed = parseInt(timeSecondValue, 10);
+                        if (!Number.isInteger(parsed) || parsed <= 0) {
+                          setInputError("Temps invalide");
+                          return;
+                        }
+                        const val = Number(cotesRow![COTE_FIELD.EXACT_TIME_SECOND]);
+                        toggle({
+                          id: `${p.participantId}:EXACT_TIME_SECOND`, participantId: p.participantId, betType: "EXACT_TIME_SECOND",
+                          betLabel: `Temps à la seconde : ${parsed}s`, nm: p.nm, ctry: p.ctry, note: p.note, val,
+                          competitionId, categorie: selectedCat, predictedTimeSeconds: parsed,
                         });
                         setExpandedInput(null);
                       }}
