@@ -53,13 +53,17 @@ export const ALGO_PARAMS = {
   // ═══ v4 — calibration des cotes : bornes [min, max] par type de pari ═══
   // Ancrages (planchers) calibrés : un favori évident tombe au plancher.
   // Plafond global 30 (Top1 uniquement — les autres types ont leur propre
-  // plafond, resserré en v4.2) ; temps à la seconde plafonné à 4.
+  // plafond, resserré en v4.2/v4.3).
   COTE_MAX_GLOBAL: 30.0,
   COTE_MIN_TOP1: 1.68,
   COTE_MIN_TOP3: 1.15,
   COTE_MIN_TOP5: 1.05,
   COTE_MIN_EXACT: 1.05,          // place exacte / temps dixième
-  COTE_MAX_EXACT_TIME_SECOND: 4.0,
+  // v4.3 — plafonds resserrés pour place exacte / temps (jusqu'ici bornés au
+  // plafond global 30 pour place exacte et temps dixième — beaucoup trop haut).
+  COTE_MAX_EXACT_PLACE: 6.0,
+  COTE_MAX_EXACT_TIME: 15.0,      // temps au dixième
+  COTE_MAX_EXACT_TIME_SECOND: 5.0,
   COTE_MIN_EXACT_TIME_SECOND: 1.05,
   // v4.2 — Top3/Top5/Top10 resserrés : jusqu'ici bornés au plafond global (30),
   // beaucoup trop haut pour des paris structurellement "plus faciles" que le
@@ -92,5 +96,5 @@ export const ALGO_PARAMS = {
   // Décroissance exponentielle de la force selon le rang (Sprint Finale / Mass Start)
   K_FORCE: 0.20,
 
-  ALGO_VERSION: 'v4.2',
+  ALGO_VERSION: 'v4.3',
 } as const;

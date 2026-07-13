@@ -212,11 +212,11 @@ function buildCoteResult(
   // (côté client/serveur, via rang_espere + sigma exposés).
   const placeProbable = Math.max(1, Math.round(rangEspere));
   const pPlace = probExactPlace(rangEspere, sigma, placeProbable);
-  const coteExactPlace = probToCote(pPlace, P.COTE_MIN_EXACT, P.COTE_MAX_GLOBAL);
+  const coteExactPlace = probToCote(pPlace, P.COTE_MIN_EXACT, P.COTE_MAX_EXACT_PLACE);
 
   // Temps exact — pas de modèle de temps absolu : heuristique basée sur la
   // prédictibilité (prob d'être la performance de référence = p1) × précision.
-  const coteExactTime = probToCote(p1 * P.K_EXACT_TIME_TENTH, P.COTE_MIN_EXACT, P.COTE_MAX_GLOBAL);
+  const coteExactTime = probToCote(p1 * P.K_EXACT_TIME_TENTH, P.COTE_MIN_EXACT, P.COTE_MAX_EXACT_TIME);
   const coteExactTimeSecond = probToCote(
     p1 * P.K_EXACT_TIME_SECOND,
     P.COTE_MIN_EXACT_TIME_SECOND,

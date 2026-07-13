@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Cotes indisponibles pour cette sélection" }, { status: 400 });
         }
         const p = probExactPlace(rang, sig, place);
-        serverCote = probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_GLOBAL);
+        serverCote = probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_EXACT_PLACE);
       } else {
         serverCote = coteColumn(betType, cotesRow);
       }

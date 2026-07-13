@@ -27,8 +27,8 @@ Normalisé sur les sources présentes, ∈ [0,1] :
 
 ### Cotes (`probToCote(prob, min, max)`, `bradley-terry.ts`)
 `cote = clamp(MARGE/prob, min, max)` arrondi au 0.05. Ancrages (planchers, calibrés) : **Top1 1.68**, **Top3 1.15**, **Top5 1.05**. Un favori évident tombe au plancher. Plafonds (v4.2, resserrés) : **Top1 30**, **Top3 15**, **Top5 10**, **Top10 8**, Top20 8 (legacy).
-- **Place exacte** : cote **dynamique** = `probToCote(probExactPlace(rang, sigma, N), 1.05, 30)`. Calculée en direct côté client (rang_espere + sigma exposés par l'API cotes) selon la place choisie, **revalidée serveur** dans `POST /api/user/bets`. Place n°1 interdite (→ pari Vainqueur).
-- **Temps au dixième / à la seconde** : pas de modèle de temps absolu → heuristique basée sur la prédictibilité (`p1`) × facteur de précision (`K_EXACT_TIME_TENTH`/`_SECOND`). Cote **par athlète** (ne dépend pas du temps tapé). Dixième plafond 30, **seconde plafond 4**. *(Amélioration future : vrai modèle de temps pour une cote dépendant de la valeur.)*
+- **Place exacte** : cote **dynamique** = `probToCote(probExactPlace(rang, sigma, N), 1.05, 6)` (plafond `COTE_MAX_EXACT_PLACE`, v4.3). Calculée en direct côté client (rang_espere + sigma exposés par l'API cotes) selon la place choisie, **revalidée serveur** dans `POST /api/user/bets`. Place n°1 interdite (→ pari Vainqueur).
+- **Temps au dixième / à la seconde** : pas de modèle de temps absolu → heuristique basée sur la prédictibilité (`p1`) × facteur de précision (`K_EXACT_TIME_TENTH`/`_SECOND`). Cote **par athlète** (ne dépend pas du temps tapé). Dixième plafond **15** (`COTE_MAX_EXACT_TIME`), **seconde plafond 5** (`COTE_MAX_EXACT_TIME_SECOND`, v4.3). *(Amélioration future : vrai modèle de temps pour une cote dépendant de la valeur.)*
 - **Top 10 / Top 20** : retirés de l'UI de paris ; colonnes + règlement conservés pour les paris déjà placés.
 
 ### Garde-fou classement numérique — v4.2 (`capCoteByRangNumerique`, `bradley-terry.ts`)

@@ -12,7 +12,7 @@ const BETA_INFO_SEEN_KEY = "kb_algo_beta_seen_v1";
 // distribution de l'athlète (rang espéré + sigma), même formule que le serveur.
 function dynamicPlaceCote(row: { rang_espere: number; sigma: number }, place: number): number {
   const p = probExactPlace(Number(row.rang_espere), Number(row.sigma), place);
-  return probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_GLOBAL);
+  return probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_EXACT_PLACE);
 }
 
 export type BetOdd = {
