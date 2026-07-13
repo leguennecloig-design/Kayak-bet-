@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import { notifyUser } from "@/lib/notifications/create";
 
 const INSTAGRAM_REWARD = 500;
 
@@ -64,6 +65,12 @@ export async function POST(req: NextRequest) {
       .eq("id", userId)
       .eq("instagram_reward_status", "pending");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await notifyUser(adminSb, userId, {
+      type: "instagram_reward_rejected",
+      title: "Bonus Instagram refusé",
+      body: "Ton abonnement n'a pas pu être vérifié. Vérifie que tu suis bien @kayakbet puis renvoie ta demande depuis ton profil.",
+      url: "/app",
+    });
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 
@@ -95,6 +102,13 @@ export async function POST(req: NextRequest) {
     type:        "instagram_reward",
     amount:      INSTAGRAM_REWARD,
     description: "Bonus Instagram — abonnement vérifié",
+  });
+
+  await notifyUser(adminSb, userId, {
+    type: "instagram_reward_approved",
+    title: "Bonus Instagram approuvé 🎉",
+    body: `Ton abonnement Instagram a été vérifié — +${INSTAGRAM_REWARD} crédits !`,
+    url: "/app",
   });
 
   return NextResponse.json({ ok: true, status: "approved", bonus: INSTAGRAM_REWARD });

@@ -10,7 +10,9 @@ export type NotificationType =
   | "bet_won"
   | "bet_lost"
   | "competition"
-  | "broadcast";
+  | "broadcast"
+  | "instagram_reward_approved"
+  | "instagram_reward_rejected";
 
 // Crée une notification sur le site (table notifications) ET envoie un push,
 // en une seule fonction. Ne jette jamais : une notif ratée ne doit pas casser
