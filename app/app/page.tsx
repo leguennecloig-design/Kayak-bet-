@@ -226,7 +226,13 @@ type Player = {
   instagram?: string | null;
   streak: number;
   isMe?: boolean;
+  totalBets?: number;
+  winRate?: number;
+  estimatedGain?: number;
+  wonGains?: number;
 };
+
+type LeaderboardType = "points" | "winrate" | "estimated" | "wongains";
 
 type BetRecord = {
   id: string;
@@ -629,12 +635,74 @@ function CompetitionsView({
   );
 }
 
-function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel }: ClassementViewProps) {
-  const [showAll, setShowAll] = useState(false);
-  const [allLb, setAllLb] = useState<Player[] | null>(null);
-  const [loadingAll, setLoadingAll] = useState(false);
+const BOARD_TABS: { type: LeaderboardType; label: string }[] = [
+  { type: "points",    label: "Points" },
+  { type: "winrate",   label: "Winrate" },
+  { type: "estimated", label: "Gains estimés" },
+  { type: "wongains",  label: "Plus gros gains" },
+];
 
-  const lb   = showAll && allLb ? allLb : effectiveLb;
+function primaryStat(p: Player, type: LeaderboardType): string {
+  switch (type) {
+    case "winrate":   return `${p.winRate ?? 0}%`;
+    case "estimated": return `${(p.estimatedGain ?? 0).toLocaleString("fr-FR")} cr.`;
+    case "wongains":  return `${(p.wonGains ?? 0).toLocaleString("fr-FR")} cr.`;
+    default:          return `${p.balance.toLocaleString("fr-FR")} cr.`;
+  }
+}
+
+function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel }: ClassementViewProps) {
+  const [boardType, setBoardType] = useState<LeaderboardType>("points");
+  const [showAll, setShowAll] = useState(false);
+  const [fetchedLb, setFetchedLb] = useState<Player[] | null>(null);
+  const [loadingLb, setLoadingLb] = useState(false);
+  const [search, setSearch] = useState("");
+
+  // Vue par défaut (points, top 10) : réutilise la liste déjà chargée par le
+  // parent, pas besoin de refetch. Tout autre onglet/mode passe par un fetch dédié.
+  const isDefaultView = boardType === "points" && !showAll;
+  const lb = isDefaultView ? effectiveLb : (fetchedLb ?? []);
+
+  async function loadBoard(type: LeaderboardType, all: boolean) {
+    setLoadingLb(true);
+    try {
+      const qs = new URLSearchParams();
+      if (all) qs.set("all", "1");
+      if (type !== "points") qs.set("type", type);
+      const res = await fetch(`/api/user/leaderboard?${qs.toString()}`);
+      if (res.ok) setFetchedLb(await res.json());
+    } finally {
+      setLoadingLb(false);
+    }
+  }
+
+  function selectBoard(type: LeaderboardType) {
+    setBoardType(type);
+    setSearch("");
+    if (type === "points" && !showAll) { setFetchedLb(null); return; }
+    loadBoard(type, showAll);
+  }
+
+  async function handleToggleAll() {
+    const next = !showAll;
+    setShowAll(next);
+    if (next || boardType !== "points") loadBoard(boardType, next);
+    else setFetchedLb(null);
+  }
+
+  // Chercher un joueur : passe automatiquement en liste complète la première
+  // fois qu'on tape (sinon la recherche ne porterait que sur le top 10).
+  useEffect(() => {
+    if (search.trim() && !showAll) {
+      setShowAll(true);
+      loadBoard(boardType, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const q = search.trim().toLowerCase();
+  const searchResults = q ? lb.filter((p) => p.name.toLowerCase().includes(q)) : null;
+
   const top3 = lb.filter((p) => p.rank <= 3);
   // En vue complète, tout le monde est déjà dans l'ordre naturel — pas besoin
   // de sortir "moi" avec un séparateur "···" comme dans le top 10 tronqué.
@@ -648,20 +716,6 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
       .then((data) => setLeagues(data.leagues ?? []))
       .catch(() => {});
   }, []);
-
-  async function handleToggleAll() {
-    if (showAll) { setShowAll(false); return; }
-    setShowAll(true);
-    if (!allLb) {
-      setLoadingAll(true);
-      try {
-        const res = await fetch("/api/user/leaderboard?all=1");
-        if (res.ok) setAllLb(await res.json());
-      } finally {
-        setLoadingAll(false);
-      }
-    }
-  }
 
   function openProfile(p: Player) {
     if (p.id) onOpenProfile(p.id);
@@ -677,6 +731,52 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
         <p>{seasonLabel} · {lb.length} joueur{lb.length > 1 ? "s" : ""}{showAll ? "" : " (top 10)"}</p>
       </div>
 
+      <div className="cat-tabs cls-board-tabs">
+        {BOARD_TABS.map((t) => (
+          <button
+            key={t.type}
+            className={`cat-tab${boardType === t.type ? " active" : ""}`}
+            onClick={() => selectBoard(t.type)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="friend-search cls-search">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" /><path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Chercher un joueur…"
+        />
+      </div>
+
+      {loadingLb && <p className="cls-loading">Chargement…</p>}
+
+      {searchResults ? (
+        <div className="lb-list">
+          {searchResults.length === 0 ? (
+            <p className="friend-search-status">Aucun joueur ne correspond à ta recherche.</p>
+          ) : searchResults.map((p) => (
+            <div
+              key={p.id}
+              className={`lb-row${p.isMe ? " lb-me" : ""}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => openProfile(p)}
+              onKeyDown={(e) => onProfileKeyDown(e, p)}
+            >
+              <span className="lb-rank">{p.rank}</span>
+              <div className={`lb-avatar${p.isMe ? " lb-avatar-me" : ""}`}>{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
+              <span className="lb-name">{p.name}{p.isMe && <span className="me-tag">Moi</span>}<InstaLink handle={p.instagram} /></span>
+              <span className="lb-bal">{primaryStat(p, boardType)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+      <>
       {leagues.length > 0 && (
         <div className="cls-leagues">
           <div className="cls-leagues-head">
@@ -719,7 +819,7 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
             </div>
             <div className="pod-rank" style={{ color: rankColors[p!.rank] }}>#{p!.rank}</div>
             <div className="pod-name">{p!.name}<InstaLink handle={p!.instagram} /></div>
-            <div className="pod-bal">{p!.balance.toLocaleString("fr-FR")} cr.</div>
+            <div className="pod-bal">{primaryStat(p!, boardType)}</div>
           </div>
         ))}
       </div>
@@ -737,8 +837,8 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
             <span className="lb-rank">{p.rank}</span>
             <div className={`lb-avatar${p.isMe ? " lb-avatar-me" : ""}`}>{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : <span>{p.ini}</span>}</div>
             <span className="lb-name">{p.name}{p.isMe && <span className="me-tag">Moi</span>}<InstaLink handle={p.instagram} /></span>
-            <span className="lb-wins">{p.wins} victoires</span>
-            <span className="lb-bal">{p.balance.toLocaleString("fr-FR")} cr.</span>
+            {boardType === "points" && <span className="lb-wins">{p.wins} victoires</span>}
+            <span className="lb-bal">{primaryStat(p, boardType)}</span>
             {p.streak > 0 && <span className="lb-streak"><ColFlame />{p.streak}</span>}
           </div>
         ))}
@@ -756,8 +856,8 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
               <span className="lb-rank">{me.rank}</span>
               <div className="lb-avatar lb-avatar-me">{me.avatarUrl ? <img src={me.avatarUrl} alt="" /> : <span>{me.ini}</span>}</div>
               <span className="lb-name">{me.name} <span className="me-tag">Moi</span><InstaLink handle={me.instagram} /></span>
-              <span className="lb-wins">{me.wins} victoires</span>
-              <span className="lb-bal">{me.balance.toLocaleString("fr-FR")} cr.</span>
+              {boardType === "points" && <span className="lb-wins">{me.wins} victoires</span>}
+              <span className="lb-bal">{primaryStat(me, boardType)}</span>
               {me.streak > 0 && <span className="lb-streak"><ColFlame />{me.streak}</span>}
             </div>
           </>
@@ -768,10 +868,12 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
         type="button"
         className="cls-show-all"
         onClick={handleToggleAll}
-        disabled={loadingAll}
+        disabled={loadingLb}
       >
-        {loadingAll ? "Chargement…" : showAll ? "Réduire au top 10" : "Voir le classement complet"}
+        {loadingLb ? "Chargement…" : showAll ? "Réduire au top 10" : "Voir le classement complet"}
       </button>
+      </>
+      )}
     </>
   );
 }
