@@ -62,12 +62,24 @@ function parseValue(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function parseDataRow(line: string): ExternalCoteAthlete | null {
+type RowResult = { athlete: ExternalCoteAthlete | null; reason?: string };
+
+// Nom d'équipage ("SURNAME I. / SURNAME I.") plus long qu'un nom solo — sur
+// certaines lignes du fichier source, la colonne Nom déborde et se retrouve
+// collée au Club SANS aucun espace séparateur (ex: "GOULLEY TPL ARGENTAN...").
+// Le split /\s{2,}/ ne peut alors plus distinguer nom et club : on le détecte
+// (club vide après découpage) et on le signale plutôt que de deviner — la
+// quantité de texte perdue dans le collage n'est pas prévisible (parfois
+// seule l'initiale est collée, parfois elle est entièrement absente), donc
+// toute reconstruction automatique risquerait de produire un club silencieusement
+// faux. Le vrai correctif est côté générateur du fichier (élargir la colonne
+// Nom pour les équipages, ou garantir un espacement minimum).
+function parseDataRow(line: string): RowResult {
   const fields = line.trim().split(/\s{2,}/).filter(Boolean);
-  if (fields.length < 6) return null; // dossard + nom + club + au moins 3 valeurs
+  if (fields.length < 6) return { athlete: null }; // dossard + nom + club + au moins 3 valeurs
 
   const dossard = parseInt(fields[0], 10);
-  if (!Number.isInteger(dossard)) return null;
+  if (!Number.isInteger(dossard)) return { athlete: null };
 
   const values = fields.slice(-4);
   const [t1, t3, t5, t10] = values.map(parseValue);
@@ -79,7 +91,14 @@ function parseDataRow(line: string): ExternalCoteAthlete | null {
 
   const club = fields.slice(2, fields.length - 4).join(" ").trim();
 
-  return { dossard, nom, club, cote_top1: t1, cote_top3: t3, cote_top5: t5, cote_top10: t10, noData };
+  if (club === "" && !isAnon && nom.includes(" / ")) {
+    return {
+      athlete: null,
+      reason: `nom et club fusionnés (colonne "Nom" trop étroite dans le fichier source pour "${nom}") — corrige la ligne dans le fichier ou ajoute ce participant manuellement après import`,
+    };
+  }
+
+  return { athlete: { dossard, nom, club, cote_top1: t1, cote_top3: t3, cote_top5: t5, cote_top10: t10, noData } };
 }
 
 // Best-effort : extrait nom/lieu/dates du bloc d'en-tête. Toujours à confirmer/
@@ -149,9 +168,11 @@ export function parseExternalCotesFile(content: string): ParsedExternalCotes {
 
     if (!current) continue; // encore dans le bloc d'en-tête général
 
-    const row = parseDataRow(line);
-    if (row) {
-      current.athletes.push(row);
+    const { athlete, reason } = parseDataRow(line);
+    if (athlete) {
+      current.athletes.push(athlete);
+    } else if (reason) {
+      errors.push(`Ligne ${i + 1} dans "${current.libelle}" : ${reason}.`);
     } else {
       errors.push(`Ligne ${i + 1} non reconnue dans "${current.libelle}" : "${lines[i].slice(0, 80)}"`);
     }
