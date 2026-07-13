@@ -68,6 +68,11 @@ export default function CouponInfoModal({ open, onClose }: Props) {
             Attention : dans un combiné, <b>tous les pronostics doivent être justes</b> pour
             que le pari soit gagnant. Si un seul se plante, le pari entier est perdu.
           </p>
+          <p>
+            💡 Conseil : plutôt qu&apos;un seul gros combiné, il est possible — et souvent plus
+            malin — de faire <b>plusieurs petits paris simples séparés</b>. Ça multiplie tes
+            chances de toucher au moins un gain, sans tout miser sur un seul résultat parfait.
+          </p>
 
           <h4>4. Règles</h4>
           <ul>

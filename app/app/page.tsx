@@ -11,6 +11,7 @@ import ReferralModal from "@/app/components/ReferralModal";
 import InstagramRewardCard, { type IgRewardStatus } from "@/app/components/InstagramRewardCard";
 import NotificationBell from "@/app/components/NotificationBell";
 import CouponInfoModal from "@/app/components/CouponInfoModal";
+import AppUpdatePopup from "@/app/components/AppUpdatePopup";
 import { comboBonusFor } from "@/lib/bets/combo";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
@@ -2074,6 +2075,7 @@ export default function DashboardPage() {
       </aside>
 
       <CouponInfoModal open={couponInfoOpen} onClose={() => setCouponInfoOpen(false)} />
+      <AppUpdatePopup />
 
       <EditProfileModal
         open={editProfileOpen}

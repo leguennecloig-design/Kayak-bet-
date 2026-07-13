@@ -25,7 +25,10 @@ const GROUPS: NavGroup[] = [
   },
   {
     label: "Notifications",
-    links: [{ href: "/admin/notifications", label: "Diffusion push" }],
+    links: [
+      { href: "/admin/notifications", label: "Diffusion push" },
+      { href: "/admin/updates", label: "Pop-up de mise à jour" },
+    ],
   },
   {
     label: "Classement",

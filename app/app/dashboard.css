@@ -3074,6 +3074,124 @@
   }
 }
 
+/* ============ POP-UP MISE À JOUR (carte ancrée en bas) ============ */
+.kb-app .update-popup {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 55;
+  max-width: 420px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, var(--navy-2), var(--navy) 60%);
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+}
+.kb-app .update-popup-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 14px 14px 16px;
+}
+.kb-app .update-popup-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(40, 215, 230, 0.15);
+  color: var(--cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kb-app .update-popup-icon svg { width: 17px; height: 17px; }
+.kb-app .update-popup-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.kb-app .update-popup-titles .t {
+  font: 800 13.5px/1.2 var(--font-archivo);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kb-app .update-popup-titles .v {
+  font: 600 11px/1 var(--font-archivo);
+  color: var(--sub);
+}
+.kb-app .update-popup-collapse,
+.kb-app .update-popup-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--idle);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kb-app .update-popup-collapse svg,
+.kb-app .update-popup-close svg {
+  width: 13px;
+  height: 13px;
+  transition: transform .15s;
+}
+.kb-app .update-popup-collapse:hover,
+.kb-app .update-popup-close:hover { color: #fff; }
+.kb-app .update-popup-body {
+  padding: 0 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.kb-app .update-popup-section {
+  font: 700 9.5px/1 var(--font-grotesk), monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.kb-app .update-popup-body ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kb-app .update-popup-body li {
+  position: relative;
+  padding-left: 16px;
+  font: 600 12.5px/1.5 var(--font-archivo);
+  color: var(--soft);
+}
+.kb-app .update-popup-body li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+}
+.kb-app .update-popup-cta {
+  align-self: flex-start;
+  margin-top: 2px;
+  font: 700 13px/1 var(--font-archivo);
+  color: var(--cyan);
+  text-decoration: none;
+}
+.kb-app .update-popup-cta:hover { text-decoration: underline; }
+
 /* ============ MODALE GÉNÉRIQUE (scrim + carte centrée) ============ */
 /* Utilisée par Modifier le profil, Lier mon profil athlète, Parrainage. */
 .kb-app .kb-modal-scrim {
