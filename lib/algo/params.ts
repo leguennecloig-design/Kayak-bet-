@@ -34,9 +34,18 @@ export const ALGO_PARAMS = {
   // Confrontations directes ±25%
   BONUS_CONFRONTATION: 0.25,
 
-  // CDF normale
-  SIGMA_FACTOR: 0.55,
-  SIGMA_MIN: 0.80,
+  // v4.1 — exposant de séparation Bradley-Terry (voir computeForces). Sans
+  // lui, deux scores absolus compressés dans une bande étroite (ex 0.85 vs
+  // 0.55) ne produisaient pas un écart de force suffisant pour que le rang
+  // espéré d'un vrai favori s'approche de 1 — même un athlète en équipe de
+  // France pouvait finir avec une cote Top1 plafonnée à 30. Calibré par
+  // simulation (favori réaliste ~0.90 → cote Top1 ≈ 1.8-2.1).
+  K_SHARPEN_FORCE: 7,
+
+  // CDF normale — resserrée en v4.1 (avec K_SHARPEN_FORCE) pour que les
+  // rangs espérés proches de 1 se traduisent par des cotes vraiment basses.
+  SIGMA_FACTOR: 0.40,
+  SIGMA_MIN: 0.60,
 
   // Marge bookmaker
   MARGE: 1.10,
@@ -63,5 +72,5 @@ export const ALGO_PARAMS = {
   // Décroissance exponentielle de la force selon le rang (Sprint Finale / Mass Start)
   K_FORCE: 0.20,
 
-  ALGO_VERSION: 'v4.0',
+  ALGO_VERSION: 'v4.1',
 } as const;

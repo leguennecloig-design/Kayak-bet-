@@ -156,21 +156,34 @@ function resolveFallback(h: V3History): {
 //  3. Force finale = (1-wRel)·S_abs + wRel·S_rel. Le buildCoteResult fait la
 //     2e passe BT (rang espéré final) sur ces forces.
 function computeForces(startlist: AthleteInStartlist[]): Map<string, number> {
+  // "Force" Bradley-Terry = score^K_SHARPEN_FORCE. Sans cet exposant, un
+  // favori net (score absolu 0.85-0.90) ne se détachait pas assez du peloton
+  // (souvent 0.45-0.70) pour que fi/(fi+fj) s'écarte vraiment de 0.5 — le rang
+  // espéré restait élevé (5-7) même pour un champion en équipe de France, et
+  // sa cote Top1 finissait plafonnée à 30. L'exposant étire les scores forts
+  // vers 1 et écrase les scores moyens/faibles vers 0, donnant une séparation
+  // Bradley-Terry nette et des cotes cohérentes avec le niveau réel.
+  const { K_SHARPEN_FORCE } = ALGO_PARAMS;
+  const sharpen = (s: number) => Math.pow(Math.max(0, Math.min(1, s)), K_SHARPEN_FORCE);
+
   const scoresAbs = new Map<string, number>();
   for (const a of startlist) {
     const base = calculerScoreComposite(a);
     const adj  = ajusterParConfrontations(a, startlist, base);
     scoresAbs.set(a.code_bateau, Math.max(0, Math.min(1, adj)));
   }
+  const sharpenedAbs = new Map<string, number>();
+  for (const [code, s] of scoresAbs) sharpenedAbs.set(code, sharpen(s));
 
   const N = startlist.length;
   const forces = new Map<string, number>();
   for (const a of startlist) {
-    const rangEsp1 = calculerRangEspere(a, scoresAbs);
+    const rangEsp1 = calculerRangEspere(a, sharpenedAbs);
     const sRel = N > 1 ? Math.max(0, Math.min(1, 1 - (rangEsp1 - 1) / (N - 1))) : 1;
     const wRel = estM22AvecSef(a) ? ALGO_PARAMS.V4_M22_W_RELATIF : ALGO_PARAMS.V4_W_RELATIF;
-    const sAbs = scoresAbs.get(a.code_bateau)!;
-    forces.set(a.code_bateau, (1 - wRel) * sAbs + wRel * sRel);
+    const sAbsSharp = sharpenedAbs.get(a.code_bateau)!;
+    const sRelSharp = sharpen(sRel);
+    forces.set(a.code_bateau, (1 - wRel) * sAbsSharp + wRel * sRelSharp);
   }
   return forces;
 }

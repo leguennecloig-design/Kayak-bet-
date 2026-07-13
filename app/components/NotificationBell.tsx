@@ -88,6 +88,17 @@ export default function NotificationBell({ onFriendsChanged }: { onFriendsChange
     }
   }, []);
 
+  // Fermeture au clavier (Échap) — cohérent avec les autres popups de l'app.
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    dialogRef.current?.focus();
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   const badge = unread + incoming.length;
 
   async function openPanel() {

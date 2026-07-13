@@ -1755,6 +1755,12 @@ export default function DashboardPage() {
   function navigate(v: View | "drawer") {
     if (v === "drawer") { setDrawerOpen(true); return; }
     setView(v);
+    // Remet le scroll en haut à chaque changement de vue — sinon, en venant
+    // d'une page longue (Accueil) vers une page plus courte (Compétitions),
+    // le navigateur doit "rattraper" la position de scroll désormais hors
+    // limites, ce qui fait apparaître/disparaître la barre d'adresse Safari
+    // sur iOS et donne l'impression que la barre de navigation du bas saute.
+    window.scrollTo(0, 0);
   }
 
   const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;

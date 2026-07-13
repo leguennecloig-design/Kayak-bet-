@@ -1738,6 +1738,14 @@
   align-items: end;
 }
 .kb-app .pod {
+  /* min-width:0 est indispensable : sans lui, même si .pod-name tronque son
+     texte avec ellipsis, la grille calcule la taille de colonne sur la
+     largeur MIN-CONTENT du nom en entier (non retourné à la ligne), ce qui
+     pouvait pousser toute la grille (et la page) plus large que l'écran —
+     le 3e du podium se retrouvait alors coupé/invisible sur mobile, la page
+     débordant silencieusement (overflow-x:hidden sur body masque le dépassement
+     au lieu de faire apparaître un scroll). */
+  min-width: 0;
   text-align: center;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-2);
@@ -3011,10 +3019,13 @@
   margin: 0;
 }
 .kb-app .kb-modal-close {
+  /* 40px : sous 44px (repère Apple HIG pour une cible tactile fiable), 32px
+     était trop juste sur téléphone — cause plausible des "je n'arrive pas à
+     fermer" (le tap manquait le bouton plus souvent qu'à la souris). */
   flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   border: 1px solid var(--border-2);
   background: transparent;
   color: var(--idle);
@@ -3023,9 +3034,10 @@
   align-items: center;
   justify-content: center;
 }
+.kb-app .kb-modal-close:hover { color: #fff; border-color: rgba(40,215,230,.4); }
 .kb-app .kb-modal-close svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 .kb-app .kb-modal-body {
   flex: 1;
