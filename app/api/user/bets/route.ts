@@ -168,26 +168,36 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Un seul athlète peut gagner une catégorie donnée : rejette un même coupon
-  // qui contiendrait deux paris "vainqueur" (Top1 ou place exacte n°1,
-  // équivalent) sur deux athlètes différents de la même catégorie — déjà
-  // empêché côté client dans toggle(), revalidé ici.
-  const isWinnerSelection = (s: Selection) =>
-    (s.betType ?? "TOP_1") === "TOP_1" || ((s.betType ?? "TOP_1") === "EXACT_PLACE" && s.targetPlace === 1);
-  const winnersByCategory = new Map<string, Set<string>>();
+  // Au plus N athlètes peuvent finir dans le Top N d'une catégorie donnée :
+  // rejette un coupon qui contiendrait plus de pronostics "Top N" (sur des
+  // athlètes différents) que de places réellement disponibles dans ce
+  // marché — déjà empêché côté client dans toggle(), revalidé ici. Place
+  // exacte n°1 est l'équivalent de Vainqueur (Top 1).
+  const MAX_PER_CATEGORY: Record<string, number> = { TOP_1: 1, TOP_3: 3, TOP_5: 5, TOP_10: 10 };
+  const marketFor = (s: Selection): string | null => {
+    const t = s.betType ?? "TOP_1";
+    if (t === "TOP_1") return "TOP_1";
+    if (t === "EXACT_PLACE" && s.targetPlace === 1) return "TOP_1"; // équivalent
+    if (t === "TOP_3" || t === "TOP_5" || t === "TOP_10") return t;
+    return null;
+  };
+  const byCategoryMarket = new Map<string, Set<string>>();
   for (const s of selections) {
-    if (!isWinnerSelection(s)) continue;
-    const key = `${s.competitionId}:${s.categorie}`;
-    const set = winnersByCategory.get(key) ?? new Set<string>();
+    const market = marketFor(s);
+    if (!market) continue;
+    const key = `${s.competitionId}:${s.categorie}:${market}`;
+    const set = byCategoryMarket.get(key) ?? new Set<string>();
     set.add(s.participantId);
-    winnersByCategory.set(key, set);
+    byCategoryMarket.set(key, set);
   }
-  for (const participantsSet of winnersByCategory.values()) {
-    if (participantsSet.size > 1) {
-      return NextResponse.json(
-        { error: "Un seul pari Vainqueur par catégorie (un seul athlète peut gagner une course)" },
-        { status: 400 }
-      );
+  for (const [key, participantsSet] of byCategoryMarket) {
+    const market = key.slice(key.lastIndexOf(":") + 1);
+    const max = MAX_PER_CATEGORY[market];
+    if (participantsSet.size > max) {
+      const error = market === "TOP_1"
+        ? "Un seul pari Vainqueur par catégorie (un seul athlète peut gagner une course)"
+        : `Maximum ${max} pronostics "Top ${max}" par catégorie (seuls ${max} athlètes peuvent y finir)`;
+      return NextResponse.json({ error }, { status: 400 });
     }
   }
 

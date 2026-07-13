@@ -1678,6 +1678,16 @@ export default function DashboardPage() {
     return o.betType === "TOP_1" || (o.betType === "EXACT_PLACE" && o.targetPlace === 1);
   }
 
+  // Au plus N athlètes peuvent finir dans le Top N d'une catégorie : au-delà,
+  // le pronostic est mathématiquement impossible à combiner avec les autres
+  // (pas assez de places). Contrairement à Vainqueur (1 seule place, on
+  // remplace sans ambiguïté), on bloque ici plutôt que de deviner lequel
+  // retirer parmi plusieurs déjà pris.
+  const MAX_PER_CATEGORY: Record<string, number> = { TOP_3: 3, TOP_5: 5, TOP_10: 10 };
+  function marketFor(o: Odd): string | null {
+    return o.betType === "TOP_3" || o.betType === "TOP_5" || o.betType === "TOP_10" ? o.betType : null;
+  }
+
   // L'ajout au coupon n'est jamais bloqué par "Pari combiné" — la case n'est
   // vérifiée qu'au moment de valider (voir validate()), pour ne jamais
   // dépendre d'un état React capturé au mauvais moment lors d'un clic rapide.
@@ -1685,6 +1695,20 @@ export default function DashboardPage() {
     setCoupon((prev) => {
       const next = { ...prev };
       if (next[o.id]) { delete next[o.id]; return next; }
+
+      const market = marketFor(o);
+      if (market) {
+        const max = MAX_PER_CATEGORY[market];
+        const countInCategory = new Set(
+          Object.values(next)
+            .filter(x => x.betType === market && x.categorie === o.categorie && x.participantId !== o.participantId)
+            .map(x => x.participantId)
+        ).size;
+        if (countInCategory >= max) {
+          showToast(<XIcon c="#FF7A45" />, `Maximum ${max} pronostics "Top ${max}" pour cette catégorie`, true);
+          return prev;
+        }
+      }
 
       const oIsWinner = isWinnerBet(o);
       for (const key of Object.keys(next)) {
@@ -1949,6 +1973,7 @@ export default function DashboardPage() {
               toggle={toggle}
               couponCount={count}
               onOpenCoupon={() => setDrawerOpen(true)}
+              onOpenComboInfo={() => setCouponInfoOpen(true)}
             />
           )}
           {view === "joueur" && viewedPlayerId && (

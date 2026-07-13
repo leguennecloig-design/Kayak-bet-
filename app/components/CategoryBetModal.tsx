@@ -7,6 +7,7 @@ import OddsInfoModal from "./OddsInfoModal";
 import AlgoBetaInfoModal from "./AlgoBetaInfoModal";
 
 const BETA_INFO_SEEN_KEY = "kb_algo_beta_seen_v1";
+const COMBO_INFO_SEEN_KEY = "kb_combo_info_seen_v1";
 
 // Cote "place exacte" DYNAMIQUE : recalculée selon la place choisie et la
 // distribution de l'athlète (rang espéré + sigma), même formule que le serveur.
@@ -83,6 +84,7 @@ type Props = {
   toggle: (o: BetOdd) => void;
   couponCount: number;
   onOpenCoupon: () => void;
+  onOpenComboInfo?: () => void;
 };
 
 function fmtOpensAt(iso: string) {
@@ -90,7 +92,7 @@ function fmtOpensAt(iso: string) {
 }
 
 export default function CategoryBetModal({
-  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon,
+  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon, onOpenComboInfo,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
   const [search, setSearch] = useState("");
@@ -104,13 +106,23 @@ export default function CategoryBetModal({
   );
 
   // Pop-up bêta/algo : affiché une seule fois, la première fois qu'un joueur
-  // ouvre une compétition pour parier (mémorisé en localStorage).
+  // ouvre une compétition pour parier (mémorisé en localStorage). Pop-up
+  // "pari combiné" (partagée avec le coupon, voir onOpenComboInfo) : affichée
+  // une seule fois elle aussi, mais jamais en même temps que la pop-up bêta
+  // (sinon deux pop-ups s'empileraient au tout premier passage) — elle
+  // attend simplement le prochain passage si c'est la toute première visite.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!window.localStorage.getItem(BETA_INFO_SEEN_KEY)) {
       setBetaInfoOpen(true);
       window.localStorage.setItem(BETA_INFO_SEEN_KEY, "1");
+      return;
     }
+    if (onOpenComboInfo && !window.localStorage.getItem(COMBO_INFO_SEEN_KEY)) {
+      onOpenComboInfo();
+      window.localStorage.setItem(COMBO_INFO_SEEN_KEY, "1");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Saisie inline pour Place exacte (n°), Temps au dixième et Temps à la

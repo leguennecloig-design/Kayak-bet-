@@ -73,6 +73,7 @@ export default function CouponInfoModal({ open, onClose }: Props) {
           <ul>
             <li>Un seul pari en attente par athlète à la fois.</li>
             <li>Un seul pronostic « Vainqueur » par catégorie (un seul athlète peut gagner une course).</li>
+            <li>Au plus 3 pronostics « Top 3 », 5 « Top 5 » et 10 « Top 10 » par catégorie — pas plus que de places disponibles dans le marché.</li>
             <li>Mise minimum 30 cr.</li>
           </ul>
         </div>
