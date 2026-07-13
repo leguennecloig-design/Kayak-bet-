@@ -1,5 +1,39 @@
 # Kayakbet
 
+## Algo de cotes — v4 (`lib/algo/`)
+
+Pipeline : score composite absolu → double passe Bradley-Terry → CDF normale (probas) → conversion en cote. Tous les paramètres sont dans `lib/algo/params.ts` (`ALGO_PARAMS`), tunables.
+
+### Choix de l'algo
+`competitions.algo_type` (`sprint | classique | mass_start | sprint_finale`) est choisi explicitement à la création (formulaires admin, obligatoire). `calculate-cotes` le lit (override formulaire > base) pour dériver le format et `disciplineEstSprint` — plus de détection sur le nom/discipline. Seuls **classique** et **sprint** utilisent le scoring v4 ci-dessous ; **mass_start** et **sprint_finale** combinent ce score de base avec les résultats d'une manche précédente (engines inchangés).
+
+### Saison
+Uniquement **2026** : `ALGO_PARAMS.SAISON_COTES = 2026` (filtre `ffck_competitions.annee`), pas l'horloge murale. Le classement numérique vient de la table `athletes` (seedée 2026).
+
+### Score composite absolu `S_abs` (`calculerScoreComposite`, `bradley-terry.ts`)
+Normalisé sur les sources présentes, ∈ [0,1] :
+- **Cas standard** : national **0.50** + numérique **0.25** (le relatif 0.25 est ajouté ensuite dans la force).
+- **Cas M22 avec SEF 2026** : SEF **0.50** + national **0.25** + numérique **0.15** (relatif 0.10 ensuite). Déclenché si la catégorie contient `M22` ET l'athlète a ≥ 1 résultat SEF 2026 ; sinon cas standard.
+- Bloc **national** = N1 **71%** / IR **29%** (`V4_N1_RATIO`/`V4_IR_RATIO`, hérité du ratio 25/10 v3 — à réajuster si le volume IR 2026 est faible).
+- Pénalité `FIAB_FALLBACK_AUTRE_DISCIPLINE` (0.75) appliquée aux scores de course quand on se rabat sur l'autre discipline.
+- Renormalisation : une source absente redistribue son poids (un athlète sans résultat national → 100% numérique).
+
+### Relatif catégorie — double Bradley-Terry (`computeForces`, `cotes-engine.ts`)
+1. `S_abs` (+ ajustement confrontations directes ±25%), clampé [0,1].
+2. 1re passe BT sur `S_abs` → `S_rel = 1 − (rang−1)/(N−1)`.
+3. Force finale `F = (1−wRel)·S_abs + wRel·S_rel`, `wRel` = 0.25 (std) / 0.10 (M22-SEF).
+4. 2e passe BT sur `F` → rang espéré final → probas Top-N (CDF normale, `sigmaFor`).
+> Architecture volontairement tunable (« flou » assumé), à affiner après tests réels.
+
+### Cotes (`probToCote(prob, min, max)`, `bradley-terry.ts`)
+`cote = clamp(MARGE/prob, min, max)` arrondi au 0.05. **Plafond global 30.** Ancrages (planchers, calibrés) : **Top1 1.68**, **Top3 1.15**, **Top5 1.05**. Un favori évident tombe au plancher.
+- **Place exacte** : cote **dynamique** = `probToCote(probExactPlace(rang, sigma, N), 1.05, 30)`. Calculée en direct côté client (rang_espere + sigma exposés par l'API cotes) selon la place choisie, **revalidée serveur** dans `POST /api/user/bets`. Place n°1 interdite (→ pari Vainqueur).
+- **Temps au dixième / à la seconde** : pas de modèle de temps absolu → heuristique basée sur la prédictibilité (`p1`) × facteur de précision (`K_EXACT_TIME_TENTH`/`_SECOND`). Cote **par athlète** (ne dépend pas du temps tapé). Dixième plafond 30, **seconde plafond 4**. *(Amélioration future : vrai modèle de temps pour une cote dépendant de la valeur.)*
+- **Top 10 / Top 20** : retirés de l'UI de paris ; colonnes + règlement conservés pour les paris déjà placés.
+
+### Bug v3 corrigé
+Les cotes place exacte / temps exact étaient figées en dur (`5.00` / `20.00`, aucune proba). Désormais calculées. Pénalité fallback autre-discipline désormais réellement appliquée.
+
 ## Discord — Onboarding & Rôles
 
 ### Structure d'accès
