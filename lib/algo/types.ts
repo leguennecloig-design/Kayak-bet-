@@ -44,8 +44,9 @@ export interface CoteResult {
   prob_top10: number; cote_top10: number
   prob_top20: number; cote_top20: number
 
-  cote_exact_place: number
-  cote_exact_time:  number
+  cote_exact_place:      number  // cote représentative (place la plus probable) ; le vrai calcul est dynamique
+  cote_exact_time:       number  // temps au dixième
+  cote_exact_time_second: number // temps à la seconde (plafond 4)
   algo_version: string
   format_course?: 'standard' | 'sprint_finale' | 'mass_start'
 }

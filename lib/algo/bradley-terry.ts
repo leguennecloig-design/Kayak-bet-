@@ -30,38 +30,49 @@ export function cumulativeNormal(z: number): number {
   return sign === 1 ? cdf : 1 - cdf;
 }
 
-// Score composite — poids SEF/NAT/IR/NUM avec redistribution si source absente
-export function calculerScoreComposite(a: AthleteInStartlist): number {
-  const {
-    W_SEF, W_NAT, W_IR, W_NUM,
-    FIAB_SEF_BASE, FIAB_SEF_INC,
-    FIAB_NAT_BASE, FIAB_NAT_INC,
-    FIAB_IR_BASE,  FIAB_IR_INC,
-  } = ALGO_PARAMS;
+// M22 avec résultats SEF 2026 → pondération spéciale (SEF prioritaire).
+export function estM22AvecSef(a: AthleteInStartlist): boolean {
+  return a.categorie.toUpperCase().includes('M22') && a.sef.length > 0;
+}
 
+// Score composite ABSOLU v4 ∈ [0,1] — national (N1 71% / IR 29%) + numérique
+// (+ SEF pour M22). Le "relatif catégorie" (Bradley-Terry) n'est PAS ici : il
+// est mélangé plus tard dans la force finale (voir computeForces). Renormalise
+// sur les sources présentes. Pénalité si repli sur l'autre discipline.
+export function calculerScoreComposite(a: AthleteInStartlist): number {
+  const P = ALGO_PARAMS;
+
+  // Classement numérique 2026 (toujours présent)
   const scoreNum = 1 / (1 + Math.log(Math.max(a.rang_national, 1)));
 
-  const scoreSef = scoreSource(a.sef) * fiabilite(a.sef.length, FIAB_SEF_BASE, FIAB_SEF_INC);
-  const scoreNat = scoreSource(a.nat) * fiabilite(a.nat.length, FIAB_NAT_BASE, FIAB_NAT_INC);
-  const scoreIr  = scoreSource(a.ir)  * fiabilite(a.ir.length,  FIAB_IR_BASE,  FIAB_IR_INC);
+  // Pénalité fallback autre discipline sur les scores de course
+  const pen = a.fallback_type === 'autre_discipline' ? P.FIAB_FALLBACK_AUTRE_DISCIPLINE : 1;
 
-  // Poids de base — ne garder que les sources avec des données
-  const poidsRaw: Record<string, number> = { num: W_NUM };
-  if (a.sef.length > 0) poidsRaw['sef'] = W_SEF;
-  if (a.nat.length > 0) poidsRaw['nat'] = W_NAT;
-  if (a.ir.length  > 0) poidsRaw['ir']  = W_IR;
+  // National = N1 (nat) + IR sous-pondérés 71/29, chacun fiabilisé
+  const scoreN1 = a.nat.length > 0 ? scoreSource(a.nat) * fiabilite(a.nat.length, P.FIAB_NAT_BASE, P.FIAB_NAT_INC) : null;
+  const scoreIr = a.ir.length  > 0 ? scoreSource(a.ir)  * fiabilite(a.ir.length,  P.FIAB_IR_BASE,  P.FIAB_IR_INC)  : null;
+  let scoreNat: number | null = null;
+  if (scoreN1 !== null && scoreIr !== null) scoreNat = P.V4_N1_RATIO * scoreN1 + P.V4_IR_RATIO * scoreIr;
+  else if (scoreN1 !== null) scoreNat = scoreN1;
+  else if (scoreIr !== null) scoreNat = scoreIr;
+  if (scoreNat !== null) scoreNat *= pen;
 
-  // Redistribuer proportionnellement
-  const total = Object.values(poidsRaw).reduce((s, p) => s + p, 0);
-  const poids: Record<string, number> = {};
-  for (const k in poidsRaw) poids[k] = poidsRaw[k] / total;
+  // SEF (M22 uniquement, si résultats disponibles)
+  const useM22Sef = estM22AvecSef(a);
+  const scoreSef = useM22Sef
+    ? scoreSource(a.sef) * fiabilite(a.sef.length, P.FIAB_SEF_BASE, P.FIAB_SEF_INC) * pen
+    : null;
 
-  let score = poids['num'] * scoreNum;
-  if ('sef' in poids) score += poids['sef'] * scoreSef;
-  if ('nat' in poids) score += poids['nat'] * scoreNat;
-  if ('ir'  in poids) score += poids['ir']  * scoreIr;
+  // Poids absolus (le relatif est appliqué dans la force finale)
+  const wNat = useM22Sef ? P.V4_M22_W_NATIONAL  : P.V4_W_NATIONAL;
+  const wNum = useM22Sef ? P.V4_M22_W_NUMERIQUE : P.V4_W_NUMERIQUE;
 
-  return score;
+  const parts: { w: number; s: number }[] = [{ w: wNum, s: scoreNum }];
+  if (scoreNat !== null) parts.push({ w: wNat, s: scoreNat });
+  if (scoreSef !== null) parts.push({ w: P.V4_M22_W_SEF, s: scoreSef });
+
+  const totalW = parts.reduce((t, p) => t + p.w, 0);
+  return parts.reduce((t, p) => t + (p.w / totalW) * p.s, 0);
 }
 
 // Ajustement confrontations directes (SEF + NAT uniquement — sources premium)
@@ -124,16 +135,20 @@ export function sigmaFor(rangEspere: number): number {
   return Math.max(SIGMA_MIN, SIGMA_FACTOR * Math.sqrt(rangEspere));
 }
 
-export function probToCote(prob: number, plafond: number): number {
-  const { MARGE, COTE_MIN } = ALGO_PARAMS;
-  const raw  = MARGE / prob;
-  const cote = Math.min(Math.max(raw, COTE_MIN), plafond);
+// v4 : conversion proba → cote, bornée [min, max] par type de pari.
+// L'ancrage (min) fait qu'un favori évident tombe au plancher (Top1 ≈ 1.68).
+export function probToCote(prob: number, min: number, max: number): number {
+  const { MARGE } = ALGO_PARAMS;
+  const raw  = MARGE / Math.max(prob, 1e-6);
+  const cote = Math.min(Math.max(raw, min), max);
   return Math.round(cote / 0.05) * 0.05;  // arrondi au 0.05
 }
 
-export function plafondTop1(rangNational: number): number {
-  const { PLAFOND_TOP1_RANG_10, PLAFOND_TOP1_RANG_20, PLAFOND_TOP1_AU_DELA } = ALGO_PARAMS;
-  if (rangNational <= 10) return PLAFOND_TOP1_RANG_10;
-  if (rangNational <= 20) return PLAFOND_TOP1_RANG_20;
-  return PLAFOND_TOP1_AU_DELA;
+// Probabilité de finir EXACTEMENT à la place N (bande [N-0.5, N+0.5] de la loi
+// normale du rang espéré). Sert au calcul dynamique de la cote "place exacte".
+export function probExactPlace(rangEspere: number, sigma: number, place: number): number {
+  const zHi = (place + 0.5 - rangEspere) / sigma;
+  const zLo = (place - 0.5 - rangEspere) / sigma;
+  const p = cumulativeNormal(zHi) - cumulativeNormal(zLo);
+  return Math.min(Math.max(p, 0.005), 0.999);
 }

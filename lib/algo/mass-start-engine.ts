@@ -6,7 +6,6 @@ import { calculateCotesForCourse } from "./cotes-engine";
 import {
   probTopN,
   probToCote,
-  plafondTop1,
   sigmaFor,
   ALGO_PARAMS,
 } from "./bradley-terry";
@@ -109,11 +108,11 @@ export function combineMassStart(
       score_final: fi,
       rang_espere: rangEspere,
       sigma,
-      prob_top1: p1, cote_top1: probToCote(p1, plafondTop1(coteV3.rang_national)),
-      prob_top3: p3, cote_top3: probToCote(p3, ALGO_PARAMS.PLAFOND_TOP3),
-      prob_top5: p5, cote_top5: probToCote(p5, ALGO_PARAMS.PLAFOND_TOP5),
-      prob_top10: p10, cote_top10: probToCote(p10, ALGO_PARAMS.PLAFOND_TOP10),
-      prob_top20: p20, cote_top20: probToCote(p20, ALGO_PARAMS.PLAFOND_TOP20),
+      prob_top1: p1, cote_top1: probToCote(p1, ALGO_PARAMS.COTE_MIN_TOP1, ALGO_PARAMS.COTE_MAX_GLOBAL),
+      prob_top3: p3, cote_top3: probToCote(p3, ALGO_PARAMS.COTE_MIN_TOP3, ALGO_PARAMS.COTE_MAX_GLOBAL),
+      prob_top5: p5, cote_top5: probToCote(p5, ALGO_PARAMS.COTE_MIN_TOP5, ALGO_PARAMS.COTE_MAX_GLOBAL),
+      prob_top10: p10, cote_top10: probToCote(p10, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_TOP10),
+      prob_top20: p20, cote_top20: probToCote(p20, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_TOP20),
       algo_version: ALGO_VERSION,
       sources_utilisees: `CLASSIQUE_WE(rang:${rangClassique})+V3`,
     });

@@ -2,10 +2,11 @@ import {
   calculerScoreComposite,
   ajusterParConfrontations,
   calculerRangEspere,
+  estM22AvecSef,
   sigmaFor,
   probTopN,
   probToCote,
-  plafondTop1,
+  probExactPlace,
   ALGO_PARAMS,
 } from './bradley-terry';
 import type { AthleteInStartlist, CoteResult, FallbackType } from './types';
@@ -148,15 +149,28 @@ function resolveFallback(h: V3History): {
 
 // ── computeForces ─────────────────────────────────────────────────────────────
 
+// v4 — double passe Bradley-Terry pour intégrer "relatif catégorie" (25% std,
+// 10% M22-SEF) sans perdre le comparatif intra-catégorie qui produit le rang.
+//  1. S_abs (national+numérique[+SEF]) + ajustement confrontations, clampé [0,1].
+//  2. 1re passe BT sur S_abs → S_rel ∈ [0,1] (rang relatif dans la catégorie).
+//  3. Force finale = (1-wRel)·S_abs + wRel·S_rel. Le buildCoteResult fait la
+//     2e passe BT (rang espéré final) sur ces forces.
 function computeForces(startlist: AthleteInStartlist[]): Map<string, number> {
-  const forces = new Map<string, number>();
-  const scores = new Map<string, number>();
-
+  const scoresAbs = new Map<string, number>();
   for (const a of startlist) {
-    scores.set(a.code_bateau, calculerScoreComposite(a));
+    const base = calculerScoreComposite(a);
+    const adj  = ajusterParConfrontations(a, startlist, base);
+    scoresAbs.set(a.code_bateau, Math.max(0, Math.min(1, adj)));
   }
+
+  const N = startlist.length;
+  const forces = new Map<string, number>();
   for (const a of startlist) {
-    forces.set(a.code_bateau, ajusterParConfrontations(a, startlist, scores.get(a.code_bateau)!));
+    const rangEsp1 = calculerRangEspere(a, scoresAbs);
+    const sRel = N > 1 ? Math.max(0, Math.min(1, 1 - (rangEsp1 - 1) / (N - 1))) : 1;
+    const wRel = estM22AvecSef(a) ? ALGO_PARAMS.V4_M22_W_RELATIF : ALGO_PARAMS.V4_W_RELATIF;
+    const sAbs = scoresAbs.get(a.code_bateau)!;
+    forces.set(a.code_bateau, (1 - wRel) * sAbs + wRel * sRel);
   }
   return forces;
 }
@@ -169,6 +183,7 @@ function buildCoteResult(
   scoreComposite: number,
   startlistLen: number
 ): CoteResult {
+  const P = ALGO_PARAMS;
   const rangEspere = calculerRangEspere(a, forces);
   const sigma      = sigmaFor(rangEspere);
 
@@ -177,6 +192,22 @@ function buildCoteResult(
   const p5  = probTopN(rangEspere, sigma, 5);
   const p10 = probTopN(rangEspere, sigma, 10);
   const p20 = probTopN(rangEspere, sigma, 20);
+
+  // Place exacte — cote REPRÉSENTATIVE (place la plus probable = round(rang
+  // espéré)). La vraie cote est calculée dynamiquement selon la place choisie
+  // (côté client/serveur, via rang_espere + sigma exposés).
+  const placeProbable = Math.max(1, Math.round(rangEspere));
+  const pPlace = probExactPlace(rangEspere, sigma, placeProbable);
+  const coteExactPlace = probToCote(pPlace, P.COTE_MIN_EXACT, P.COTE_MAX_GLOBAL);
+
+  // Temps exact — pas de modèle de temps absolu : heuristique basée sur la
+  // prédictibilité (prob d'être la performance de référence = p1) × précision.
+  const coteExactTime = probToCote(p1 * P.K_EXACT_TIME_TENTH, P.COTE_MIN_EXACT, P.COTE_MAX_GLOBAL);
+  const coteExactTimeSecond = probToCote(
+    p1 * P.K_EXACT_TIME_SECOND,
+    P.COTE_MIN_EXACT_TIME_SECOND,
+    P.COTE_MAX_EXACT_TIME_SECOND
+  );
 
   return {
     code_bateau:           a.code_bateau,
@@ -192,14 +223,15 @@ function buildCoteResult(
     sigma,
     fallback_type:         a.fallback_type,
     sources_utilisees:     buildSourcesLabel(a.sef, a.nat, a.ir),
-    prob_top1:  p1,  cote_top1:  probToCote(p1,  plafondTop1(a.rang_national)),
-    prob_top3:  p3,  cote_top3:  probToCote(p3,  ALGO_PARAMS.PLAFOND_TOP3),
-    prob_top5:  p5,  cote_top5:  probToCote(p5,  ALGO_PARAMS.PLAFOND_TOP5),
-    prob_top10: p10, cote_top10: probToCote(p10, ALGO_PARAMS.PLAFOND_TOP10),
-    prob_top20: p20, cote_top20: probToCote(p20, ALGO_PARAMS.PLAFOND_TOP20),
-    cote_exact_place: 5.00,
-    cote_exact_time:  20.00,
-    algo_version:     ALGO_PARAMS.ALGO_VERSION,
+    prob_top1:  p1,  cote_top1:  probToCote(p1,  P.COTE_MIN_TOP1, P.COTE_MAX_GLOBAL),
+    prob_top3:  p3,  cote_top3:  probToCote(p3,  P.COTE_MIN_TOP3, P.COTE_MAX_GLOBAL),
+    prob_top5:  p5,  cote_top5:  probToCote(p5,  P.COTE_MIN_TOP5, P.COTE_MAX_GLOBAL),
+    prob_top10: p10, cote_top10: probToCote(p10, P.COTE_MIN_EXACT, P.COTE_MAX_TOP10),
+    prob_top20: p20, cote_top20: probToCote(p20, P.COTE_MIN_EXACT, P.COTE_MAX_TOP20),
+    cote_exact_place:       coteExactPlace,
+    cote_exact_time:        coteExactTime,
+    cote_exact_time_second: coteExactTimeSecond,
+    algo_version:           P.ALGO_VERSION,
   };
 }
 
