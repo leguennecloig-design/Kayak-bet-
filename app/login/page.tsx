@@ -481,11 +481,13 @@ function InstallGuide() {
    Main login page
 ================================================================ */
 export default function LoginPage() {
-  const [mode,     setMode]     = useState<Mode>(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("welcome") === "1"
-      ? "welcome"
-      : "login"
-  );
+  const [mode,     setMode]     = useState<Mode>(() => {
+    if (typeof window === "undefined") return "login";
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("welcome") === "1") return "welcome";
+    if (params.get("mode") === "signup") return "signup";
+    return "login";
+  });
   const [revealBalance, setRevealBalance] = useState(0);
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -560,13 +562,36 @@ export default function LoginPage() {
       return;
     }
 
-    // La création de compte se fait uniquement via Google (bouton dédié,
-    // handleGoogle) — plus de formulaire email/mot de passe pour l'inscription,
-    // donc plus besoin de gérer signUp()/mail de confirmation ici. Les comptes
-    // email/mot de passe déjà existants peuvent toujours se connecter.
-    const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captchaToken || undefined } });
-    if (error) { setError(error.message); resetCaptcha(); }
-    else { setMode("welcome"); }
+    if (mode === "signup") {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${location.origin}/auth/callback`, captchaToken: captchaToken || undefined },
+      });
+      if (error) {
+        if (/already registered/i.test(error.message)) {
+          setError("Un compte existe déjà avec cette adresse e-mail. Connecte-toi plutôt.");
+        } else {
+          setError(error.message);
+        }
+        resetCaptcha();
+      } else if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        // Anti-énumération Supabase : le compte existe déjà mais n'a jamais été confirmé —
+        // signUp() renvoie un succès obfusqué (identities vide) au lieu d'une erreur.
+        setError("Un compte existe déjà avec cette adresse e-mail. Connecte-toi, ou vérifie ta boîte mail si tu ne l'as jamais confirmé.");
+        resetCaptcha();
+      } else if (data.session) {
+        // "Confirm email" désactivé côté Supabase (ou compte auto-confirmé) : signUp()
+        // renvoie directement une session active, pas de mail à attendre.
+        setMode("welcome");
+      } else {
+        setMode("sent");
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captchaToken || undefined } });
+      if (error) { setError(error.message); resetCaptcha(); }
+      else { setMode("welcome"); }
+    }
 
     setLoading(false);
   }
@@ -876,78 +901,66 @@ export default function LoginPage() {
               </button>
             )}
 
-            {/* Inscription : Google uniquement, pas de formulaire email/mot de passe
-                (évite tout le sujet des emails de confirmation à envoyer). */}
-            {isSignup && error && (
-              <p className="font-archivo text-[13px] rounded-[10px] px-4 py-3 mt-5" style={{ color: "#FF7A45", background: "rgba(255,122,69,.1)", border: "1px solid rgba(255,122,69,.25)" }}>
-                {error}
-              </p>
-            )}
+            {/* Divider */}
+            {!isForgot && <div className="lp-divider"><span>ou</span></div>}
+            {isForgot  && <div style={{ marginTop: "24px" }} />}
 
-            {!isSignup && (
-              <>
-                {/* Divider */}
-                {!isForgot && <div className="lp-divider"><span>ou</span></div>}
-                {isForgot  && <div style={{ marginTop: "24px" }} />}
+            {/* Form — partagé login/signup (email + mot de passe) */}
+            <form onSubmit={handleSubmit}>
+              <div className="lp-field">
+                <label htmlFor="lp-email">Adresse e-mail</label>
+                <div>
+                  <input id="lp-email" type="email" placeholder="prenom.nom@email.com" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} />
+                </div>
+              </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit}>
-                  <div className="lp-field">
-                    <label htmlFor="lp-email">Adresse e-mail</label>
-                    <div>
-                      <input id="lp-email" type="email" placeholder="prenom.nom@email.com" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} />
-                    </div>
+              {!isForgot && (
+                <div className="lp-field">
+                  <label htmlFor="lp-pw">Mot de passe</label>
+                  <div className="lp-field-pw">
+                    <input id="lp-pw" type={showPw ? "text" : "password"} placeholder="••••••••" autoComplete={isSignup ? "new-password" : "current-password"} required minLength={6} value={password} onChange={e => setPassword(e.target.value)} />
+                    <button type="button" className="lp-pw-toggle" aria-label={showPw ? "Masquer" : "Afficher le mot de passe"} onClick={() => setShowPw(v => !v)}>
+                      {showPw ? <EyeOff /> : <EyeOpen />}
+                    </button>
                   </div>
+                </div>
+              )}
 
-                  {!isForgot && (
-                    <div className="lp-field">
-                      <label htmlFor="lp-pw">Mot de passe</label>
-                      <div className="lp-field-pw">
-                        <input id="lp-pw" type={showPw ? "text" : "password"} placeholder="••••••••" autoComplete="current-password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} />
-                        <button type="button" className="lp-pw-toggle" aria-label={showPw ? "Masquer" : "Afficher le mot de passe"} onClick={() => setShowPw(v => !v)}>
-                          {showPw ? <EyeOff /> : <EyeOpen />}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {mode === "login" && (
-                    <div className="flex items-center justify-between mt-[2px] mb-[26px]">
-                      <label className="lp-remember">
-                        <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
-                        Se souvenir de moi
-                      </label>
-                      <button
-                        type="button"
-                        className="font-archivo font-bold text-[13px] transition-colors"
-                        style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }}
-                        onClick={() => switchMode("forgot")}
-                        onMouseOver={e => (e.currentTarget.style.color = "#fff")}
-                        onMouseOut={e => (e.currentTarget.style.color = "var(--cyan)")}
-                      >
-                        Mot de passe oublié ?
-                      </button>
-                    </div>
-                  )}
-
-                  {TURNSTILE_SITE_KEY && (
-                    <div style={{ margin: "4px 0 18px" }}>
-                      <Turnstile onToken={setCaptchaToken} onExpire={() => setCaptchaToken("")} resetKey={captchaReset} />
-                    </div>
-                  )}
-
-                  {error && (
-                    <p className="font-archivo text-[13px] rounded-[10px] px-4 py-3 mb-4" style={{ color: "#FF7A45", background: "rgba(255,122,69,.1)", border: "1px solid rgba(255,122,69,.25)" }}>
-                      {error}
-                    </p>
-                  )}
-
-                  <button type="submit" disabled={loading} className="lp-btn-primary" style={{ marginTop: mode === "login" ? 0 : "26px" }}>
-                    {loading ? "Chargement…" : isForgot ? "Envoyer le lien" : "Se connecter"}
+              {mode === "login" && (
+                <div className="flex items-center justify-between mt-[2px] mb-[26px]">
+                  <label className="lp-remember">
+                    <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+                    Se souvenir de moi
+                  </label>
+                  <button
+                    type="button"
+                    className="font-archivo font-bold text-[13px] transition-colors"
+                    style={{ color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }}
+                    onClick={() => switchMode("forgot")}
+                    onMouseOver={e => (e.currentTarget.style.color = "#fff")}
+                    onMouseOut={e => (e.currentTarget.style.color = "var(--cyan)")}
+                  >
+                    Mot de passe oublié ?
                   </button>
-                </form>
-              </>
-            )}
+                </div>
+              )}
+
+              {TURNSTILE_SITE_KEY && (
+                <div style={{ margin: "4px 0 18px" }}>
+                  <Turnstile onToken={setCaptchaToken} onExpire={() => setCaptchaToken("")} resetKey={captchaReset} />
+                </div>
+              )}
+
+              {error && (
+                <p className="font-archivo text-[13px] rounded-[10px] px-4 py-3 mb-4" style={{ color: "#FF7A45", background: "rgba(255,122,69,.1)", border: "1px solid rgba(255,122,69,.25)" }}>
+                  {error}
+                </p>
+              )}
+
+              <button type="submit" disabled={loading} className="lp-btn-primary" style={{ marginTop: mode === "login" ? 0 : "26px" }}>
+                {loading ? "Chargement…" : isForgot ? "Envoyer le lien" : isSignup ? "Créer mon compte" : "Se connecter"}
+              </button>
+            </form>
           </div>
         </div>
 

@@ -133,7 +133,7 @@ export default function Hero() {
             Pronostiquez sur le circuit mondial de kayak de descente. Crédits fictifs, zéro risque, sensations garanties.
           </p>
           <div className="hero-cta flex flex-col min-[561px]:flex-row gap-[13px] mt-9 flex-wrap">
-            <a className="btn btn-primary w-full min-[561px]:w-auto" href="/login">
+            <a className="btn btn-primary w-full min-[561px]:w-auto" href="/login?mode=signup">
               Créer mon compte gratuit
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />

@@ -112,7 +112,7 @@ export default function CtaBand() {
             ton premier coupon dès aujourd'hui.
           </p>
           <div className="relative z-[1] flex flex-col min-[561px]:flex-row gap-[13px] justify-center mt-8 flex-wrap">
-            <a className="btn btn-primary w-full min-[561px]:w-auto" href="/login">
+            <a className="btn btn-primary w-full min-[561px]:w-auto" href="/login?mode=signup">
               Créer mon compte gratuit
               <svg viewBox="0 0 24 24" fill="none">
                 <path

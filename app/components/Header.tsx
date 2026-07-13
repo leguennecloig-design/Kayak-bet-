@@ -36,7 +36,7 @@ export default function Header() {
           >
             Connexion
           </a>
-          <a className="btn btn-primary" href="/login">
+          <a className="btn btn-primary" href="/login?mode=signup">
             Créer mon compte
           </a>
         </div>
@@ -67,7 +67,7 @@ export default function Header() {
           <div className="flex flex-col gap-[11px] mt-[18px]">
             <a
               className="btn btn-primary"
-              href="/login"
+              href="/login?mode=signup"
               onClick={() => setOpen(false)}
             >
               Créer mon compte
