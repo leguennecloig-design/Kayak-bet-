@@ -84,6 +84,12 @@ export async function GET(
     };
   });
 
+  const { data: linkedAthleteRow } = await adminSb
+    .from("athletes")
+    .select("id, nom, prenom, club, categorie, rang_national")
+    .eq("linked_user_id", targetId)
+    .maybeSingle();
+
   const name = displayName(row);
 
   // Statut d'amitié avec le visiteur connecté (si différent du profil consulté)
@@ -119,5 +125,13 @@ export async function GET(
     bets,
     friendshipStatus,
     friendshipId,
+    linkedAthlete: linkedAthleteRow ? {
+      id:           linkedAthleteRow.id,
+      nom:          linkedAthleteRow.nom,
+      prenom:       linkedAthleteRow.prenom,
+      club:         linkedAthleteRow.club,
+      categorie:    linkedAthleteRow.categorie,
+      rangNational: linkedAthleteRow.rang_national,
+    } : null,
   });
 }

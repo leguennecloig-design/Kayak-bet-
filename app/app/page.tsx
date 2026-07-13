@@ -357,6 +357,7 @@ type PublicProfile = {
   bets: BetRecord[];
   friendshipStatus?: FriendshipStatus;
   friendshipId?: string | null;
+  linkedAthlete?: LinkedAthlete | null;
 };
 
 type FriendEntry = {
@@ -389,7 +390,7 @@ type ProfilViewProps = {
   seasonLabel: string;
 };
 
-type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null };
+type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null; rangNational?: number | null };
 
 /* ----------------------------------------------------------------
    Sub-views — defined OUTSIDE DashboardPage so React never
@@ -897,6 +898,27 @@ function PlayerProfileView({ playerId, onBack, seasonLabel }: PlayerProfileViewP
 
           <ProfilStatsRow bets={profile.totalBets} wins={profile.wins} winRate={profile.winRate} balance={profile.balance} />
 
+          {profile.linkedAthlete && (
+            <div className="profil-section">
+              <div className="profil-section-head">
+                <span>Athlète lié</span>
+              </div>
+              <div className="linked-athlete-card">
+                <div className="linked-athlete-av">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 2 7l10 5 10-5-10-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M6 10v6c0 1.5 2.7 3 6 3s6-1.5 6-3v-6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+                </div>
+                <div className="linked-athlete-info">
+                  <span className="nm">{profile.linkedAthlete.prenom} {profile.linkedAthlete.nom}</span>
+                  <span className="meta">
+                    {profile.linkedAthlete.club ?? "Circuit national"}
+                    {profile.linkedAthlete.categorie ? ` · ${profile.linkedAthlete.categorie}` : ""}
+                    {profile.linkedAthlete.rangNational ? ` · Rang national ${profile.linkedAthlete.rangNational}` : ""}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="profil-section">
             <div className="profil-section-head">
               <span>Historique des paris</span>
@@ -1089,6 +1111,44 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
     loadFriends();
   }
 
+  // Recherche d'amis par pseudo (debounce 300ms), pour envoyer une demande.
+  const [friendQ, setFriendQ] = useState("");
+  const [friendResults, setFriendResults] = useState<{ id: string; username: string; initials: string; avatarUrl: string | null }[]>([]);
+  const [friendSearching, setFriendSearching] = useState(false);
+  const [friendRequestSentTo, setFriendRequestSentTo] = useState<Set<string>>(new Set());
+  const friendDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (friendDebounceRef.current) clearTimeout(friendDebounceRef.current);
+    if (friendQ.trim().length < 2) { setFriendResults([]); return; }
+    setFriendSearching(true);
+    friendDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(friendQ.trim())}`);
+        const json = await res.json();
+        setFriendResults(json.users ?? []);
+      } catch {
+        setFriendResults([]);
+      } finally {
+        setFriendSearching(false);
+      }
+    }, 300);
+    return () => { if (friendDebounceRef.current) clearTimeout(friendDebounceRef.current); };
+  }, [friendQ]);
+
+  async function sendFriendRequest(targetUserId: string) {
+    setFriendRequestSentTo(prev => new Set(prev).add(targetUserId));
+    try {
+      await fetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId }),
+      });
+    } catch {
+      /* le bouton reste sur "Envoyée" par optimisme — pas critique si ça a raté */
+    }
+  }
+
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   const [leaguesLoaded, setLeaguesLoaded] = useState(false);
   const [leagueForm, setLeagueForm] = useState<"none" | "create" | "join">("none");
@@ -1240,6 +1300,37 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
           <span>Mes amis</span>
           <span className="ps-count">{friends.length} ami{friends.length !== 1 ? "s" : ""}</span>
         </div>
+
+        <div className="friend-search">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" /><path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+          <input
+            type="text"
+            value={friendQ}
+            onChange={(e) => setFriendQ(e.target.value)}
+            placeholder="Chercher un joueur par pseudo…"
+          />
+        </div>
+        {friendSearching && <p className="friend-search-status">Recherche…</p>}
+        {friendResults.length > 0 && (
+          <div className="friend-search-results">
+            {friendResults.map((u) => (
+              <div key={u.id} className="friend-search-row">
+                <div className="av" role="button" tabIndex={0} onClick={() => onOpenProfile(u.id)}>
+                  {u.avatarUrl ? <img src={u.avatarUrl} alt="" /> : u.initials}
+                </div>
+                <span className="nm" role="button" tabIndex={0} onClick={() => onOpenProfile(u.id)}>{u.username}</span>
+                <button
+                  className="friend-search-add"
+                  disabled={friendRequestSentTo.has(u.id)}
+                  onClick={() => sendFriendRequest(u.id)}
+                >
+                  {friendRequestSentTo.has(u.id) ? "Envoyée ✓" : "Ajouter"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {incoming.length > 0 && (
           <div className="friend-requests">
             {incoming.map((f) => (

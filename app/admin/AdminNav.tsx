@@ -35,6 +35,10 @@ const GROUPS: NavGroup[] = [
     links: [{ href: "/admin/seasons", label: "Saisons" }],
   },
   {
+    label: "Joueurs",
+    links: [{ href: "/admin/joueurs", label: "Gestion des jetons" }],
+  },
+  {
     label: "Récompenses",
     links: [{ href: "/admin/instagram", label: "Bonus Instagram" }],
   },
