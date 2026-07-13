@@ -152,15 +152,15 @@
   border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--border-2);
-  color: var(--soft);
+  color: var(--idle);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color .15s, color .15s;
+  transition: border-color .15s, color .15s, background .15s;
 }
-.kb-app .notif-bell:hover { border-color: rgba(40,215,230,.4); color: #fff; }
-.kb-app .notif-bell svg { width: 20px; height: 20px; }
+.kb-app .notif-bell:hover { border-color: rgba(40,215,230,.4); color: #fff; background: var(--surface-hi); }
+.kb-app .notif-bell svg { width: 21px; height: 21px; }
 .kb-app .notif-bell-badge {
   position: absolute;
   top: -5px;
@@ -1241,6 +1241,66 @@
   }
   .kb-app .balance .k {
     display: none;
+  }
+  /* En-tête compacte mobile — sans ça, logo + solde + cloche + avatar
+     dépassent largement la largeur d'un téléphone (padding .wrap 32px de
+     chaque côté + tous les éléments à taille desktop) ; avec overflow-x:
+     hidden sur body, le surplus n'apparaît pas en scroll, il est juste
+     rogné/écrasé silencieusement — d'où la cloche (et parfois l'avatar)
+     mal lisibles ou coupés. */
+  .kb-app header.site .wrap {
+    padding: 0 14px;
+  }
+  .kb-app .nav-in {
+    gap: 10px;
+  }
+  .kb-app .head-right {
+    gap: 6px;
+  }
+  .kb-app .balance {
+    padding: 7px 9px;
+    gap: 7px;
+  }
+  .kb-app .balance .v {
+    font-size: 15px;
+  }
+  .kb-app .balance .plus {
+    width: 22px;
+    height: 22px;
+  }
+  .kb-app .notif-bell {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  .kb-app .notif-bell svg {
+    width: 18px;
+    height: 18px;
+  }
+  .kb-app .notif-bell-badge {
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    font-size: 9px;
+    line-height: 16px;
+  }
+  .kb-app .avatar {
+    padding: 3px;
+  }
+  .kb-app .avatar .pic {
+    width: 34px;
+    height: 34px;
+  }
+  .kb-app .logo {
+    gap: 8px;
+  }
+  .kb-app .logo .drop {
+    width: 24px;
+    height: 27px;
+  }
+  .kb-app .logo .wm {
+    font-size: 19px;
   }
   .kb-app main {
     padding: 22px 0 110px;

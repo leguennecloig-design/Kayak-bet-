@@ -22,8 +22,8 @@ type Incoming = {
 
 const BellSvg = () => (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M6 10.5a6 6 0 0 1 12 0c0 3.6 1 5 2 6H4c1-1 2-2.4 2-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-    <path d="M9.7 19.5a2.3 2.3 0 0 0 4.6 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M6 10.5a6 6 0 0 1 12 0c0 3.6 1 5 2 6H4c1-1 2-2.4 2-6Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M9.7 19.5a2.3 2.3 0 0 0 4.6 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 
