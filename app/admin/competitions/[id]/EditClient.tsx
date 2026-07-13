@@ -46,6 +46,12 @@ type Participant = {
   code_bateau?: string | null;
   cote_top3?: number | null;
   cote_top5?: number | null;
+  cote_top10?: number | null;
+};
+
+type AdvancedCoteField = "cote_top3" | "cote_top5" | "cote_top10";
+const ADVANCED_COTE_LABEL: Record<AdvancedCoteField, string> = {
+  cote_top3: "T3", cote_top5: "T5", cote_top10: "T10",
 };
 
 type AthleteResult = {
@@ -114,6 +120,11 @@ export default function EditClient({
   // Edit participant inline
   const [editId,   setEditId]   = useState<string | null>(null);
   const [editCote, setEditCote] = useState("");
+
+  // Edit cotes avancées (T3/T5/T10) inline — vivent dans la table `cotes`,
+  // pas `participants` (voir saveAdvancedCote).
+  const [editAdv,      setEditAdv]      = useState<{ pid: string; field: AdvancedCoteField } | null>(null);
+  const [editAdvValue, setEditAdvValue] = useState("");
 
   // Athlete search
   const [showAthleteSearch, setShowAthleteSearch] = useState(false);
@@ -236,6 +247,24 @@ export default function EditClient({
           .sort((a, b) => (a.cote ?? 99) - (b.cote ?? 99))
       );
       setEditId(null);
+    }
+  }
+
+  /* ---- Modifier une cote avancée (T3/T5/T10) d'un participant ---- */
+  async function saveAdvancedCote(pid: string, field: AdvancedCoteField) {
+    const res = await fetch(`/api/admin/competitions/${compId}/participants/${pid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: editAdvValue }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setParticipants((prev) =>
+        prev.map((p) => p.id === pid ? { ...p, [field]: parseFloat(editAdvValue) } : p)
+      );
+      setEditAdv(null);
+    } else {
+      setPError(json.error ?? "Erreur");
     }
   }
 
@@ -533,19 +562,41 @@ export default function EditClient({
                   )}
                 </div>
 
-                {/* Cotes avancées Top3 / Top5 (calculées par l'algo) */}
-                {(p.cote_top3 != null || p.cote_top5 != null) && (
+                {/* Cotes avancées Top3 / Top5 / Top10 — cliquables pour éditer */}
+                {(p.cote_top3 != null || p.cote_top5 != null || p.cote_top10 != null) && (
                   <div className="flex items-center gap-1.5 flex-none">
-                    {p.cote_top3 != null && (
-                      <span className="font-grotesk font-bold text-[10px] text-[#9fbac6] bg-[rgba(255,255,255,.04)] border border-[var(--border-2)] rounded-[7px] px-2 py-1" title="Cote Top 3">
-                        T3 <span className="text-white">{p.cote_top3.toFixed(2)}</span>
-                      </span>
-                    )}
-                    {p.cote_top5 != null && (
-                      <span className="font-grotesk font-bold text-[10px] text-[#9fbac6] bg-[rgba(255,255,255,.04)] border border-[var(--border-2)] rounded-[7px] px-2 py-1" title="Cote Top 5">
-                        T5 <span className="text-white">{p.cote_top5.toFixed(2)}</span>
-                      </span>
-                    )}
+                    {(["cote_top3", "cote_top5", "cote_top10"] as AdvancedCoteField[]).map((field) => {
+                      const value = p[field];
+                      if (value == null) return null;
+                      const isEditing = editAdv?.pid === p.id && editAdv.field === field;
+                      if (isEditing) {
+                        return (
+                          <span key={field} className="flex items-center gap-1 flex-none">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="1"
+                              value={editAdvValue}
+                              onChange={(e) => setEditAdvValue(e.target.value)}
+                              autoFocus
+                              className="w-14 bg-[rgba(40,215,230,.08)] border border-[rgba(40,215,230,.5)] rounded-[6px] px-1.5 py-0.5 text-[#28D7E6] font-archivo font-bold text-[11px] outline-none text-center"
+                            />
+                            <button onClick={() => saveAdvancedCote(p.id, field)} className="text-[#28D7E6] font-archivo font-bold text-[11px] hover:underline">✓</button>
+                            <button onClick={() => setEditAdv(null)} className="text-[#5c7c8c] font-archivo text-[11px] hover:text-white">✕</button>
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          key={field}
+                          onClick={() => { setEditAdv({ pid: p.id, field }); setEditAdvValue(String(value)); }}
+                          className="font-grotesk font-bold text-[10px] text-[#9fbac6] bg-[rgba(255,255,255,.04)] border border-[var(--border-2)] rounded-[7px] px-2 py-1 hover:border-[rgba(40,215,230,.4)] hover:text-white transition-colors"
+                          title={`Cliquer pour modifier la cote ${ADVANCED_COTE_LABEL[field]}`}
+                        >
+                          {ADVANCED_COTE_LABEL[field]} <span className="text-white">{value.toFixed(2)}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

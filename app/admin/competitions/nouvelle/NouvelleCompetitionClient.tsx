@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 import ManualCreationClient from "./ManualCreationClient";
+import ImportCotesFileClient from "./ImportCotesFileClient";
 import InscriptionsClient from "../../inscriptions/InscriptionsClient";
 
-type Mode = "ffck" | "manuel" | null;
+type Mode = "ffck" | "manuel" | "cotes" | null;
 
 export default function NouvelleCompetitionClient() {
   const [mode, setMode] = useState<Mode>(null);
 
   if (mode === "manuel") {
     return <ManualCreationClient onBack={() => setMode(null)} />;
+  }
+
+  if (mode === "cotes") {
+    return <ImportCotesFileClient onBack={() => setMode(null)} />;
   }
 
   if (mode === "ffck") {
@@ -40,6 +45,24 @@ export default function NouvelleCompetitionClient() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button
+          onClick={() => setMode("cotes")}
+          className="text-left bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] hover:border-[rgba(40,215,230,.4)] rounded-[18px] p-6 transition-colors group sm:col-span-2"
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-cyan mb-4">
+            <path d="M4 19V5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M14 3v6h6M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <p className="font-archivo font-extrabold text-[16px] text-white group-hover:text-cyan transition-colors">
+            Import cotes précalculées (.txt)
+          </p>
+          <p className="font-archivo text-[12.5px] text-[#7c9aaa] mt-2 leading-relaxed">
+            La liste de départ ET les cotes (Top1/Top3/Top5/Top10) ont déjà été
+            calculées ailleurs — importe le fichier .txt directement, sans repasser
+            par l&apos;algo interne.
+          </p>
+        </button>
+
         <button
           onClick={() => setMode("ffck")}
           className="text-left bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] hover:border-[rgba(40,215,230,.4)] rounded-[18px] p-6 transition-colors group"

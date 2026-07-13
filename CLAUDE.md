@@ -41,6 +41,12 @@ Valeurs tunables (`RANG_NUM_CAP10_*`/`RANG_NUM_CAP20_*` dans `params.ts`), à aj
 ### Bug v3 corrigé
 Les cotes place exacte / temps exact étaient figées en dur (`5.00` / `20.00`, aucune proba). Désormais calculées. Pénalité fallback autre-discipline désormais réellement appliquée.
 
+### Import de cotes précalculées (.txt)
+Troisième mode de création (`app/admin/competitions/nouvelle/NouvelleCompetitionClient.tsx`, à côté de "Inscriptions FFCK" et "Création manuelle") : `ImportCotesFileClient.tsx` accepte un fichier `.txt` où la startlist ET les cotes (Top1/Top3/Top5/Top10, par catégorie) ont déjà été calculées ailleurs — **aucun recalcul** n'est fait, les valeurs du fichier sont enregistrées telles quelles.
+- Format attendu (parseur `lib/algo/external-cotes-parser.ts`) : sections `<Libellé> (<CODE>) – N partant(s)` suivies d'un tableau `Dos / Nom / Club / T1 / T3 / T5 / T10` (padding ≥ 2 espaces entre colonnes ; `N/D` = marché non pertinent → `null`). Parsing structurel robuste à l'encodage (split sur les espaces de padding, pas sur la position de colonne) ; extraction du nom/lieu/dates de l'en-tête en best-effort, toujours éditable avant création.
+- `POST /api/admin/parse-cotes-file` (preview, ne touche pas la DB) → `POST /api/admin/import-cotes-file` (crée `competitions` avec `algo_type: null`, puis `participants` + `cotes` directement, `code_bateau` synthétique `${categorie}-${dossard}`).
+- Cotes avancées T3/T5/T10 éditables en ligne dans la startlist admin (`EditClient.tsx`, à côté de la cote Top1 déjà éditable) — `PATCH /api/admin/competitions/[id]/participants/[pid]` accepte maintenant `cote_top3`/`cote_top5`/`cote_top10` en plus de `cote`/`nom`/`pays`, mis à jour sur la table `cotes` (jointe par `competition_id` + `code_bateau`).
+
 ## Discord — Onboarding & Rôles
 
 ### Structure d'accès

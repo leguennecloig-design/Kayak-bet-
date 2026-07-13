@@ -40,7 +40,7 @@ export default async function EditCompetition({
   const { data: cotesRows } = codesBateaux.length > 0
     ? await supabase
         .from("cotes")
-        .select("code_bateau, cote_top3, cote_top5")
+        .select("code_bateau, cote_top3, cote_top5, cote_top10")
         .eq("competition_id", params.id)
         .in("code_bateau", codesBateaux)
     : { data: [] };
@@ -51,8 +51,9 @@ export default async function EditCompetition({
     const extra = p.code_bateau ? cotesByCode.get(p.code_bateau as string) : undefined;
     return {
       ...p,
-      cote_top3: (extra?.cote_top3 as number | null) ?? null,
-      cote_top5: (extra?.cote_top5 as number | null) ?? null,
+      cote_top3:  (extra?.cote_top3  as number | null) ?? null,
+      cote_top5:  (extra?.cote_top5  as number | null) ?? null,
+      cote_top10: (extra?.cote_top10 as number | null) ?? null,
     };
   });
 
