@@ -144,6 +144,17 @@ export function probToCote(prob: number, min: number, max: number): number {
   return Math.round(cote / 0.05) * 0.05;  // arrondi au 0.05
 }
 
+// v4.2 — garde-fou : un athlète classé numériquement dans le top 10/20
+// (rang_national ≤ 10 ou ≤ 20) est un favori réel — sa cote ne doit jamais
+// dépasser le plafond correspondant, même si le calcul Bradley-Terry (dilué
+// par des données de course faibles/absentes) produit un résultat plus haut.
+// Appliqué en dernier recours, par-dessus le clamp [min, max] habituel.
+export function capCoteByRangNumerique(cote: number, rangNational: number, cap10: number, cap20: number): number {
+  if (rangNational <= 10) return Math.min(cote, cap10);
+  if (rangNational <= 20) return Math.min(cote, cap20);
+  return cote;
+}
+
 // Probabilité de finir EXACTEMENT à la place N (bande [N-0.5, N+0.5] de la loi
 // normale du rang espéré). Sert au calcul dynamique de la cote "place exacte".
 export function probExactPlace(rangEspere: number, sigma: number, place: number): number {

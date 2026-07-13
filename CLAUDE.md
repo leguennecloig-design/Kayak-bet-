@@ -26,10 +26,17 @@ Normalisé sur les sources présentes, ∈ [0,1] :
 > Architecture volontairement tunable (« flou » assumé), à affiner après tests réels.
 
 ### Cotes (`probToCote(prob, min, max)`, `bradley-terry.ts`)
-`cote = clamp(MARGE/prob, min, max)` arrondi au 0.05. **Plafond global 30.** Ancrages (planchers, calibrés) : **Top1 1.68**, **Top3 1.15**, **Top5 1.05**. Un favori évident tombe au plancher.
+`cote = clamp(MARGE/prob, min, max)` arrondi au 0.05. Ancrages (planchers, calibrés) : **Top1 1.68**, **Top3 1.15**, **Top5 1.05**. Un favori évident tombe au plancher. Plafonds (v4.2, resserrés) : **Top1 30**, **Top3 15**, **Top5 10**, **Top10 8**, Top20 8 (legacy).
 - **Place exacte** : cote **dynamique** = `probToCote(probExactPlace(rang, sigma, N), 1.05, 30)`. Calculée en direct côté client (rang_espere + sigma exposés par l'API cotes) selon la place choisie, **revalidée serveur** dans `POST /api/user/bets`. Place n°1 interdite (→ pari Vainqueur).
 - **Temps au dixième / à la seconde** : pas de modèle de temps absolu → heuristique basée sur la prédictibilité (`p1`) × facteur de précision (`K_EXACT_TIME_TENTH`/`_SECOND`). Cote **par athlète** (ne dépend pas du temps tapé). Dixième plafond 30, **seconde plafond 4**. *(Amélioration future : vrai modèle de temps pour une cote dépendant de la valeur.)*
 - **Top 10 / Top 20** : retirés de l'UI de paris ; colonnes + règlement conservés pour les paris déjà placés.
+
+### Garde-fou classement numérique — v4.2 (`capCoteByRangNumerique`, `bradley-terry.ts`)
+Un athlète bien classé au classement numérique 2026 (`rang_national`) est un favori réel, même si son composite est dilué par des résultats de course faibles ou absents — le Bradley-Terry seul ne suffisait pas toujours à l'en sortir (cotes aberrantes malgré un bon classement). Cape directement `cote_top1/3/5/10`, **par-dessus** le clamp `[min,max]` habituel, appliqué dans `cotes-engine.ts`/`mass-start-engine.ts`/`sprint-finale-engine.ts` :
+- `rang_national ≤ 10` → Top1 ≤ **10**, Top3 ≤ **6**, Top5 ≤ **4**, Top10 ≤ **3**.
+- `rang_national ≤ 20` → Top1 ≤ **20**, Top3 ≤ **12**, Top5 ≤ **8**, Top10 ≤ **6**.
+- Au-delà (rang inconnu = 999 inclus) : pas de cap, seul le plafond général s'applique.
+Valeurs tunables (`RANG_NUM_CAP10_*`/`RANG_NUM_CAP20_*` dans `params.ts`), à ajuster après tests réels.
 
 ### Bug v3 corrigé
 Les cotes place exacte / temps exact étaient figées en dur (`5.00` / `20.00`, aucune proba). Désormais calculées. Pénalité fallback autre-discipline désormais réellement appliquée.

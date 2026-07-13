@@ -7,6 +7,7 @@ import {
   probTopN,
   probToCote,
   sigmaFor,
+  capCoteByRangNumerique,
   ALGO_PARAMS,
 } from "./bradley-terry";
 import type { ParsedResult } from "./result-parser";
@@ -103,15 +104,23 @@ export function combineMassStart(
 
     const rangClassique = classiqueCat.find((r) => r.code_bateau === code)?.rang ?? null;
 
+    // v4.2 — garde-fou classement numérique (voir capCoteByRangNumerique)
+    const P = ALGO_PARAMS;
+    const rangNat = coteV3.rang_national;
+    const coteTop1  = capCoteByRangNumerique(probToCote(p1,  P.COTE_MIN_TOP1, P.COTE_MAX_GLOBAL), rangNat, P.RANG_NUM_CAP10_TOP1,  P.RANG_NUM_CAP20_TOP1);
+    const coteTop3  = capCoteByRangNumerique(probToCote(p3,  P.COTE_MIN_TOP3, P.COTE_MAX_TOP3),   rangNat, P.RANG_NUM_CAP10_TOP3,  P.RANG_NUM_CAP20_TOP3);
+    const coteTop5  = capCoteByRangNumerique(probToCote(p5,  P.COTE_MIN_TOP5, P.COTE_MAX_TOP5),   rangNat, P.RANG_NUM_CAP10_TOP5,  P.RANG_NUM_CAP20_TOP5);
+    const coteTop10 = capCoteByRangNumerique(probToCote(p10, P.COTE_MIN_EXACT, P.COTE_MAX_TOP10), rangNat, P.RANG_NUM_CAP10_TOP10, P.RANG_NUM_CAP20_TOP10);
+
     results.push({
       ...coteV3,
       score_final: fi,
       rang_espere: rangEspere,
       sigma,
-      prob_top1: p1, cote_top1: probToCote(p1, ALGO_PARAMS.COTE_MIN_TOP1, ALGO_PARAMS.COTE_MAX_GLOBAL),
-      prob_top3: p3, cote_top3: probToCote(p3, ALGO_PARAMS.COTE_MIN_TOP3, ALGO_PARAMS.COTE_MAX_GLOBAL),
-      prob_top5: p5, cote_top5: probToCote(p5, ALGO_PARAMS.COTE_MIN_TOP5, ALGO_PARAMS.COTE_MAX_GLOBAL),
-      prob_top10: p10, cote_top10: probToCote(p10, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_TOP10),
+      prob_top1: p1, cote_top1: coteTop1,
+      prob_top3: p3, cote_top3: coteTop3,
+      prob_top5: p5, cote_top5: coteTop5,
+      prob_top10: p10, cote_top10: coteTop10,
       prob_top20: p20, cote_top20: probToCote(p20, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_TOP20),
       algo_version: ALGO_VERSION,
       sources_utilisees: `CLASSIQUE_WE(rang:${rangClassique})+V3`,

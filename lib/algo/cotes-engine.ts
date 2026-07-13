@@ -7,6 +7,7 @@ import {
   probTopN,
   probToCote,
   probExactPlace,
+  capCoteByRangNumerique,
   ALGO_PARAMS,
 } from './bradley-terry';
 import type { AthleteInStartlist, CoteResult, FallbackType } from './types';
@@ -222,6 +223,13 @@ function buildCoteResult(
     P.COTE_MAX_EXACT_TIME_SECOND
   );
 
+  // v4.2 — garde-fou classement numérique (voir capCoteByRangNumerique)
+  const rangNat    = a.rang_national;
+  const coteTop1  = capCoteByRangNumerique(probToCote(p1,  P.COTE_MIN_TOP1, P.COTE_MAX_GLOBAL), rangNat, P.RANG_NUM_CAP10_TOP1,  P.RANG_NUM_CAP20_TOP1);
+  const coteTop3  = capCoteByRangNumerique(probToCote(p3,  P.COTE_MIN_TOP3, P.COTE_MAX_TOP3),   rangNat, P.RANG_NUM_CAP10_TOP3,  P.RANG_NUM_CAP20_TOP3);
+  const coteTop5  = capCoteByRangNumerique(probToCote(p5,  P.COTE_MIN_TOP5, P.COTE_MAX_TOP5),   rangNat, P.RANG_NUM_CAP10_TOP5,  P.RANG_NUM_CAP20_TOP5);
+  const coteTop10 = capCoteByRangNumerique(probToCote(p10, P.COTE_MIN_EXACT, P.COTE_MAX_TOP10), rangNat, P.RANG_NUM_CAP10_TOP10, P.RANG_NUM_CAP20_TOP10);
+
   return {
     code_bateau:           a.code_bateau,
     athlete_id:            a.athlete_id,
@@ -236,10 +244,10 @@ function buildCoteResult(
     sigma,
     fallback_type:         a.fallback_type,
     sources_utilisees:     buildSourcesLabel(a.sef, a.nat, a.ir),
-    prob_top1:  p1,  cote_top1:  probToCote(p1,  P.COTE_MIN_TOP1, P.COTE_MAX_GLOBAL),
-    prob_top3:  p3,  cote_top3:  probToCote(p3,  P.COTE_MIN_TOP3, P.COTE_MAX_GLOBAL),
-    prob_top5:  p5,  cote_top5:  probToCote(p5,  P.COTE_MIN_TOP5, P.COTE_MAX_GLOBAL),
-    prob_top10: p10, cote_top10: probToCote(p10, P.COTE_MIN_EXACT, P.COTE_MAX_TOP10),
+    prob_top1:  p1,  cote_top1:  coteTop1,
+    prob_top3:  p3,  cote_top3:  coteTop3,
+    prob_top5:  p5,  cote_top5:  coteTop5,
+    prob_top10: p10, cote_top10: coteTop10,
     prob_top20: p20, cote_top20: probToCote(p20, P.COTE_MIN_EXACT, P.COTE_MAX_TOP20),
     cote_exact_place:       coteExactPlace,
     cote_exact_time:        coteExactTime,

@@ -52,7 +52,8 @@ export const ALGO_PARAMS = {
 
   // ═══ v4 — calibration des cotes : bornes [min, max] par type de pari ═══
   // Ancrages (planchers) calibrés : un favori évident tombe au plancher.
-  // Plafond global 30 ; temps à la seconde plafonné à 4.
+  // Plafond global 30 (Top1 uniquement — les autres types ont leur propre
+  // plafond, resserré en v4.2) ; temps à la seconde plafonné à 4.
   COTE_MAX_GLOBAL: 30.0,
   COTE_MIN_TOP1: 1.68,
   COTE_MIN_TOP3: 1.15,
@@ -60,9 +61,28 @@ export const ALGO_PARAMS = {
   COTE_MIN_EXACT: 1.05,          // place exacte / temps dixième
   COTE_MAX_EXACT_TIME_SECOND: 4.0,
   COTE_MIN_EXACT_TIME_SECOND: 1.05,
-  // Top10/20 : retirés de l'UI mais colonnes conservées (paris legacy).
-  COTE_MAX_TOP10: 15.0,
-  COTE_MAX_TOP20: 8.0,
+  // v4.2 — Top3/Top5/Top10 resserrés : jusqu'ici bornés au plafond global (30),
+  // beaucoup trop haut pour des paris structurellement "plus faciles" que le
+  // vainqueur. Top10/20 : retirés de l'UI mais colonnes conservées (paris legacy).
+  COTE_MAX_TOP3:  15.0,
+  COTE_MAX_TOP5:  10.0,
+  COTE_MAX_TOP10:  8.0,
+  COTE_MAX_TOP20:  8.0,
+
+  // v4.2 — garde-fou par classement numérique : un athlète bien classé au
+  // classement numérique 2026 est un favori réel, indépendamment de la
+  // qualité/disponibilité de ses résultats de course (composite dilué par un
+  // signal national faible ou absent). On cape directement cote_top1/3/5/10
+  // selon rang_national, PAR-DESSUS le calcul Bradley-Terry — un garde-fou,
+  // pas un remplacement du modèle. Valeurs tunables.
+  RANG_NUM_CAP10_TOP1:  10,
+  RANG_NUM_CAP10_TOP3:   6,
+  RANG_NUM_CAP10_TOP5:   4,
+  RANG_NUM_CAP10_TOP10:  3,
+  RANG_NUM_CAP20_TOP1:  20,
+  RANG_NUM_CAP20_TOP3:  12,
+  RANG_NUM_CAP20_TOP5:   8,
+  RANG_NUM_CAP20_TOP10:  6,
 
   // Heuristique "temps exact" (pas de modèle de temps absolu) : proba de toucher
   // le temps ≈ prob d'être la performance de référence × facteur de précision.
@@ -72,5 +92,5 @@ export const ALGO_PARAMS = {
   // Décroissance exponentielle de la force selon le rang (Sprint Finale / Mass Start)
   K_FORCE: 0.20,
 
-  ALGO_VERSION: 'v4.1',
+  ALGO_VERSION: 'v4.2',
 } as const;
