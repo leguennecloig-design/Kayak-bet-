@@ -2,12 +2,63 @@
 
 import { useState } from "react";
 
+type Template = { label: string; title: string; body: string; url?: string };
+
+// Notices pré-enregistrées : Loig peut en choisir une pour pré-remplir le
+// formulaire (puis ajuster/envoyer), au lieu de tout retaper à chaque fois.
+const TEMPLATES: Template[] = [
+  {
+    label: "Nouvelle compétition",
+    title: "Nouvelle compétition disponible !",
+    body: "Les paris sont ouverts — viens tenter ta chance sur Kayakbet.",
+    url: "/app",
+  },
+  {
+    label: "Clôture des paris imminente",
+    title: "Dernière chance de parier !",
+    body: "Les paris ferment bientôt sur la compétition en cours. Ne rate pas ta chance.",
+    url: "/app",
+  },
+  {
+    label: "Résultats disponibles",
+    title: "Les résultats sont tombés 🏁",
+    body: "Va voir si tes pronostics étaient les bons !",
+    url: "/app",
+  },
+  {
+    label: "Maintenance prévue",
+    title: "Maintenance en cours",
+    body: "Kayakbet est en maintenance quelques minutes. Merci de ta patience, ça sera vite réglé.",
+    url: "/app",
+  },
+  {
+    label: "Nouvelle fonctionnalité",
+    title: "Nouveauté sur Kayakbet",
+    body: "On a ajouté une nouvelle fonctionnalité — va y jeter un œil !",
+    url: "/app",
+  },
+  {
+    label: "Relance joueurs inactifs",
+    title: "On t'a pas vu récemment 👀",
+    body: "De nouvelles compétitions t'attendent sur Kayakbet. Reviens tenter ta chance !",
+    url: "/app",
+  },
+];
+
 export default function NotificationsClient() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [url, setUrl] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [msg, setMsg] = useState("");
+
+  function applyTemplate(t: Template) {
+    setTitle(t.title);
+    setBody(t.body);
+    setUrl(t.url ?? "");
+    setState("idle");
+    setMsg("");
+  }
 
   async function send() {
     if (!title.trim() || !body.trim()) return;
@@ -43,6 +94,22 @@ export default function NotificationsClient() {
       <p className="font-archivo text-[13px] text-[#7c9aaa] mt-3 mb-8 leading-relaxed">
         Diffusion manuelle immédiate à tous les joueurs actuellement abonnés aux notifications push.
       </p>
+
+      <div className="mb-6">
+        <label className={labelCls}>Notices pré-enregistrées</label>
+        <div className="flex flex-wrap gap-2 mt-1.5">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.label}
+              type="button"
+              onClick={() => applyTemplate(t)}
+              className="bg-[rgba(255,255,255,.04)] border border-[var(--border-2)] rounded-[9px] px-3.5 py-2 text-[12px] font-archivo text-[#cfe8ee] hover:border-[rgba(40,215,230,.5)] hover:text-white hover:bg-[rgba(40,215,230,.06)] transition-colors"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-[18px] p-6 flex flex-col gap-4">
         <div>
