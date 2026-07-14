@@ -292,6 +292,20 @@ function betAvatarLabel(athlete: string, selectionsCount: number) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// Ligne titre de l'historique des paris. Pour un pari combiné, `b.athlete`
+// est une longue chaîne "Nom1 + Nom2 + Nom3…" qui, tronquée en une seule
+// ligne (ellipsis CSS), donnait l'impression d'un nom d'athlète coupé au
+// milieu — on affiche plutôt un intitulé court et sans ambiguïté, les noms
+// passant dans la ligne du dessous (voir betHistorySubline).
+function betHistoryHeadline(b: BetRecord): string {
+  const n = b.selections?.length ?? 1;
+  return n > 1 ? `Coupon combiné · ${n} sélections` : b.athlete;
+}
+function betHistorySubline(b: BetRecord): string {
+  const n = b.selections?.length ?? 1;
+  return n > 1 ? `${b.athlete} · ${b.odds.toFixed(2)}` : `${b.event} · ${b.odds.toFixed(2)}`;
+}
+
 const TOPNAV = [
   { ic: "home",   t: "Accueil",      v: "home"         as View | "drawer" },
   { ic: "trophy", t: "Compétitions", v: "competitions" as View | "drawer" },
@@ -1145,8 +1159,8 @@ function PlayerProfileView({ playerId, onBack, seasonLabel }: PlayerProfileViewP
                       {betAvatarLabel(b.athlete, b.selections?.length ?? 1)}
                     </div>
                     <div className="hi-body">
-                      <div className="hi-athlete-main">{b.athlete}</div>
-                      <div className="hi-event-sub">{b.event} · {b.odds.toFixed(2)}</div>
+                      <div className="hi-athlete-main">{betHistoryHeadline(b)}</div>
+                      <div className="hi-event-sub">{betHistorySubline(b)}</div>
                     </div>
                     <div className="hi-right">
                       <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
@@ -1487,8 +1501,8 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
                   {betAvatarLabel(b.athlete, b.selections?.length ?? 1)}
                 </div>
                 <div className="hi-body">
-                  <div className="hi-athlete-main">{b.athlete}</div>
-                  <div className="hi-event-sub">{b.event} · {b.odds.toFixed(2)}</div>
+                  <div className="hi-athlete-main">{betHistoryHeadline(b)}</div>
+                  <div className="hi-event-sub">{betHistorySubline(b)}</div>
                 </div>
                 <div className="hi-right">
                   <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
@@ -2091,6 +2105,15 @@ export default function DashboardPage() {
           oIsWinner && !sameParticipant && isWinnerBet(existing) && existing.categorie === o.categorie;
         if (bothRankTiers || top1VsExactPl1 || rivalWinnerSameCategory) delete next[key];
       }
+
+      // Sans "Pari combiné" activé, le coupon ne peut contenir qu'UNE seule
+      // sélection à la fois — sinon la cote totale se multiplie (et le gain
+      // affiché avec) sans que l'utilisateur ait vraiment activé le combiné.
+      if (!comboMode && Object.keys(next).length >= 1) {
+        showToast(<XIcon c="#FF7A45" />, "Active « Pari combiné » pour sélectionner plusieurs pronostics", true);
+        return prev;
+      }
+
       next[o.id] = o;
       return next;
     });
@@ -2477,7 +2500,11 @@ export default function DashboardPage() {
       </main>
 
       {/* ============ SCRIM + DRAWER ============ */}
-      <div className={`scrim${drawerOpen ? " open" : ""}`} onClick={() => (editingBetId ? cancelEditBet() : setDrawerOpen(false))} />
+      {/* Fermer le tiroir NE reset jamais une édition en cours : ça permet de
+          le refermer pour aller ajouter d'autres sélections depuis l'onglet
+          Compétitions, puis rouvrir "Mon coupon" plus tard pour continuer.
+          Seul le bouton "Annuler la modification" abandonne vraiment l'édition. */}
+      <div className={`scrim${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} />
       <aside className={`drawer${drawerOpen ? " open" : ""}`}>
         <div className="drawer-head">
           <div className="ttl"><TicketStroke c="#fff" /> {editingBetId ? "Modifier le pari" : "Mon coupon"}</div>
@@ -2487,7 +2514,7 @@ export default function DashboardPage() {
                 <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
               </button>
             )}
-            <button className="close" onClick={() => (editingBetId ? cancelEditBet() : setDrawerOpen(false))}><XIcon c="#9FBAC6" /></button>
+            <button className="close" onClick={() => setDrawerOpen(false)}><XIcon c="#9FBAC6" /></button>
           </div>
         </div>
 

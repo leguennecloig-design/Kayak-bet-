@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
+import { notifyAllUsers } from "@/lib/notifications/create";
 
 // GET /api/admin/app-announcements — historique complet, plus récentes d'abord.
 export async function GET() {
@@ -53,5 +54,16 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, id: data.id });
+
+  // Notifie tout le monde (site + push) qu'une nouvelle version est dispo,
+  // en plus de la carte "Nouvelle version disponible" affichée dans l'app —
+  // sans ça, seuls les joueurs qui relancent la PWA voyaient la carte.
+  const { sent } = await notifyAllUsers(supabase, {
+    type: "broadcast",
+    title,
+    body: changelog[0] ?? "De nouvelles fonctionnalités sont disponibles.",
+    url: "/app",
+  });
+
+  return NextResponse.json({ ok: true, id: data.id, notified: sent });
 }
