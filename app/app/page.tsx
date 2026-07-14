@@ -233,9 +233,12 @@ type Player = {
   winRate?: number;
   estimatedGain?: number;
   wonGains?: number;
+  lostGains?: number;
 };
 
-type LeaderboardType = "points" | "winrate" | "estimated" | "wongains";
+type LeaderboardType = "points" | "winrate" | "estimated" | "wongains" | "lostgains" | "competition";
+
+type CompetitionBoard = { id: string; nom: string; date: string | null };
 
 type BetRecord = {
   id: string;
@@ -643,13 +646,17 @@ const BOARD_TABS: { type: LeaderboardType; label: string }[] = [
   { type: "winrate",   label: "Winrate" },
   { type: "estimated", label: "Gains estimés" },
   { type: "wongains",  label: "Plus gros gains" },
+  { type: "lostgains", label: "Plus grosses pertes" },
+  { type: "competition", label: "Par compétition" },
 ];
 
 function primaryStat(p: Player, type: LeaderboardType): string {
   switch (type) {
     case "winrate":   return `${p.winRate ?? 0}%`;
     case "estimated": return `${(p.estimatedGain ?? 0).toLocaleString("fr-FR")} cr.`;
-    case "wongains":  return `${(p.wonGains ?? 0).toLocaleString("fr-FR")} cr.`;
+    case "wongains":
+    case "competition": return `${(p.wonGains ?? 0).toLocaleString("fr-FR")} cr.`;
+    case "lostgains": return `-${(p.lostGains ?? 0).toLocaleString("fr-FR")} cr.`;
     default:          return `${p.balance.toLocaleString("fr-FR")} cr.`;
   }
 }
@@ -660,18 +667,28 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
   const [fetchedLb, setFetchedLb] = useState<Player[] | null>(null);
   const [loadingLb, setLoadingLb] = useState(false);
   const [search, setSearch] = useState("");
+  const [compBoards, setCompBoards] = useState<CompetitionBoard[]>([]);
+  const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/competitions/leaderboard-list")
+      .then((res) => res.json())
+      .then((data) => setCompBoards(data.competitions ?? []))
+      .catch(() => {});
+  }, []);
 
   // Vue par défaut (points, top 10) : réutilise la liste déjà chargée par le
   // parent, pas besoin de refetch. Tout autre onglet/mode passe par un fetch dédié.
   const isDefaultView = boardType === "points" && !showAll;
   const lb = isDefaultView ? effectiveLb : (fetchedLb ?? []);
 
-  async function loadBoard(type: LeaderboardType, all: boolean) {
+  async function loadBoard(type: LeaderboardType, all: boolean, compId?: string | null) {
     setLoadingLb(true);
     try {
       const qs = new URLSearchParams();
       if (all) qs.set("all", "1");
-      if (type !== "points") qs.set("type", type);
+      if (compId) qs.set("competitionId", compId);
+      else if (type !== "points") qs.set("type", type);
       const res = await fetch(`/api/user/leaderboard?${qs.toString()}`);
       if (res.ok) setFetchedLb(await res.json());
     } finally {
@@ -682,13 +699,24 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
   function selectBoard(type: LeaderboardType) {
     setBoardType(type);
     setSearch("");
+    if (type === "competition") { setSelectedCompId(null); setFetchedLb(null); return; }
     if (type === "points" && !showAll) { setFetchedLb(null); return; }
     loadBoard(type, showAll);
+  }
+
+  function selectCompetition(id: string) {
+    setSelectedCompId(id);
+    setSearch("");
+    loadBoard("wongains", showAll, id);
   }
 
   async function handleToggleAll() {
     const next = !showAll;
     setShowAll(next);
+    if (boardType === "competition") {
+      if (selectedCompId) loadBoard("wongains", next, selectedCompId);
+      return;
+    }
     if (next || boardType !== "points") loadBoard(boardType, next);
     else setFetchedLb(null);
   }
@@ -698,7 +726,7 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
   useEffect(() => {
     if (search.trim() && !showAll) {
       setShowAll(true);
-      loadBoard(boardType, true);
+      loadBoard(boardType, true, boardType === "competition" ? selectedCompId : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -727,11 +755,18 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProfile(p); }
   }
 
+  const showingCompPicker = boardType === "competition" && !selectedCompId;
+  const selectedComp = selectedCompId ? compBoards.find((c) => c.id === selectedCompId) : null;
+
   return (
     <>
       <div className="view-header">
         <h1>Classement</h1>
-        <p>{seasonLabel} · {lb.length} joueur{lb.length > 1 ? "s" : ""}{showAll ? "" : " (top 10)"}</p>
+        {showingCompPicker ? (
+          <p>Choisis une compétition pour voir son classement</p>
+        ) : (
+          <p>{selectedComp ? selectedComp.nom : seasonLabel} · {lb.length} joueur{lb.length > 1 ? "s" : ""}{showAll || selectedCompId ? "" : " (top 10)"}</p>
+        )}
       </div>
 
       <div className="cat-tabs cls-board-tabs">
@@ -745,6 +780,35 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
           </button>
         ))}
       </div>
+
+      {showingCompPicker ? (
+        <div className="lb-list">
+          {compBoards.length === 0 ? (
+            <p className="friend-search-status">Aucun classement de compétition publié pour le moment.</p>
+          ) : compBoards.map((c) => (
+            <div
+              key={c.id}
+              className="cls-league-row"
+              role="button"
+              tabIndex={0}
+              onClick={() => selectCompetition(c.id)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectCompetition(c.id); } }}
+            >
+              <div className="cls-league-info">
+                <span className="nm">{c.nom}</span>
+                {c.date && <small>{fmtDate(c.date)}</small>}
+              </div>
+              <ChevRight />
+            </div>
+          ))}
+        </div>
+      ) : (
+      <>
+      {selectedCompId && (
+        <button type="button" className="cls-show-all" onClick={() => { setSelectedCompId(null); setFetchedLb(null); }}>
+          ← Choisir une autre compétition
+        </button>
+      )}
 
       <div className="friend-search cls-search">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" /><path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -875,6 +939,8 @@ function ClassementView({ effectiveLb, onOpenProfile, onOpenLeague, seasonLabel 
       >
         {loadingLb ? "Chargement…" : showAll ? "Réduire au top 10" : "Voir le classement complet"}
       </button>
+      </>
+      )}
       </>
       )}
     </>

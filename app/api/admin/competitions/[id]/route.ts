@@ -24,6 +24,7 @@ export async function PATCH(
   if (body.type_competition !== undefined) allowed.type_competition = body.type_competition || null;
   if (body.algo_type !== undefined) allowed.algo_type = body.algo_type || null;
   if (body.paris_ouverts_a !== undefined) allowed.paris_ouverts_a = body.paris_ouverts_a || null;
+  if (body.leaderboard_visible !== undefined) allowed.leaderboard_visible = !!body.leaderboard_visible;
 
   const supabase = createAdminSupabase();
 

@@ -3,16 +3,19 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { displayName, initials } from "@/lib/display-name";
 
-type BoardType = "points" | "winrate" | "estimated" | "wongains";
-const VALID_TYPES: BoardType[] = ["points", "winrate", "estimated", "wongains"];
+type BoardType = "points" | "winrate" | "estimated" | "wongains" | "lostgains";
+const VALID_TYPES: BoardType[] = ["points", "winrate", "estimated", "wongains", "lostgains"];
 
-// GET /api/user/leaderboard[?all=1][&type=points|winrate|estimated|wongains]
+// GET /api/user/leaderboard[?all=1][&type=points|winrate|estimated|wongains|lostgains][&competitionId=...]
 // Par défaut : classement "points" (solde), top 10 + position du joueur
 // connecté. Avec ?all=1 : classement complet. ?type= choisit le classement :
-//   points    — solde actuel (comme avant)
-//   winrate   — % de paris gagnés (parmi les joueurs ayant misé au moins 1 fois)
-//   estimated — gain potentiel total sur les paris EN COURS (pending)
-//   wongains  — gains réels cumulés sur les paris GAGNÉS
+//   points     — solde actuel (comme avant)
+//   winrate    — % de paris gagnés (parmi les joueurs ayant misé au moins 1 fois)
+//   estimated  — gain potentiel total sur les paris EN COURS (pending)
+//   wongains   — gains réels cumulés sur les paris GAGNÉS
+//   lostgains  — mises cumulées perdues sur les paris PERDUS
+// ?competitionId= restreint aux paris de cette seule compétition (gains réels
+// uniquement, voir competitions.leaderboard_visible) — ignore ?type.
 export async function GET(req: NextRequest) {
   const supabase = createServerSupabase();
   const adminSb  = createAdminSupabase();
@@ -20,27 +23,36 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const currentUserId = user?.id ?? null;
   const showAll = req.nextUrl.searchParams.get("all") === "1";
+  const competitionId = req.nextUrl.searchParams.get("competitionId");
   const typeParam = req.nextUrl.searchParams.get("type");
-  const type: BoardType = VALID_TYPES.includes(typeParam as BoardType) ? (typeParam as BoardType) : "points";
+  const type: BoardType = competitionId
+    ? "wongains"
+    : VALID_TYPES.includes(typeParam as BoardType) ? (typeParam as BoardType) : "points";
 
   const { data: users, error } = await adminSb
     .from("users")
     .select("id, username, email, balance, avatar_url, instagram_handle");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: bets } = await adminSb
+  let betsQuery = adminSb
     .from("bets")
-    .select("user_id, status, gain_reel, gain_potentiel");
+    .select("user_id, status, stake, gain_reel, gain_potentiel");
+  if (competitionId) betsQuery = betsQuery.eq("competition_id", competitionId);
+  const { data: bets } = await betsQuery;
 
   const winsMap      = new Map<string, number>();
   const totalMap      = new Map<string, number>();
   const estimatedMap  = new Map<string, number>();
   const wonGainsMap   = new Map<string, number>();
+  const lostGainsMap  = new Map<string, number>();
   for (const b of (bets ?? [])) {
     totalMap.set(b.user_id, (totalMap.get(b.user_id) ?? 0) + 1);
     if (b.status === "won") {
       winsMap.set(b.user_id, (winsMap.get(b.user_id) ?? 0) + 1);
       wonGainsMap.set(b.user_id, (wonGainsMap.get(b.user_id) ?? 0) + Number(b.gain_reel ?? 0));
+    }
+    if (b.status === "lost") {
+      lostGainsMap.set(b.user_id, (lostGainsMap.get(b.user_id) ?? 0) + Number(b.stake ?? 0));
     }
     if (b.status === "pending") {
       estimatedMap.set(b.user_id, (estimatedMap.get(b.user_id) ?? 0) + Number(b.gain_potentiel ?? 0));
@@ -51,7 +63,7 @@ export async function GET(req: NextRequest) {
     id: string; name: string; ini: string; balance: number;
     avatarUrl: string | null; instagram: string | null;
     wins: number; totalBets: number; winRate: number;
-    estimatedGain: number; wonGains: number; isMe: boolean;
+    estimatedGain: number; wonGains: number; lostGains: number; isMe: boolean;
   };
 
   let rows: Row[] = (users ?? []).map((u) => {
@@ -70,6 +82,7 @@ export async function GET(req: NextRequest) {
       winRate:       total > 0 ? wins / total : 0,
       estimatedGain: estimatedMap.get(u.id) ?? 0,
       wonGains:      wonGainsMap.get(u.id) ?? 0,
+      lostGains:     lostGainsMap.get(u.id) ?? 0,
       isMe:          u.id === currentUserId,
     };
   });
@@ -79,12 +92,14 @@ export async function GET(req: NextRequest) {
   if (type === "winrate")   rows = rows.filter(r => r.totalBets > 0);
   if (type === "estimated") rows = rows.filter(r => r.estimatedGain > 0);
   if (type === "wongains")  rows = rows.filter(r => r.wonGains > 0);
+  if (type === "lostgains") rows = rows.filter(r => r.lostGains > 0);
 
   const sortValue: Record<BoardType, (r: Row) => number> = {
     points:    (r) => r.balance,
     winrate:   (r) => r.winRate,
     estimated: (r) => r.estimatedGain,
     wongains:  (r) => r.wonGains,
+    lostgains: (r) => r.lostGains,
   };
   rows.sort((a, b) => sortValue[type](b) - sortValue[type](a) || b.totalBets - a.totalBets);
 
@@ -103,6 +118,7 @@ export async function GET(req: NextRequest) {
     winRate:   Math.round(r.winRate * 100),
     estimatedGain: Math.round(r.estimatedGain),
     wonGains:      Math.round(r.wonGains),
+    lostGains:     Math.round(r.lostGains),
   }));
 
   if (showAll) return NextResponse.json(ranked);

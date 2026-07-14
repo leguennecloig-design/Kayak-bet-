@@ -17,6 +17,7 @@ type Competition = {
   algo_type: string | null;
   type_epreuve: string | null;
   paris_ouverts_a: string | null;
+  leaderboard_visible?: boolean;
 };
 
 // ISO -> "YYYY-MM-DDTHH:mm" pour <input type="datetime-local"> (en heure locale)
@@ -105,6 +106,7 @@ export default function EditClient({
   const [algoType, setAlgoType] = useState(competition.algo_type ?? competition.type_competition ?? "");
   const [lieu,       setLieu]       = useState(competition.lieu ?? "");
   const [parisOuvertsA, setParisOuvertsA] = useState(toDatetimeLocal(competition.paris_ouverts_a));
+  const [leaderboardVisible, setLeaderboardVisible] = useState(competition.leaderboard_visible ?? false);
   const [status,     setStatus]     = useState(competition.status);
   const [saving,     setSaving]     = useState(false);
   const [saveMsg,    setSaveMsg]    = useState("");
@@ -168,6 +170,7 @@ export default function EditClient({
         type_competition: typeCompetition || null,
         algo_type: algoType || null,
         paris_ouverts_a: parisOuvertsA ? new Date(parisOuvertsA).toISOString() : null,
+        leaderboard_visible: leaderboardVisible,
       }),
     });
     setSaving(false);
@@ -505,6 +508,18 @@ export default function EditClient({
               onChange={(e) => setParisOuvertsA(e.target.value)}
               className={inputCls}
             />
+          </div>
+          <div className="sm:col-span-2 flex items-center gap-2.5">
+            <input
+              type="checkbox"
+              id="leaderboard-visible"
+              checked={leaderboardVisible}
+              onChange={(e) => setLeaderboardVisible(e.target.checked)}
+              className="w-4 h-4 accent-[#28D7E6]"
+            />
+            <label htmlFor="leaderboard-visible" className="font-archivo text-[13px] text-[#9fbac6] cursor-pointer">
+              Publier un classement pour cette compétition <span className="text-[#5c7c8c]">(gains des joueurs sur leurs paris ici — visible dans l&apos;onglet Classement de l&apos;app)</span>
+            </label>
           </div>
         </div>
         <div className="flex items-center gap-3 mt-5">
