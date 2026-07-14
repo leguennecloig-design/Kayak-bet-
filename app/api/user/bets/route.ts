@@ -1,40 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
-import type { BetType } from "@/lib/algo/types";
-import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
 import { comboBonusFor } from "@/lib/bets/combo";
-
-type Selection = {
-  participantId:   string;
-  betType?:        BetType;   // absent = "TOP_1" (rétrocompat anciens clients)
-  nom:             string;
-  cote:            number;
-  competitionId:   string;
-  competitionNom:  string;
-  categorie:       string;
-  targetPlace?:          number; // EXACT_PLACE uniquement
-  predictedTimeSeconds?: number; // EXACT_TIME uniquement
-};
-
-const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME", "EXACT_TIME_SECOND"];
-const MIN_STAKE = 30;
-const BALANCE_FLOOR = 200;
-
-// Cotes lues directement dans la table (statiques par athlète). EXACT_PLACE est
-// traité à part (cote DYNAMIQUE selon la place choisie — voir plus bas).
-function coteColumn(betType: BetType, row: Record<string, unknown>): number {
-  switch (betType) {
-    case "TOP_1":              return Number(row.cote_top1);
-    case "TOP_3":              return Number(row.cote_top3);
-    case "TOP_5":              return Number(row.cote_top5);
-    case "TOP_10":             return Number(row.cote_top10);
-    case "TOP_20":             return Number(row.cote_top20);
-    case "EXACT_PLACE":        return Number(row.cote_exact_place); // repli, normalement dynamique
-    case "EXACT_TIME":         return Number(row.cote_exact_time);
-    case "EXACT_TIME_SECOND":  return Number(row.cote_exact_time_second);
-  }
-}
+import {
+  type Selection,
+  MIN_STAKE,
+  BALANCE_FLOOR,
+  validateShape,
+  checkRankTierExclusivity,
+  checkMaxPerCategory,
+  checkPendingConflicts,
+  revalidateSelections,
+} from "@/lib/bets/validate-selections";
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
 function fmtDate(iso: string) {
@@ -85,6 +62,7 @@ export async function GET() {
       date:          fmtDate(b.created_at as string),
       gainPotentiel: Number(b.gain_potentiel),
       gainReel:      b.gain_reel != null ? Number(b.gain_reel) : null,
+      selections:    sels,
     };
   });
 
@@ -104,221 +82,20 @@ export async function POST(req: NextRequest) {
   const selections: Selection[] = body.selections ?? [];
   const stake = Math.max(0, Number(body.stake) || 0);
 
-  if (selections.length === 0) {
-    return NextResponse.json({ error: "Aucune sélection" }, { status: 400 });
-  }
-  if (stake < MIN_STAKE) {
-    return NextResponse.json({ error: `Mise minimum : ${MIN_STAKE} cr` }, { status: 400 });
-  }
-  if (selections.some(s => !s.participantId || !s.cote || s.cote <= 1)) {
-    return NextResponse.json({ error: "Sélection invalide" }, { status: 400 });
-  }
-  for (const s of selections) {
-    if (s.betType != null && !VALID_BET_TYPES.includes(s.betType)) {
-      return NextResponse.json({ error: "Type de pari invalide" }, { status: 400 });
-    }
-    if (s.betType === "EXACT_PLACE") {
-      if (!Number.isInteger(s.targetPlace) || s.targetPlace! < 2 || s.targetPlace! > 50) {
-        return NextResponse.json({ error: "Place exacte invalide (doit être un entier ≥ 2)" }, { status: 400 });
-      }
-    }
-    if (s.betType === "EXACT_TIME") {
-      if (typeof s.predictedTimeSeconds !== "number" || !Number.isFinite(s.predictedTimeSeconds) || s.predictedTimeSeconds <= 0 || s.predictedTimeSeconds > 36000) {
-        return NextResponse.json({ error: "Temps prédit invalide" }, { status: 400 });
-      }
-    }
-    if (s.betType === "EXACT_TIME_SECOND") {
-      // Temps à la seconde : entier de secondes
-      if (!Number.isInteger(s.predictedTimeSeconds) || s.predictedTimeSeconds! <= 0 || s.predictedTimeSeconds! > 36000) {
-        return NextResponse.json({ error: "Temps prédit (à la seconde) invalide" }, { status: 400 });
-      }
-    }
-  }
+  const shapeError = validateShape(selections, stake);
+  if (shapeError) return NextResponse.json({ error: shapeError }, { status: 400 });
 
-  // Un seul type de classement (Vainqueur/Top3/5/10/20) par athlète DANS CE
-  // COUPON, et Place exacte n°1 incompatible avec Vainqueur pour ce même
-  // athlète (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). Place
-  // exacte ≥ 2 et temps exact (dixième/seconde) restent en revanche toujours
-  // cumulables avec n'importe quel autre pari sur le même athlète — déjà
-  // appliqué côté client dans toggle(), revalidé ici.
-  const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
-  const byParticipantTypes = new Map<string, Selection[]>();
-  for (const s of selections) {
-    byParticipantTypes.set(s.participantId, [...(byParticipantTypes.get(s.participantId) ?? []), s]);
-  }
-  for (const [, sels] of byParticipantTypes) {
-    const types = sels.map(s => s.betType ?? "TOP_1");
-    if (types.filter(t => RANK_TIERS.has(t)).length > 1) {
-      return NextResponse.json(
-        { error: "Un seul type de classement (Vainqueur/Top 3/5/10/20) par athlète" },
-        { status: 400 }
-      );
-    }
-    const hasTop1 = types.includes("TOP_1");
-    const hasExactPlace1 = sels.some(s => (s.betType ?? "TOP_1") === "EXACT_PLACE" && s.targetPlace === 1);
-    if (hasTop1 && hasExactPlace1) {
-      return NextResponse.json(
-        { error: "Vainqueur et Place exacte n°1 sont incompatibles pour un même athlète" },
-        { status: 400 }
-      );
-    }
-  }
+  const tierError = checkRankTierExclusivity(selections);
+  if (tierError) return NextResponse.json({ error: tierError }, { status: 400 });
 
-  // Un seul pari "de classement" actif par athlète À LA FOIS DANS LE TEMPS :
-  // un nouveau pari Vainqueur/Top3/5/10/20 (ou place exacte n°1) est refusé
-  // sur un athlète qui en a déjà un en attente d'une soumission précédente
-  // (remplace l'ancien plafond de mise cumulée par athlète). Place exacte
-  // ≥ 2 et temps exact restent TOUJOURS cumulables, même avec un pari de
-  // classement déjà en attente sur ce même athlète — ni bloquants, ni
-  // bloqués par cette règle.
-  const isAlwaysStackable = (s: Selection) => {
-    const t = s.betType ?? "TOP_1";
-    return t === "EXACT_TIME" || t === "EXACT_TIME_SECOND" || (t === "EXACT_PLACE" && s.targetPlace !== 1);
-  };
+  const conflictError = await checkPendingConflicts(adminSb, user.id, selections);
+  if (conflictError) return NextResponse.json({ error: conflictError }, { status: 400 });
 
-  const { data: pendingBetsRows } = await adminSb
-    .from("bets")
-    .select("selections")
-    .eq("user_id", user.id)
-    .eq("status", "pending");
+  const categoryError = checkMaxPerCategory(selections);
+  if (categoryError) return NextResponse.json({ error: categoryError }, { status: 400 });
 
-  const pendingParticipants = new Map<string, string>(); // participantId -> nom, pour le message d'erreur
-  for (const b of pendingBetsRows ?? []) {
-    const sels: Selection[] = Array.isArray(b.selections) ? b.selections : [];
-    for (const s of sels) {
-      if (isAlwaysStackable(s)) continue;
-      pendingParticipants.set(s.participantId, s.nom);
-    }
-  }
-  for (const s of selections) {
-    if (isAlwaysStackable(s)) continue;
-    if (pendingParticipants.has(s.participantId)) {
-      return NextResponse.json(
-        { error: `Tu as déjà un pari en attente sur ${pendingParticipants.get(s.participantId)} — attends qu'il soit réglé avant d'en placer un autre.` },
-        { status: 400 }
-      );
-    }
-  }
-
-  // Au plus N athlètes peuvent finir dans le Top N d'une catégorie donnée :
-  // rejette un coupon qui contiendrait plus de pronostics "Top N" (sur des
-  // athlètes différents) que de places réellement disponibles dans ce
-  // marché — déjà empêché côté client dans toggle(), revalidé ici. Place
-  // exacte n°1 est l'équivalent de Vainqueur (Top 1).
-  const MAX_PER_CATEGORY: Record<string, number> = { TOP_1: 1, TOP_3: 3, TOP_5: 5, TOP_10: 10 };
-  const marketFor = (s: Selection): string | null => {
-    const t = s.betType ?? "TOP_1";
-    if (t === "TOP_1") return "TOP_1";
-    if (t === "EXACT_PLACE" && s.targetPlace === 1) return "TOP_1"; // équivalent
-    if (t === "TOP_3" || t === "TOP_5" || t === "TOP_10") return t;
-    return null;
-  };
-  const byCategoryMarket = new Map<string, Set<string>>();
-  for (const s of selections) {
-    const market = marketFor(s);
-    if (!market) continue;
-    const key = `${s.competitionId}:${s.categorie}:${market}`;
-    const set = byCategoryMarket.get(key) ?? new Set<string>();
-    set.add(s.participantId);
-    byCategoryMarket.set(key, set);
-  }
-  for (const [key, participantsSet] of byCategoryMarket) {
-    const market = key.slice(key.lastIndexOf(":") + 1);
-    const max = MAX_PER_CATEGORY[market];
-    if (participantsSet.size > max) {
-      const error = market === "TOP_1"
-        ? "Un seul pari Vainqueur par catégorie (un seul athlète peut gagner une course)"
-        : `Maximum ${max} pronostics "Top ${max}" par catégorie (seuls ${max} athlètes peuvent y finir)`;
-      return NextResponse.json({ error }, { status: 400 });
-    }
-  }
-
-  // Revalidation serveur : ne jamais faire confiance à la cote envoyée par le
-  // client. On recharge participants + cotes et on recalcule chaque cote
-  // côté serveur avant d'accepter le pari.
-  const participantIds = [...new Set(selections.map(s => s.participantId))];
-  const { data: participantsRows, error: partErr } = await adminSb
-    .from("participants")
-    .select("id, competition_id, code_bateau, cote")
-    .in("id", participantIds);
-  if (partErr) return NextResponse.json({ error: partErr.message }, { status: 500 });
-
-  const participantsById = new Map((participantsRows ?? []).map(p => [p.id, p]));
-
-  const compIds = [...new Set(selections.map(s => s.competitionId))];
-  const { data: compsRows } = await adminSb
-    .from("competitions")
-    .select("id, status, paris_ouverts_a")
-    .in("id", compIds);
-  const compStatusById = new Map((compsRows ?? []).map(c => [c.id, c.status]));
-  const compOpensAtById = new Map((compsRows ?? []).map(c => [c.id, c.paris_ouverts_a as string | null]));
-
-  const { data: cotesRows } = await adminSb
-    .from("cotes")
-    .select("competition_id, code_bateau, rang_espere, sigma, cote_top1, cote_top3, cote_top5, cote_top10, cote_top20, cote_exact_place, cote_exact_time, cote_exact_time_second")
-    .in("competition_id", compIds);
-  const cotesByKey = new Map(
-    (cotesRows ?? []).map(c => [`${c.competition_id}:${c.code_bateau}`, c])
-  );
-
-  for (const s of selections) {
-    const participant = participantsById.get(s.participantId);
-    if (!participant) {
-      return NextResponse.json(
-        { error: "Sélection invalide : les cotes ont peut-être été recalculées, réactualise la page." },
-        { status: 400 }
-      );
-    }
-    if (compStatusById.get(participant.competition_id) !== "published") {
-      return NextResponse.json({ error: "Cette compétition n'est plus ouverte aux paris" }, { status: 400 });
-    }
-    const opensAt = compOpensAtById.get(participant.competition_id);
-    if (opensAt && new Date(opensAt).getTime() > Date.now()) {
-      return NextResponse.json(
-        { error: `Les paris ouvrent le ${new Date(opensAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}` },
-        { status: 400 }
-      );
-    }
-
-    const betType: BetType = s.betType ?? "TOP_1";
-    let serverCote: number;
-    if (betType === "TOP_1") {
-      // Vainqueur : source de vérité = participants.cote (couvre aussi les
-      // participants ajoutés manuellement, sans code_bateau/ligne cotes).
-      serverCote = Number(participant.cote);
-    } else {
-      if (!participant.code_bateau) {
-        return NextResponse.json({ error: "Cotes avancées indisponibles pour cet athlète" }, { status: 400 });
-      }
-      const cotesRow = cotesByKey.get(`${participant.competition_id}:${participant.code_bateau}`);
-      if (!cotesRow) {
-        return NextResponse.json({ error: "Cotes indisponibles pour cette sélection" }, { status: 400 });
-      }
-      if (betType === "EXACT_PLACE") {
-        // Cote DYNAMIQUE : recalcul serveur à partir de la place choisie et de
-        // la distribution de l'athlète (rang espéré + sigma). Jamais la valeur
-        // client, jamais la colonne figée.
-        const place = Number(s.targetPlace);
-        const rang  = Number((cotesRow as Record<string, unknown>).rang_espere);
-        const sig   = Number((cotesRow as Record<string, unknown>).sigma);
-        if (!Number.isFinite(rang) || !Number.isFinite(sig) || sig <= 0) {
-          return NextResponse.json({ error: "Cotes indisponibles pour cette sélection" }, { status: 400 });
-        }
-        const p = probExactPlace(rang, sig, place);
-        serverCote = probToCote(p, ALGO_PARAMS.COTE_MIN_EXACT, ALGO_PARAMS.COTE_MAX_EXACT_PLACE);
-      } else {
-        serverCote = coteColumn(betType, cotesRow);
-      }
-    }
-
-    if (!Number.isFinite(serverCote) || serverCote <= 1) {
-      return NextResponse.json({ error: "Cote invalide" }, { status: 400 });
-    }
-    if (Math.abs(serverCote - s.cote) > 0.01) {
-      return NextResponse.json({ error: "La cote a changé, réactualise ta sélection" }, { status: 409 });
-    }
-    s.cote = serverCote; // jamais la valeur client pour le calcul financier
-  }
+  const revalidationError = await revalidateSelections(adminSb, selections);
+  if (revalidationError) return NextResponse.json({ error: revalidationError.error }, { status: revalidationError.status });
 
   const coteTotale = selections.reduce((t, s) => t * s.cote, 1);
   // Pari combiné (2+ sélections) : bonus croissant plafonné (voir lib/bets/combo.ts),

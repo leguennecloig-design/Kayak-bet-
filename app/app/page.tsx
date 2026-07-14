@@ -240,6 +240,18 @@ type LeaderboardType = "points" | "winrate" | "estimated" | "wongains" | "lostga
 
 type CompetitionBoard = { id: string; nom: string; date: string | null };
 
+type BetSelection = {
+  participantId:   string;
+  betType?:        BetType;
+  nom:             string;
+  cote:            number;
+  competitionId:   string;
+  competitionNom:  string;
+  categorie:       string;
+  targetPlace?:          number;
+  predictedTimeSeconds?: number;
+};
+
 type BetRecord = {
   id: string;
   event: string;
@@ -250,6 +262,7 @@ type BetRecord = {
   date: string;
   gainPotentiel?: number;
   gainReel?: number | null;
+  selections?: BetSelection[];
 };
 
 /* ----------------------------------------------------------------
@@ -400,6 +413,7 @@ type ProfilViewProps = {
   instagramRewardBusy: boolean;
   onRequestInstagramReward: (handle: string) => void;
   seasonLabel: string;
+  onEditBet: (bet: BetRecord) => void;
 };
 
 type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null; rangNational?: number | null };
@@ -1252,7 +1266,7 @@ function LeagueView({ leagueId, onBack }: LeagueViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardStatus, instagramRewardBusy, onRequestInstagramReward, seasonLabel }: ProfilViewProps) {
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardStatus, instagramRewardBusy, onRequestInstagramReward, seasonLabel, onEditBet }: ProfilViewProps) {
   const totalWins = effectiveBets.filter((b) => b.result === "win").length;
   const totalBets = effectiveBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
@@ -1459,6 +1473,9 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
                 <div className="hi-right">
                   <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
                   <div className="hi-date">{fmtDate(b.date)}</div>
+                  {b.result === "pending" && b.selections && b.selections.length > 0 && (
+                    <button type="button" className="hi-edit" onClick={() => onEditBet(b)}>Modifier</button>
+                  )}
                 </div>
               </div>
             );
@@ -1740,6 +1757,8 @@ export default function DashboardPage() {
   const [comboMode,     setComboMode]     = useState(false);
   const [couponInfoOpen, setCouponInfoOpen] = useState(false);
   const [stake,         setStake]         = useState(30);
+  const [editingBetId,  setEditingBetId]  = useState<string | null>(null);
+  const [editingOriginalStake, setEditingOriginalStake] = useState(0);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [betLoading,    setBetLoading]    = useState(false);
   const [cd,            setCd]            = useState({ d: "00", h: "00", m: "00", s: "00" });
@@ -2053,6 +2072,48 @@ export default function DashboardPage() {
     setCoupon((prev) => { const next = { ...prev }; delete next[id]; return next; });
   }
 
+  // Ouvre le coupon existant (en attente) en édition : recharge ses
+  // sélections/mise dans l'état du coupon habituel, réutilisant tout le
+  // tiroir de pari déjà construit. `validate()` bascule alors en PATCH.
+  function startEditBet(bet: BetRecord) {
+    const sels = bet.selections ?? [];
+    const rebuilt: Record<string, Odd> = {};
+    for (const s of sels) {
+      const betType: BetType = s.betType ?? "TOP_1";
+      const id = `${s.participantId}:${betType}`;
+      rebuilt[id] = {
+        id,
+        participantId: s.participantId,
+        betType,
+        betLabel: BET_LABELS[betType],
+        nm: s.nom,
+        ctry: "",
+        note: "",
+        val: s.cote,
+        competitionId: s.competitionId,
+        categorie: s.categorie,
+        codeBateau: null,
+        ...(s.targetPlace != null ? { targetPlace: s.targetPlace } : {}),
+        ...(s.predictedTimeSeconds != null ? { predictedTimeSeconds: s.predictedTimeSeconds } : {}),
+      };
+    }
+    setCoupon(rebuilt);
+    setStake(bet.stake);
+    setComboMode(sels.length > 1);
+    setEditingBetId(bet.id);
+    setEditingOriginalStake(bet.stake);
+    setDrawerOpen(true);
+  }
+
+  function cancelEditBet() {
+    setEditingBetId(null);
+    setEditingOriginalStake(0);
+    setCoupon({});
+    setComboMode(false);
+    setStake(30);
+    setDrawerOpen(false);
+  }
+
   function openBetModal(compId: string, compNom: string) {
     setViewedCompetitionId({ compId, compNom, from: view });
     navigate("competition-detail");
@@ -2124,7 +2185,10 @@ export default function DashboardPage() {
       return;
     }
     if (s < 30) { showToast(<XIcon c="#FF7A45" />, "Mise minimum : 30 cr", true); return; }
-    if (s > balance - 200) { showToast(<XIcon c="#FF7A45" />, "Il doit te rester au moins 200 cr après la mise", true); return; }
+    // En édition, la mise d'origine a déjà été débitée : elle compte comme
+    // disponible pour ce calcul (seule la différence sera vraiment débitée).
+    const availableForStake = balance + (editingBetId ? editingOriginalStake : 0);
+    if (s > availableForStake - 200) { showToast(<XIcon c="#FF7A45" />, "Il doit te rester au moins 200 cr après la mise", true); return; }
     if (betLoading) return;
 
     setBetLoading(true);
@@ -2147,8 +2211,8 @@ export default function DashboardPage() {
         ...(o.predictedTimeSeconds != null ? { predictedTimeSeconds: o.predictedTimeSeconds } : {}),
       }));
 
-      const res  = await fetch("/api/user/bets", {
-        method: "POST",
+      const res  = await fetch(editingBetId ? `/api/user/bets/${editingBetId}` : "/api/user/bets", {
+        method: editingBetId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selections: selectionsPayload, stake: s }),
       });
@@ -2163,7 +2227,11 @@ export default function DashboardPage() {
       setCoupon({});
       setComboMode(false);
       setDrawerOpen(false);
-      showBetSuccessOverlay(Math.round(json.gainPotentiel));
+      const wasEditing = editingBetId != null;
+      setEditingBetId(null);
+      setEditingOriginalStake(0);
+      if (!wasEditing) showBetSuccessOverlay(Math.round(json.gainPotentiel));
+      else showToast(<Check c="#28D7E6" />, "Pari modifié");
       void firstComp;
       fetchBetHistory();
     } catch {
@@ -2351,21 +2419,24 @@ export default function DashboardPage() {
               instagramRewardBusy={instagramRewardBusy}
               onRequestInstagramReward={requestInstagramReward}
               seasonLabel={seasonLabel}
+              onEditBet={startEditBet}
             />
           )}
         </div>
       </main>
 
       {/* ============ SCRIM + DRAWER ============ */}
-      <div className={`scrim${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} />
+      <div className={`scrim${drawerOpen ? " open" : ""}`} onClick={() => (editingBetId ? cancelEditBet() : setDrawerOpen(false))} />
       <aside className={`drawer${drawerOpen ? " open" : ""}`}>
         <div className="drawer-head">
-          <div className="ttl"><TicketStroke c="#fff" /> Mon coupon</div>
+          <div className="ttl"><TicketStroke c="#fff" /> {editingBetId ? "Modifier le pari" : "Mon coupon"}</div>
           <div className="drawer-head-actions">
-            <button className="drawer-info" aria-label="Comment parier" onClick={() => setCouponInfoOpen(true)}>
-              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
-            </button>
-            <button className="close" onClick={() => setDrawerOpen(false)}><XIcon c="#9FBAC6" /></button>
+            {!editingBetId && (
+              <button className="drawer-info" aria-label="Comment parier" onClick={() => setCouponInfoOpen(true)}>
+                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
+              </button>
+            )}
+            <button className="close" onClick={() => (editingBetId ? cancelEditBet() : setDrawerOpen(false))}><XIcon c="#9FBAC6" /></button>
           </div>
         </div>
 
@@ -2415,8 +2486,13 @@ export default function DashboardPage() {
               <span className="gain">{gain.toLocaleString("fr-FR")}</span>
             </div>
             <button className="validate" onClick={validate} disabled={betLoading} style={{ opacity: betLoading ? 0.6 : 1 }}>
-              {betLoading ? "Validation…" : "Valider le pari"}
+              {betLoading ? "Validation…" : editingBetId ? "Enregistrer les modifications" : "Valider le pari"}
             </button>
+            {editingBetId && (
+              <button type="button" className="cls-show-all" onClick={cancelEditBet} disabled={betLoading}>
+                Annuler la modification
+              </button>
+            )}
           </div>
         )}
       </aside>
