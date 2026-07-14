@@ -5,9 +5,11 @@ import type { BetType } from "@/lib/algo/types";
 import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
 import OddsInfoModal from "./OddsInfoModal";
 import AlgoBetaInfoModal from "./AlgoBetaInfoModal";
+import CompetitionReferralModal from "./CompetitionReferralModal";
 
 const BETA_INFO_SEEN_KEY = "kb_algo_beta_seen_v1";
 const COMBO_INFO_SEEN_KEY = "kb_combo_info_seen_v1";
+const COMP_REFERRAL_SEEN_KEY = "kb_comp_referral_seen_v1";
 
 // Cote "place exacte" DYNAMIQUE : recalculée selon la place choisie et la
 // distribution de l'athlète (rang espéré + sigma), même formule que le serveur.
@@ -97,31 +99,21 @@ export default function CategoryBetModal({
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
   const [search, setSearch] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  function shareCompetitionLink() {
-    if (typeof window === "undefined") return;
-    const link = `${window.location.origin}/c/${competitionId}${referralCode ? `?ref=${referralCode}` : ""}`;
-    navigator.clipboard.writeText(link).then(() => {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    });
-  }
   const [cotes, setCotes] = useState<CotesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
   const [betaInfoOpen, setBetaInfoOpen] = useState(false);
+  const [referralModalOpen, setReferralModalOpen] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<string | null>(
     parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null
   );
 
-  // Pop-up bêta/algo : affiché une seule fois, la première fois qu'un joueur
-  // ouvre une compétition pour parier (mémorisé en localStorage). Pop-up
-  // "pari combiné" (partagée avec le coupon, voir onOpenComboInfo) : affichée
-  // une seule fois elle aussi, mais jamais en même temps que la pop-up bêta
-  // (sinon deux pop-ups s'empileraient au tout premier passage) — elle
-  // attend simplement le prochain passage si c'est la toute première visite.
+  // Pop-ups d'info affichées une seule fois chacune (mémorisées en
+  // localStorage), jamais deux en même temps — chacune attend son tour au
+  // prochain passage si une précédente vient de s'afficher : bêta/algo,
+  // puis pari combiné (partagée avec le coupon, voir onOpenComboInfo), puis
+  // parrainage compétition.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!window.localStorage.getItem(BETA_INFO_SEEN_KEY)) {
@@ -132,6 +124,11 @@ export default function CategoryBetModal({
     if (onOpenComboInfo && !window.localStorage.getItem(COMBO_INFO_SEEN_KEY)) {
       onOpenComboInfo();
       window.localStorage.setItem(COMBO_INFO_SEEN_KEY, "1");
+      return;
+    }
+    if (!window.localStorage.getItem(COMP_REFERRAL_SEEN_KEY)) {
+      setReferralModalOpen(true);
+      window.localStorage.setItem(COMP_REFERRAL_SEEN_KEY, "1");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -203,14 +200,10 @@ export default function CategoryBetModal({
         </div>
         <button
           className="catmodal-back"
-          aria-label={linkCopied ? "Lien copié" : "Inviter un ami sur cette compétition (+200 cr chacun)"}
-          onClick={shareCompetitionLink}
+          aria-label="Inviter un ami sur cette compétition (+200 cr chacun)"
+          onClick={() => setReferralModalOpen(true)}
         >
-          {linkCopied ? (
-            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5 10 17 19 7" stroke="#28D7E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="none"><path d="M8.7 13.3a2.6 2.6 0 1 0 0-2.6M15.3 7.5a2.6 2.6 0 1 0 0 2.6M15.3 16.4a2.6 2.6 0 1 0 0-2.6M9.7 11.7l5.6-3.2M9.7 12.3l5.6 3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          )}
+          <svg viewBox="0 0 24 24" fill="none"><path d="M8.7 13.3a2.6 2.6 0 1 0 0-2.6M15.3 7.5a2.6 2.6 0 1 0 0 2.6M15.3 16.4a2.6 2.6 0 1 0 0-2.6M9.7 11.7l5.6-3.2M9.7 12.3l5.6 3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <button className="catmodal-back" aria-label="Comprendre les cotes" onClick={() => setInfoOpen(true)}>
           <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
@@ -443,6 +436,12 @@ export default function CategoryBetModal({
 
       <OddsInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
       <AlgoBetaInfoModal open={betaInfoOpen} onClose={() => setBetaInfoOpen(false)} />
+      <CompetitionReferralModal
+        open={referralModalOpen}
+        onClose={() => setReferralModalOpen(false)}
+        competitionId={competitionId}
+        myReferralCode={referralCode ?? null}
+      />
     </>
   );
 }

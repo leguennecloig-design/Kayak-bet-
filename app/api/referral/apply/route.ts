@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase-server";
 import { displayName } from "@/lib/display-name";
 import { notifyUser } from "@/lib/notifications/create";
+import { registerCompetitionReferral } from "@/lib/referral/competition-referral";
 
 const REFERRAL_BONUS = 400;
 
@@ -35,12 +36,7 @@ export async function POST(req: NextRequest) {
   // sur CETTE compétition, jamais ici. Distinct du bonus de bienvenue
   // (REFERRAL_BONUS) ci-dessous, qui lui tombe immédiatement à l'inscription.
   if (compId) {
-    await adminSb
-      .from("competition_referrals")
-      .upsert(
-        { referrer_id: referrer.id, referred_id: user.id, competition_id: compId, rewarded_at: null },
-        { onConflict: "referred_id" }
-      );
+    await registerCompetitionReferral(adminSb, trimmed, user.id, compId);
   }
 
   // Mise à jour atomique conditionnée à `referred_by IS NULL` : élimine la
