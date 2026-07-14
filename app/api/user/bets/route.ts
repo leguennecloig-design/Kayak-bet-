@@ -164,11 +164,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Un seul pari actif par athlète À LA FOIS DANS LE TEMPS : un nouveau pari
-  // est refusé sur un athlète qui a déjà un pari en attente d'une soumission
-  // précédente (remplace l'ancien plafond de mise cumulée par athlète) —
-  // n'empêche pas de combiner plusieurs types de pari sur le même athlète
-  // dans UN SEUL coupon, seulement d'en reposer un nouveau plus tard.
+  // Un seul pari "de classement" actif par athlète À LA FOIS DANS LE TEMPS :
+  // un nouveau pari Vainqueur/Top3/5/10/20 (ou place exacte n°1) est refusé
+  // sur un athlète qui en a déjà un en attente d'une soumission précédente
+  // (remplace l'ancien plafond de mise cumulée par athlète). Place exacte
+  // ≥ 2 et temps exact restent TOUJOURS cumulables, même avec un pari de
+  // classement déjà en attente sur ce même athlète — ni bloquants, ni
+  // bloqués par cette règle.
+  const isAlwaysStackable = (s: Selection) => {
+    const t = s.betType ?? "TOP_1";
+    return t === "EXACT_TIME" || t === "EXACT_TIME_SECOND" || (t === "EXACT_PLACE" && s.targetPlace !== 1);
+  };
+
   const { data: pendingBetsRows } = await adminSb
     .from("bets")
     .select("selections")
@@ -178,9 +185,13 @@ export async function POST(req: NextRequest) {
   const pendingParticipants = new Map<string, string>(); // participantId -> nom, pour le message d'erreur
   for (const b of pendingBetsRows ?? []) {
     const sels: Selection[] = Array.isArray(b.selections) ? b.selections : [];
-    for (const s of sels) pendingParticipants.set(s.participantId, s.nom);
+    for (const s of sels) {
+      if (isAlwaysStackable(s)) continue;
+      pendingParticipants.set(s.participantId, s.nom);
+    }
   }
   for (const s of selections) {
+    if (isAlwaysStackable(s)) continue;
     if (pendingParticipants.has(s.participantId)) {
       return NextResponse.json(
         { error: `Tu as déjà un pari en attente sur ${pendingParticipants.get(s.participantId)} — attends qu'il soit réglé avant d'en placer un autre.` },
