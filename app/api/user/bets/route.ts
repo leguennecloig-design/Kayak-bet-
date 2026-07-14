@@ -135,19 +135,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Un seul pari actif par athlète à la fois — ni deux sélections sur le même
-  // athlète dans ce coupon, ni un nouveau pari sur un athlète qui a déjà un
-  // pari en attente (remplace l'ancien plafond de mise cumulée par athlète).
-  // Déjà appliqué côté client dans toggle(), revalidé ici car le client n'est
-  // pas fiable.
-  const participantIdsInSubmission = selections.map(s => s.participantId);
-  if (new Set(participantIdsInSubmission).size !== participantIdsInSubmission.length) {
-    return NextResponse.json(
-      { error: "Un seul pari par athlète à la fois — retire les doublons de ton coupon" },
-      { status: 400 }
-    );
+  // Un seul type de classement (Vainqueur/Top3/5/10/20) par athlète DANS CE
+  // COUPON, et Place exacte n°1 incompatible avec Vainqueur pour ce même
+  // athlète (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). Place
+  // exacte ≥ 2 et temps exact (dixième/seconde) restent en revanche toujours
+  // cumulables avec n'importe quel autre pari sur le même athlète — déjà
+  // appliqué côté client dans toggle(), revalidé ici.
+  const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
+  const byParticipantTypes = new Map<string, Selection[]>();
+  for (const s of selections) {
+    byParticipantTypes.set(s.participantId, [...(byParticipantTypes.get(s.participantId) ?? []), s]);
+  }
+  for (const [, sels] of byParticipantTypes) {
+    const types = sels.map(s => s.betType ?? "TOP_1");
+    if (types.filter(t => RANK_TIERS.has(t)).length > 1) {
+      return NextResponse.json(
+        { error: "Un seul type de classement (Vainqueur/Top 3/5/10/20) par athlète" },
+        { status: 400 }
+      );
+    }
+    const hasTop1 = types.includes("TOP_1");
+    const hasExactPlace1 = sels.some(s => (s.betType ?? "TOP_1") === "EXACT_PLACE" && s.targetPlace === 1);
+    if (hasTop1 && hasExactPlace1) {
+      return NextResponse.json(
+        { error: "Vainqueur et Place exacte n°1 sont incompatibles pour un même athlète" },
+        { status: 400 }
+      );
+    }
   }
 
+  // Un seul pari actif par athlète À LA FOIS DANS LE TEMPS : un nouveau pari
+  // est refusé sur un athlète qui a déjà un pari en attente d'une soumission
+  // précédente (remplace l'ancien plafond de mise cumulée par athlète) —
+  // n'empêche pas de combiner plusieurs types de pari sur le même athlète
+  // dans UN SEUL coupon, seulement d'en reposer un nouveau plus tard.
   const { data: pendingBetsRows } = await adminSb
     .from("bets")
     .select("selections")

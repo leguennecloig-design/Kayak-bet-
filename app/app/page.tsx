@@ -1774,9 +1774,11 @@ export default function DashboardPage() {
   }, []);
 
   // ── Pop-ups de relance au lancement de la PWA ────────────────────────────
-  // Une seule à la fois par lancement, dans cet ordre de priorité : Instagram
-  // (toujours la 1re fois, puis aléatoirement) > parrainage (jusqu'à cocher
-  // "ne plus afficher") > notifications désactivées > pas de photo de profil.
+  // Une seule à la fois par lancement, dans cet ordre de priorité :
+  // notifications désactivées (priorité absolue, affichée à CHAQUE lancement
+  // tant qu'elles ne sont pas activées) > Instagram (toujours la 1re fois,
+  // puis aléatoirement) > parrainage (jusqu'à cocher "ne plus afficher") >
+  // pas de photo de profil.
   const [activeNudge, setActiveNudge] = useState<null | "instagram" | "referral" | "notifications" | "photo">(null);
   const nudgeCheckedRef = useRef(false);
   const pushNudge = usePushNotifications();
@@ -1787,6 +1789,11 @@ export default function DashboardPage() {
     if (instagramRewardStatus === "loading") return;
     if (!pushNudge.checked) return; // attend de savoir si les notifs sont déjà actives
     nudgeCheckedRef.current = true;
+
+    if (pushNudge.supported && !pushNudge.subscribed) {
+      setActiveNudge("notifications");
+      return;
+    }
 
     const INSTA_MIN_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 jours
     function instagramEligible(): boolean {
@@ -1808,10 +1815,6 @@ export default function DashboardPage() {
     }
     if (typeof window !== "undefined" && !window.localStorage.getItem("kb_referral_nudge_dismissed")) {
       setActiveNudge("referral");
-      return;
-    }
-    if (pushNudge.supported && !pushNudge.subscribed) {
-      setActiveNudge("notifications");
       return;
     }
     if (!avatarUrl) {
@@ -1912,11 +1915,15 @@ export default function DashboardPage() {
     toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 2800);
   }
 
-  // Un seul pari actif par athlète — sélectionner un nouveau pari sur un
-  // athlète déjà dans le coupon remplace l'ancien plutôt que de les cumuler
-  // (revalidé côté serveur : un athlète avec un pari déjà en attente ne peut
-  // de toute façon plus être sélectionné).
-  //
+  // Un seul TYPE DE CLASSEMENT (Vainqueur/Top3/5/10/20) par athlète — en
+  // sélectionner un nouveau remplace l'ancien plutôt que de les cumuler.
+  // Place exacte n°1 est incompatible avec Vainqueur pour ce même athlète
+  // (redondant : "place exacte 1" équivaut déjà à "Vainqueur"). En revanche,
+  // place exacte ≥ 2 et temps exact (dixième/seconde) restent TOUJOURS
+  // cumulables avec n'importe quel autre pari sur le même athlète — on peut
+  // par ex. combiner Vainqueur + Temps exact sur le même coureur.
+  const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
+
   // Un seul athlète ne peut gagner une catégorie donnée : sélectionner un
   // pari Vainqueur (ou "place exacte n°1", équivalent) remplace tout autre
   // pari Vainqueur/place-exacte-1 déjà pris sur un AUTRE athlète de la même
@@ -1962,9 +1969,14 @@ export default function DashboardPage() {
       for (const key of Object.keys(next)) {
         const existing = next[key];
         const sameParticipant = existing.participantId === o.participantId;
+        const bothRankTiers   = sameParticipant && RANK_TIERS.has(o.betType) && RANK_TIERS.has(existing.betType);
+        const top1VsExactPl1  = sameParticipant && (
+          (o.betType === "TOP_1" && existing.betType === "EXACT_PLACE" && existing.targetPlace === 1) ||
+          (o.betType === "EXACT_PLACE" && o.targetPlace === 1 && existing.betType === "TOP_1")
+        );
         const rivalWinnerSameCategory =
           oIsWinner && !sameParticipant && isWinnerBet(existing) && existing.categorie === o.categorie;
-        if (sameParticipant || rivalWinnerSameCategory) delete next[key];
+        if (bothRankTiers || top1VsExactPl1 || rivalWinnerSameCategory) delete next[key];
       }
       next[o.id] = o;
       return next;
