@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { comboBonusFor } from "@/lib/bets/combo";
+import { notifyUser } from "@/lib/notifications/create";
 import {
   type Selection,
   MIN_STAKE,
@@ -12,6 +13,8 @@ import {
   checkPendingConflicts,
   revalidateSelections,
 } from "@/lib/bets/validate-selections";
+
+const COMPETITION_REFERRAL_BONUS = 200;
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
 function fmtDate(iso: string) {
@@ -113,18 +116,19 @@ export async function POST(req: NextRequest) {
   // séparé, pouvaient toutes les deux lire le même solde suffisant avant
   // qu'aucune n'écrive, et donc placer plusieurs paris pour un solde qui
   // n'aurait dû en couvrir qu'un (voire faire passer le solde en négatif).
-  const { data: newBalance, error: debitErr } = await adminSb.rpc("decrement_balance_if_sufficient", {
+  const { data: newBalanceRaw, error: debitErr } = await adminSb.rpc("decrement_balance_if_sufficient", {
     user_uuid: user.id,
     amount: stake,
     floor_balance: BALANCE_FLOOR,
   });
   if (debitErr) return NextResponse.json({ error: debitErr.message }, { status: 500 });
-  if (newBalance == null) {
+  if (newBalanceRaw == null) {
     return NextResponse.json(
       { error: `Solde insuffisant (il doit rester au moins ${BALANCE_FLOOR} cr après la mise)` },
       { status: 400 }
     );
   }
+  let finalBalance = Number(newBalanceRaw);
 
   // Insérer le pari
   const { data: bet, error: betErr } = await adminSb
@@ -156,9 +160,81 @@ export async function POST(req: NextRequest) {
     description: `Mise · ${selections.map(s => s.nom).join(", ")}`,
   });
 
+  // Bonus de parrainage lié à une compétition (lien /c/[id]?ref=CODE, voir
+  // POST /api/referral/apply) : versé au parrain ET au filleul dès que ce
+  // dernier place son PREMIER pari sur LA compétition visée par le lien —
+  // jamais à l'inscription elle-même. Un seul bonus par pari, même si le
+  // coupon référence plusieurs compétitions avec invitations en attente.
+  let referralBonusApplied = 0;
+  for (const compId of uniqueComps) {
+    const { data: pendingRef } = await adminSb
+      .from("competition_referrals")
+      .select("id, referrer_id")
+      .eq("referred_id", user.id)
+      .eq("competition_id", compId)
+      .is("rewarded_at", null)
+      .maybeSingle();
+    if (!pendingRef) continue;
+
+    const { count: priorBetsCount } = await adminSb
+      .from("bets")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .neq("id", bet.id)
+      .contains("selections", JSON.stringify([{ competitionId: compId }]));
+    if (priorBetsCount && priorBetsCount > 0) continue;
+
+    // Marque "récompensé" de façon atomique (WHERE rewarded_at IS NULL) pour
+    // éviter un double crédit si deux requêtes concurrentes matchaient toutes
+    // les deux la même invitation en attente.
+    const { data: claimed } = await adminSb
+      .from("competition_referrals")
+      .update({ rewarded_at: new Date().toISOString() })
+      .eq("id", pendingRef.id)
+      .is("rewarded_at", null)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) continue;
+
+    await adminSb.rpc("increment_user_balance", { user_uuid: pendingRef.referrer_id, delta: COMPETITION_REFERRAL_BONUS });
+    const { data: balAfterBonus } = await adminSb.rpc("increment_user_balance", {
+      user_uuid: user.id,
+      delta: COMPETITION_REFERRAL_BONUS,
+    });
+    if (balAfterBonus != null) finalBalance = Number(balAfterBonus);
+
+    await adminSb.from("transactions").insert([
+      {
+        user_id:     pendingRef.referrer_id,
+        type:        "referral_bonus",
+        amount:      COMPETITION_REFERRAL_BONUS,
+        description: "Parrainage compétition — ton filleul a placé son premier pari grâce à toi",
+      },
+      {
+        user_id:     user.id,
+        type:        "referral_bonus",
+        amount:      COMPETITION_REFERRAL_BONUS,
+        bet_id:      bet.id,
+        description: "Parrainage compétition — bonus pour ton premier pari sur cette compétition",
+      },
+    ]);
+
+    await notifyUser(adminSb, pendingRef.referrer_id, {
+      type: "referral_used",
+      title: "Ton filleul a parié ! 🎉",
+      body: `Il/elle vient de placer son premier pari sur la compétition à laquelle tu l'as invité. +${COMPETITION_REFERRAL_BONUS} crédits pour toi !`,
+      url: "/app",
+      actorId: user.id,
+    });
+
+    referralBonusApplied = COMPETITION_REFERRAL_BONUS;
+    break;
+  }
+
   return NextResponse.json({
     betId:         bet.id,
-    newBalance:    Number(newBalance),
+    newBalance:    finalBalance,
     gainPotentiel,
+    referralBonusApplied,
   });
 }

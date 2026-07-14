@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
 
-  const { code } = await req.json().catch(() => ({}));
+  const { code, compId } = await req.json().catch(() => ({}));
   const trimmed = String(code ?? "").trim().toUpperCase();
   if (!trimmed) return NextResponse.json({ ok: false, reason: "no_code" });
 
@@ -27,6 +27,20 @@ export async function POST(req: NextRequest) {
 
   if (!referrer || referrer.id === user.id) {
     return NextResponse.json({ ok: false, reason: "invalid_code" });
+  }
+
+  // Lien de compétition (?ref=CODE capturé depuis /c/[id]) : enregistre
+  // l'intention de parrainage liée à cette compétition précise — le bonus de
+  // 200 cr (voir POST /api/user/bets) ne tombe qu'au premier pari du filleul
+  // sur CETTE compétition, jamais ici. Distinct du bonus de bienvenue
+  // (REFERRAL_BONUS) ci-dessous, qui lui tombe immédiatement à l'inscription.
+  if (compId) {
+    await adminSb
+      .from("competition_referrals")
+      .upsert(
+        { referrer_id: referrer.id, referred_id: user.id, competition_id: compId, rewarded_at: null },
+        { onConflict: "referred_id" }
+      );
   }
 
   // Mise à jour atomique conditionnée à `referred_by IS NULL` : élimine la

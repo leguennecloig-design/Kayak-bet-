@@ -12,6 +12,7 @@ type Mode = "login" | "signup" | "sent" | "forgot" | "reset-sent" | "welcome" | 
 
 const PUSH_PROMPT_DISMISSED_KEY = "kb_push_prompt_dismissed";
 const REFERRAL_CODE_KEY = "kb_referral_code";
+const REFERRAL_COMP_KEY = "kb_referral_comp_id";
 type OnbStep = "profile" | "setup" | "athlete" | "source" | "push" | "install";
 
 type AthleteResult = {
@@ -504,8 +505,14 @@ export default function LoginPage() {
   // ou à la confirmation d'email avant d'être appliqué (voir onDone du mode
   // "welcome" plus bas), donc stocké en localStorage plutôt qu'en state.
   useEffect(() => {
-    const ref = new URLSearchParams(window.location.search).get("ref");
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
     if (ref) localStorage.setItem(REFERRAL_CODE_KEY, ref.trim().toUpperCase());
+    // Lien de compétition (/c/[id]?ref=CODE) : mémorise la compétition visée
+    // pour que le bonus de 200 cr se déclenche au premier pari du filleul
+    // dessus (voir POST /api/user/bets), pas à l'inscription.
+    const comp = params.get("comp");
+    if (comp) localStorage.setItem(REFERRAL_COMP_KEY, comp.trim());
   }, []);
 
   // Rien à proposer (déjà abonné, ou pas supporté sur cet appareil) — on
@@ -651,13 +658,15 @@ export default function LoginPage() {
             // silencieusement sur le vrai solde (visible dans /app), sans
             // jamais contaminer le montant affiché dans l'animation.
             const refCode = typeof window !== "undefined" ? localStorage.getItem(REFERRAL_CODE_KEY) : null;
+            const refCompId = typeof window !== "undefined" ? localStorage.getItem(REFERRAL_COMP_KEY) : null;
             if (refCode) {
               localStorage.removeItem(REFERRAL_CODE_KEY);
+              localStorage.removeItem(REFERRAL_COMP_KEY);
               try {
                 await fetch("/api/referral/apply", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ code: refCode }),
+                  body: JSON.stringify({ code: refCode, compId: refCompId || undefined }),
                 });
               } catch {
                 // pas bloquant — au pire le parrainage n'est pas appliqué

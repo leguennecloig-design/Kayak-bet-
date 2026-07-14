@@ -1776,6 +1776,7 @@ export default function DashboardPage() {
 
   const [view,          setView]          = useState<View>("home");
   const [balance,       setBalance]       = useState(0);
+  const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
   const [comboMode,     setComboMode]     = useState(false);
   const [couponInfoOpen, setCouponInfoOpen] = useState(false);
@@ -1951,6 +1952,10 @@ export default function DashboardPage() {
     fetch("/api/season/current")
       .then(res => res.json())
       .then(data => { if (data.label) setSeasonLabel(data.label); })
+      .catch(() => {});
+    fetch("/api/referral")
+      .then(res => res.json())
+      .then(data => setMyReferralCode(data.code ?? null))
       .catch(() => {});
   }, []);
 
@@ -2273,6 +2278,9 @@ export default function DashboardPage() {
       setEditingOriginalStake(0);
       if (!wasEditing) showBetSuccessOverlay(Math.round(json.gainPotentiel));
       else showToast(<Check c="#28D7E6" />, "Pari modifié");
+      if (json.referralBonusApplied) {
+        showToast(<Check c="#28D7E6" />, `+${json.referralBonusApplied} cr · bonus de parrainage sur cette compétition`);
+      }
       void firstComp;
       fetchBetHistory();
     } catch {
@@ -2431,6 +2439,7 @@ export default function DashboardPage() {
               couponCount={count}
               onOpenCoupon={() => setDrawerOpen(true)}
               onOpenComboInfo={() => setCouponInfoOpen(true)}
+              referralCode={myReferralCode}
             />
           )}
           {view === "joueur" && viewedPlayerId && (

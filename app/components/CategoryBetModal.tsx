@@ -85,6 +85,7 @@ type Props = {
   couponCount: number;
   onOpenCoupon: () => void;
   onOpenComboInfo?: () => void;
+  referralCode?: string | null;
 };
 
 function fmtOpensAt(iso: string) {
@@ -92,10 +93,20 @@ function fmtOpensAt(iso: string) {
 }
 
 export default function CategoryBetModal({
-  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon, onOpenComboInfo,
+  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon, onOpenComboInfo, referralCode,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
   const [search, setSearch] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  function shareCompetitionLink() {
+    if (typeof window === "undefined") return;
+    const link = `${window.location.origin}/c/${competitionId}${referralCode ? `?ref=${referralCode}` : ""}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }
   const [cotes, setCotes] = useState<CotesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -190,6 +201,17 @@ export default function CategoryBetModal({
           </div>
           <h3>{competitionNom}</h3>
         </div>
+        <button
+          className="catmodal-back"
+          aria-label={linkCopied ? "Lien copié" : "Inviter un ami sur cette compétition (+200 cr chacun)"}
+          onClick={shareCompetitionLink}
+        >
+          {linkCopied ? (
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5 10 17 19 7" stroke="#28D7E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none"><path d="M8.7 13.3a2.6 2.6 0 1 0 0-2.6M15.3 7.5a2.6 2.6 0 1 0 0 2.6M15.3 16.4a2.6 2.6 0 1 0 0-2.6M9.7 11.7l5.6-3.2M9.7 12.3l5.6 3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          )}
+        </button>
         <button className="catmodal-back" aria-label="Comprendre les cotes" onClick={() => setInfoOpen(true)}>
           <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" /><path d="M12 11v5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="7.8" r="1.1" fill="currentColor" /></svg>
         </button>
