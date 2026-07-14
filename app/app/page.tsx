@@ -258,7 +258,7 @@ type BetRecord = {
   athlete: string;
   odds: number;
   stake: number;
-  result: "win" | "loss" | "pending";
+  result: "win" | "loss" | "pending" | "cancelled";
   date: string;
   gainPotentiel?: number;
   gainReel?: number | null;
@@ -426,6 +426,7 @@ type ProfilViewProps = {
   onRequestInstagramReward: (handle: string) => void;
   seasonLabel: string;
   onEditBet: (bet: BetRecord) => void;
+  onCancelBet: (bet: BetRecord) => void;
 };
 
 type LinkedAthlete = { id: string; nom: string; prenom: string | null; club: string | null; categorie: string | null; rangNational?: number | null };
@@ -1135,7 +1136,9 @@ function PlayerProfileView({ playerId, onBack, seasonLabel }: PlayerProfileViewP
                   ? `+${(b.gainReel ?? b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")}`
                   : b.result === "loss"
                     ? `-${b.stake}`
-                    : `${(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} en jeu`;
+                    : b.result === "cancelled"
+                      ? "Remboursé"
+                      : `${(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} en jeu`;
                 return (
                   <div key={b.id} className={`history-item hi-${b.result}`}>
                     <div className={`hi-avatar hi-avatar-${b.result}`}>
@@ -1280,9 +1283,10 @@ function LeagueView({ leagueId, onBack }: LeagueViewProps) {
   );
 }
 
-function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardStatus, instagramRewardBusy, onRequestInstagramReward, seasonLabel, onEditBet }: ProfilViewProps) {
-  const totalWins = effectiveBets.filter((b) => b.result === "win").length;
-  const totalBets = effectiveBets.length;
+function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardStatus, instagramRewardBusy, onRequestInstagramReward, seasonLabel, onEditBet, onCancelBet }: ProfilViewProps) {
+  const countedBets = effectiveBets.filter((b) => b.result !== "cancelled");
+  const totalWins = countedBets.filter((b) => b.result === "win").length;
+  const totalBets = countedBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
 
   const [friends, setFriends] = useState<FriendEntry[]>([]);
@@ -1490,7 +1494,10 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
                   <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
                   <div className="hi-date">{fmtDate(b.date)}</div>
                   {b.result === "pending" && b.selections && b.selections.length > 0 && (
-                    <button type="button" className="hi-edit" onClick={() => onEditBet(b)}>Modifier</button>
+                    <div className="hi-actions">
+                      <button type="button" className="hi-edit" onClick={() => onEditBet(b)}>Modifier</button>
+                      <button type="button" className="hi-cancel" onClick={() => onCancelBet(b)}>Annuler</button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1772,7 +1779,7 @@ export default function DashboardPage() {
   const [coupon,        setCoupon]        = useState<Record<string, Odd>>({});
   const [comboMode,     setComboMode]     = useState(false);
   const [couponInfoOpen, setCouponInfoOpen] = useState(false);
-  const [stake,         setStake]         = useState(30);
+  const [stake,         setStake]         = useState(100);
   const [editingBetId,  setEditingBetId]  = useState<string | null>(null);
   const [editingOriginalStake, setEditingOriginalStake] = useState(0);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
@@ -2126,8 +2133,25 @@ export default function DashboardPage() {
     setEditingOriginalStake(0);
     setCoupon({});
     setComboMode(false);
-    setStake(30);
+    setStake(100);
     setDrawerOpen(false);
+  }
+
+  async function cancelBet(bet: BetRecord) {
+    if (!confirm(`Annuler ce pari et récupérer tes ${bet.stake} cr ?`)) return;
+    try {
+      const res = await fetch(`/api/user/bets/${bet.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setBalance(Number(json.newBalance));
+        fetchBetHistory();
+        showToast(<Check c="#28D7E6" />, "Pari annulé, mise remboursée");
+      } else {
+        showToast(<XIcon c="#FF7A45" />, json.error ?? "Erreur", true);
+      }
+    } catch {
+      showToast(<XIcon c="#FF7A45" />, "Erreur réseau", true);
+    }
   }
 
   function openBetModal(compId: string, compNom: string) {
@@ -2200,7 +2224,7 @@ export default function DashboardPage() {
       showToast(<XIcon c="#FF7A45" />, "Active « Pari combiné » pour valider plusieurs sélections à la fois", true);
       return;
     }
-    if (s < 30) { showToast(<XIcon c="#FF7A45" />, "Mise minimum : 30 cr", true); return; }
+    if (s < 100) { showToast(<XIcon c="#FF7A45" />, "Mise minimum : 100 cr", true); return; }
     if (s > 1_000_000) { showToast(<XIcon c="#FF7A45" />, "Mise maximum : 1 000 000 cr", true); return; }
     // En édition, la mise d'origine a déjà été débitée : elle compte comme
     // disponible pour ce calcul (seule la différence sera vraiment débitée).
@@ -2437,6 +2461,7 @@ export default function DashboardPage() {
               onRequestInstagramReward={requestInstagramReward}
               seasonLabel={seasonLabel}
               onEditBet={startEditBet}
+              onCancelBet={cancelBet}
             />
           )}
         </div>
@@ -2490,7 +2515,7 @@ export default function DashboardPage() {
             <div className="stake">
               <label>Mise</label>
               <div className="field">
-                <input type="number" min={30} max={1_000_000} value={stake} onChange={(e) => setStake(Math.min(1_000_000, Math.max(0, +e.target.value || 0)))} />
+                <input type="number" min={100} max={1_000_000} value={stake} onChange={(e) => setStake(Math.min(1_000_000, Math.max(0, +e.target.value || 0)))} />
                 <div className="chips">
                   <button className="chip" onClick={() => setStake((s) => Math.min(1_000_000, (s || 0) + 10))}>+10</button>
                   <button className="chip" onClick={() => setStake((s) => Math.min(1_000_000, (s || 0) + 50))}>+50</button>

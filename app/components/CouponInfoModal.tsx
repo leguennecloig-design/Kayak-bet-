@@ -83,7 +83,7 @@ export default function CouponInfoModal({ open, onClose }: Props) {
             <li>Un seul pronostic « Vainqueur » par catégorie (un seul athlète peut gagner une course).</li>
             <li>Au plus 3 pronostics « Top 3 », 5 « Top 5 » et 10 « Top 10 » par catégorie — pas plus que de places disponibles dans le marché.</li>
             <li><b>Place exacte</b> (à partir de la 2ᵉ place) et <b>temps exact</b> (dixième/seconde) se combinent toujours avec un autre pronostic sur le même athlète — même s&apos;il a déjà un pari Vainqueur dans le coupon.</li>
-            <li>Mise minimum 30 cr.</li>
+            <li>Mise minimum 100 cr, maximum 1 000 000 cr.</li>
           </ul>
         </div>
       </div>

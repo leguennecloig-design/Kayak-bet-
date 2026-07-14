@@ -133,3 +133,66 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     gainPotentiel,
   });
 }
+
+// DELETE /api/user/bets/[id]
+// Annule un pari EN ATTENTE et rembourse la mise, tant qu'aucune des
+// compétitions référencées n'a commencé (date <= aujourd'hui) — au-delà,
+// impossible de revenir en arrière.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const supabase = createServerSupabase();
+  const adminSb  = createAdminSupabase();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
+
+  const { data: existing, error: existingErr } = await adminSb
+    .from("bets")
+    .select("id, user_id, status, stake, selections")
+    .eq("id", params.id)
+    .single();
+  if (existingErr || !existing) return NextResponse.json({ error: "Pari introuvable" }, { status: 404 });
+  if (existing.user_id !== user.id) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  if (existing.status !== "pending") {
+    return NextResponse.json({ error: "Ce pari est déjà réglé, il ne peut plus être annulé" }, { status: 400 });
+  }
+
+  const selections: Selection[] = Array.isArray(existing.selections) ? existing.selections : [];
+  const compIds = [...new Set(selections.map(s => s.competitionId))];
+  const { data: comps } = await adminSb.from("competitions").select("id, date").in("id", compIds);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const alreadyStarted = (comps ?? []).some(c => c.date && c.date <= todayStr);
+  if (alreadyStarted) {
+    return NextResponse.json(
+      { error: "Cette compétition a déjà commencé, impossible d'annuler ce pari" },
+      { status: 400 }
+    );
+  }
+
+  const stake = Number(existing.stake);
+  const { data: newBalance, error: refundErr } = await adminSb.rpc("increment_user_balance", {
+    user_uuid: user.id,
+    delta: stake,
+  });
+  if (refundErr) return NextResponse.json({ error: refundErr.message }, { status: 500 });
+
+  const { error: cancelErr } = await adminSb
+    .from("bets")
+    .update({ status: "cancelled", settled_at: new Date().toISOString() })
+    .eq("id", existing.id);
+
+  if (cancelErr) {
+    // Rollback du remboursement si l'annulation du pari échoue.
+    await adminSb.rpc("decrement_balance_if_sufficient", { user_uuid: user.id, amount: stake, floor_balance: 0 });
+    return NextResponse.json({ error: cancelErr.message }, { status: 500 });
+  }
+
+  await adminSb.from("transactions").insert({
+    user_id:     user.id,
+    type:        "refund",
+    amount:      stake,
+    bet_id:      existing.id,
+    description: `Pari annulé · ${selections.map(s => s.nom).join(", ")}`,
+  });
+
+  return NextResponse.json({ ok: true, newBalance: Number(newBalance) });
+}

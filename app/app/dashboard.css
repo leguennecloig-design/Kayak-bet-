@@ -2378,6 +2378,7 @@
 .kb-app .hi-avatar-win     { border-color: var(--cyan); }
 .kb-app .hi-avatar-loss    { border-color: var(--coral); background: linear-gradient(140deg, #5c6b73, #3a4750); }
 .kb-app .hi-avatar-pending { border-color: #7C9AAA; background: linear-gradient(140deg, #4d6470, #35454d); }
+.kb-app .hi-avatar-cancelled { border-color: #5c7c8c; background: linear-gradient(140deg, #3a4750, #263038); opacity: 0.75; }
 .kb-app .hi-body {
   flex: 1;
   min-width: 0;
@@ -2407,22 +2408,35 @@
 .kb-app .hi-result-win     { color: var(--cyan); }
 .kb-app .hi-result-loss    { color: var(--coral); }
 .kb-app .hi-result-pending { color: #7C9AAA; }
+.kb-app .hi-result-cancelled {
+  font: 700 11px/1 var(--font-archivo);
+  color: #5c7c8c;
+  font-style: normal;
+}
 .kb-app .hi-date {
   font: 600 10px/1 var(--font-archivo);
   color: var(--sub);
   margin-top: 4px;
 }
-.kb-app .hi-edit {
+.kb-app .hi-actions {
+  display: flex;
+  gap: 6px;
   margin-top: 6px;
+  justify-content: flex-end;
+}
+.kb-app .hi-edit,
+.kb-app .hi-cancel {
   padding: 4px 10px;
   border: 1px solid rgba(159, 186, 198, 0.3);
   border-radius: 999px;
   background: transparent;
-  color: var(--cyan);
   font: 700 10px/1 var(--font-archivo);
   cursor: pointer;
 }
-.kb-app .hi-edit:active { opacity: 0.7; }
+.kb-app .hi-edit { color: var(--cyan); }
+.kb-app .hi-cancel { color: var(--coral); border-color: rgba(255, 122, 69, 0.3); }
+.kb-app .hi-edit:active,
+.kb-app .hi-cancel:active { opacity: 0.7; }
 
 .kb-app .profil-signout {
   display: flex;

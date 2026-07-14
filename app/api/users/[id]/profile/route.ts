@@ -43,8 +43,9 @@ export async function GET(
     .select("status, gain_reel")
     .eq("user_id", targetId);
 
-  const totalBets = statsRows?.length ?? 0;
-  const wins      = statsRows?.filter(b => b.status === "won").length ?? 0;
+  const countedBets = statsRows?.filter(b => b.status !== "cancelled") ?? [];
+  const totalBets = countedBets.length;
+  const wins      = countedBets.filter(b => b.status === "won").length;
   const winRate   = totalBets > 0 ? Math.round((wins / totalBets) * 100) : 0;
 
   let betQuery = adminSb
@@ -67,8 +68,9 @@ export async function GET(
       : sels.map(s => s?.nom).join(" + ");
 
     const result =
-      b.status === "won"  ? "win" :
-      b.status === "lost" ? "loss" :
+      b.status === "won"       ? "win" :
+      b.status === "lost"      ? "loss" :
+      b.status === "cancelled" ? "cancelled" :
       "pending";
 
     return {

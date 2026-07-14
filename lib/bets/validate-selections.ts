@@ -22,7 +22,7 @@ export type Selection = {
 };
 
 export const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME", "EXACT_TIME_SECOND"];
-export const MIN_STAKE = 30;
+export const MIN_STAKE = 100;
 export const MAX_STAKE = 1_000_000;
 export const BALANCE_FLOOR = 200;
 const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);

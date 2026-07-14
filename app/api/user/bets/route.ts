@@ -48,8 +48,9 @@ export async function GET() {
       : sels.map(s => s.nom).join(" + ");
 
     const result =
-      b.status === "won"  ? "win" :
-      b.status === "lost" ? "loss" :
+      b.status === "won"       ? "win" :
+      b.status === "lost"      ? "loss" :
+      b.status === "cancelled" ? "cancelled" :
       "pending";
 
     return {
