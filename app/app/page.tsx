@@ -280,6 +280,18 @@ function fmtDate(iso: string) {
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
 }
 
+// Initiales d'un nom d'athlète pour l'avatar de l'historique des paris
+// (ex: "D. Tostain" -> "DT"). Pour un pari combiné, `athlete` est une
+// chaîne du type "D. Tostain + L. Fontaine" — on affiche alors le nombre
+// de sélections plutôt que des initiales trompeuses.
+function betAvatarLabel(athlete: string, selectionsCount: number) {
+  if (selectionsCount > 1) return `×${selectionsCount}`;
+  const parts = athlete.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const TOPNAV = [
   { ic: "home",   t: "Accueil",      v: "home"         as View | "drawer" },
   { ic: "trophy", t: "Compétitions", v: "competitions" as View | "drawer" },
@@ -1126,10 +1138,12 @@ function PlayerProfileView({ playerId, onBack, seasonLabel }: PlayerProfileViewP
                     : `${(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} en jeu`;
                 return (
                   <div key={b.id} className={`history-item hi-${b.result}`}>
-                    <div className={`hi-dot hi-dot-${b.result}`} />
+                    <div className={`hi-avatar hi-avatar-${b.result}`}>
+                      {betAvatarLabel(b.athlete, b.selections?.length ?? 1)}
+                    </div>
                     <div className="hi-body">
-                      <div className="hi-event">{b.event}</div>
-                      <div className="hi-athlete">{b.athlete} · {b.odds.toFixed(2)}</div>
+                      <div className="hi-athlete-main">{b.athlete}</div>
+                      <div className="hi-event-sub">{b.event} · {b.odds.toFixed(2)}</div>
                     </div>
                     <div className="hi-right">
                       <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
@@ -1465,10 +1479,12 @@ function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets,
                 : `${(b.gainPotentiel ?? Math.round(b.stake * b.odds)).toLocaleString("fr-FR")} en jeu`;
             return (
               <div key={b.id} className={`history-item hi-${b.result}`}>
-                <div className={`hi-dot hi-dot-${b.result}`} />
+                <div className={`hi-avatar hi-avatar-${b.result}`}>
+                  {betAvatarLabel(b.athlete, b.selections?.length ?? 1)}
+                </div>
                 <div className="hi-body">
-                  <div className="hi-event">{b.event}</div>
-                  <div className="hi-athlete">{b.athlete} · {b.odds.toFixed(2)}</div>
+                  <div className="hi-athlete-main">{b.athlete}</div>
+                  <div className="hi-event-sub">{b.event} · {b.odds.toFixed(2)}</div>
                 </div>
                 <div className="hi-right">
                   <div className={`hi-result hi-result-${b.result}`}>{showGain}</div>
@@ -2185,6 +2201,7 @@ export default function DashboardPage() {
       return;
     }
     if (s < 30) { showToast(<XIcon c="#FF7A45" />, "Mise minimum : 30 cr", true); return; }
+    if (s > 1_000_000) { showToast(<XIcon c="#FF7A45" />, "Mise maximum : 1 000 000 cr", true); return; }
     // En édition, la mise d'origine a déjà été débitée : elle compte comme
     // disponible pour ce calcul (seule la différence sera vraiment débitée).
     const availableForStake = balance + (editingBetId ? editingOriginalStake : 0);
@@ -2473,10 +2490,10 @@ export default function DashboardPage() {
             <div className="stake">
               <label>Mise</label>
               <div className="field">
-                <input type="number" min={30} value={stake} onChange={(e) => setStake(Math.max(0, +e.target.value || 0))} />
+                <input type="number" min={30} max={1_000_000} value={stake} onChange={(e) => setStake(Math.min(1_000_000, Math.max(0, +e.target.value || 0)))} />
                 <div className="chips">
-                  <button className="chip" onClick={() => setStake((s) => (s || 0) + 10)}>+10</button>
-                  <button className="chip" onClick={() => setStake((s) => (s || 0) + 50)}>+50</button>
+                  <button className="chip" onClick={() => setStake((s) => Math.min(1_000_000, (s || 0) + 10))}>+10</button>
+                  <button className="chip" onClick={() => setStake((s) => Math.min(1_000_000, (s || 0) + 50))}>+50</button>
                 </div>
               </div>
             </div>

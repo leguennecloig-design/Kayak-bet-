@@ -2362,30 +2362,40 @@
 .kb-app .history-item:last-child {
   border-bottom: none;
 }
-.kb-app .hi-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.kb-app .hi-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 800 12.5px/1 var(--font-archivo);
+  color: #fff;
+  background: linear-gradient(140deg, var(--cyan), var(--blue));
+  border: 2px solid transparent;
 }
-.kb-app .hi-dot-win     { background: var(--cyan); }
-.kb-app .hi-dot-loss    { background: var(--coral); }
-.kb-app .hi-dot-pending { background: #7C9AAA; }
+.kb-app .hi-avatar-win     { border-color: var(--cyan); }
+.kb-app .hi-avatar-loss    { border-color: var(--coral); background: linear-gradient(140deg, #5c6b73, #3a4750); }
+.kb-app .hi-avatar-pending { border-color: #7C9AAA; background: linear-gradient(140deg, #4d6470, #35454d); }
 .kb-app .hi-body {
   flex: 1;
   min-width: 0;
 }
-.kb-app .hi-event {
-  font: 700 12.5px/1.2 var(--font-archivo);
+.kb-app .hi-athlete-main {
+  font: 800 13.5px/1.2 var(--font-archivo);
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.kb-app .hi-athlete {
-  font: 600 11px/1 var(--font-archivo);
+.kb-app .hi-event-sub {
+  font: 600 11px/1.3 var(--font-archivo);
   color: var(--sub);
   margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .kb-app .hi-right {
   text-align: right;
@@ -3208,7 +3218,10 @@
   bottom: calc(84px + env(safe-area-inset-bottom));
   z-index: 55;
   max-width: 420px;
+  max-height: min(60vh, 480px);
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(180deg, var(--navy-2), var(--navy) 60%);
   border: 1px solid var(--border-2);
   border-radius: 16px;
@@ -3216,6 +3229,7 @@
   overflow: hidden;
 }
 .kb-app .update-popup-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 11px;
@@ -3241,11 +3255,12 @@
   gap: 1px;
 }
 .kb-app .update-popup-titles .t {
-  font: 800 13.5px/1.2 var(--font-archivo);
+  font: 800 13.5px/1.25 var(--font-archivo);
   color: #fff;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .kb-app .update-popup-titles .v {
   font: 600 11px/1 var(--font-archivo);
@@ -3280,6 +3295,9 @@
   gap: 10px;
   border-top: 1px solid var(--border);
   padding-top: 14px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 .kb-app .update-popup-section {
   font: 700 9.5px/1 var(--font-grotesk), monospace;
