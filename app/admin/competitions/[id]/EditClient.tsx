@@ -19,6 +19,7 @@ type Competition = {
   paris_ouverts_a: string | null;
   debute_a: string | null;
   leaderboard_visible?: boolean;
+  archived?: boolean;
 };
 
 // ISO -> "YYYY-MM-DDTHH:mm" pour <input type="datetime-local"> (en heure locale)
@@ -112,6 +113,8 @@ export default function EditClient({
   const [status,     setStatus]     = useState(competition.status);
   const [saving,     setSaving]     = useState(false);
   const [saveMsg,    setSaveMsg]    = useState("");
+  const [archived,   setArchived]   = useState(competition.archived ?? false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
 
   // Participants
   const [participants, setParticipants]   = useState<Participant[]>(initialParticipants);
@@ -327,6 +330,24 @@ export default function EditClient({
     } catch (e) {
       setCloseMsg(e instanceof Error ? e.message : "Erreur inconnue");
       setCloseState("error");
+    }
+  }
+
+  // Archiver : rend la compétition (et ses résultats) visible à TOUS les
+  // joueurs dans l'onglet Compétitions de l'app, pas seulement à ceux qui y
+  // ont parié — décision explicite, jamais automatique à la clôture.
+  async function toggleArchive() {
+    const next = !archived;
+    setArchiveBusy(true);
+    try {
+      const res = await fetch(`/api/admin/competitions/${compId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: next }),
+      });
+      if (res.ok) setArchived(next);
+    } finally {
+      setArchiveBusy(false);
     }
   }
 
@@ -918,6 +939,24 @@ export default function EditClient({
             </span>
           )}
         </div>
+
+        {status === "closed" && (
+          <div className="mt-4 pt-4 border-t border-[var(--border-2)]">
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="archive-comp"
+                checked={archived}
+                disabled={archiveBusy}
+                onChange={toggleArchive}
+                className="w-4 h-4 accent-[#28D7E6]"
+              />
+              <label htmlFor="archive-comp" className="font-archivo text-[13px] text-[#9fbac6] cursor-pointer">
+                Archiver cette compétition <span className="text-[#5c7c8c]">(rend les résultats visibles à tous les joueurs dans l&apos;onglet Compétitions de l&apos;app, même ceux qui n&apos;y ont pas parié)</span>
+              </label>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ---- Section Partants FFCK (Descente uniquement) ---- */}

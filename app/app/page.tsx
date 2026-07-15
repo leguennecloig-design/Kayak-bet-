@@ -186,7 +186,7 @@ const StarIcon  = ({ filled }: { filled?: boolean }) => (
 /* ----------------------------------------------------------------
    Types
 ---------------------------------------------------------------- */
-type View = "home" | "competitions" | "classement" | "profil" | "joueur" | "ligue" | "competition-detail";
+type View = "home" | "competitions" | "classement" | "profil" | "joueur" | "ligue" | "competition-detail" | "archive-detail";
 
 type Odd = {
   id: string;            // clé composite `${participantId}:${betType}`
@@ -344,7 +344,10 @@ type HomeViewProps = {
 type CompetitionsViewProps = {
   competitions: Competition[];
   openBetModal: (compId: string, compNom: string) => void;
+  onOpenArchive: (compId: string, compNom: string) => void;
 };
+
+type ArchivedCompetition = { id: string; nom: string; date: string | null; lieu: string | null; discipline: string | null };
 
 type ClassementViewProps = {
   effectiveLb: Player[];
@@ -644,42 +647,163 @@ function HomeView({
 }
 
 function CompetitionsView({
-  competitions, openBetModal,
+  competitions, openBetModal, onOpenArchive,
 }: CompetitionsViewProps) {
+  const [tab, setTab] = useState<"upcoming" | "archives">("upcoming");
+  const [archives, setArchives] = useState<ArchivedCompetition[]>([]);
+  const [archivesLoaded, setArchivesLoaded] = useState(false);
+
+  useEffect(() => {
+    if (tab !== "archives" || archivesLoaded) return;
+    fetch("/api/public/competitions/archived")
+      .then(res => res.json())
+      .then(data => { setArchives(data.competitions ?? []); setArchivesLoaded(true); })
+      .catch(() => setArchivesLoaded(true));
+  }, [tab, archivesLoaded]);
+
   return (
     <>
       <div className="view-header">
         <h1>Compétitions</h1>
-        <p>{competitions.length} événement{competitions.length !== 1 ? "s" : ""} à venir · Clique pour voir la startlist et parier</p>
+        <p>
+          {tab === "upcoming"
+            ? `${competitions.length} événement${competitions.length !== 1 ? "s" : ""} à venir · Clique pour voir la startlist et parier`
+            : `${archives.length} compétition${archives.length !== 1 ? "s" : ""} archivée${archives.length !== 1 ? "s" : ""} · Résultats consultables par tous`}
+        </p>
       </div>
-      <div className="comp-list">
-        {competitions.map((c) => (
-          <div key={c.id} className={`comp-card${c.featured ? " comp-featured" : ""}`}>
-            <div className="comp-card-top" onClick={() => openBetModal(c.id, c.name)}>
-              <div className="comp-left">
-                {c.featured && <span className="comp-badge"><span className="live-pulse-dot" /> À la une</span>}
-                <h2 className="comp-name">{c.name}</h2>
-                <div className="comp-meta">
-                  <span><ColPin />{c.location}</span>
-                  <span className="cflag">{c.flag}</span>
-                  <span>{fmtDate(c.date)}</span>
-                  <span>{c.category}</span>
-                  {c.typeCompetition && <span>{c.typeCompetition === "sprint" ? "Sprint" : "Classique"}</span>}
+
+      <div className="cat-tabs">
+        <button className={`cat-tab${tab === "upcoming" ? " active" : ""}`} onClick={() => setTab("upcoming")}>À venir</button>
+        <button className={`cat-tab${tab === "archives" ? " active" : ""}`} onClick={() => setTab("archives")}>Archives</button>
+      </div>
+
+      {tab === "upcoming" ? (
+        <div className="comp-list">
+          {competitions.map((c) => (
+            <div key={c.id} className={`comp-card${c.featured ? " comp-featured" : ""}`}>
+              <div className="comp-card-top" onClick={() => openBetModal(c.id, c.name)}>
+                <div className="comp-left">
+                  {c.featured && <span className="comp-badge"><span className="live-pulse-dot" /> À la une</span>}
+                  <h2 className="comp-name">{c.name}</h2>
+                  <div className="comp-meta">
+                    <span><ColPin />{c.location}</span>
+                    <span className="cflag">{c.flag}</span>
+                    <span>{fmtDate(c.date)}</span>
+                    <span>{c.category}</span>
+                    {c.typeCompetition && <span>{c.typeCompetition === "sprint" ? "Sprint" : "Classique"}</span>}
+                  </div>
+                </div>
+                <div className="comp-right">
+                  {c.bettors > 0 && (
+                    <div className="comp-bettors">
+                      <span className="bv">{c.bettors.toLocaleString("fr-FR")}</span>
+                      <span className="bl">parieurs</span>
+                    </div>
+                  )}
+                  <div className="comp-chevron"><ChevRight /></div>
                 </div>
               </div>
-              <div className="comp-right">
-                {c.bettors > 0 && (
-                  <div className="comp-bettors">
-                    <span className="bv">{c.bettors.toLocaleString("fr-FR")}</span>
-                    <span className="bl">parieurs</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="comp-list">
+          {archives.length === 0 ? (
+            <p style={{ color: "#5c7c8c", fontFamily: "var(--font-archivo)", fontSize: "13px", padding: "16px 0" }}>
+              Aucune compétition archivée pour l&apos;instant.
+            </p>
+          ) : archives.map((c) => (
+            <div key={c.id} className="comp-card">
+              <div className="comp-card-top" onClick={() => onOpenArchive(c.id, c.nom)}>
+                <div className="comp-left">
+                  <h2 className="comp-name">{c.nom}</h2>
+                  <div className="comp-meta">
+                    {c.lieu && <span><ColPin />{c.lieu}</span>}
+                    {c.date && <span>{fmtDate(c.date)}</span>}
                   </div>
-                )}
-                <div className="comp-chevron"><ChevRight /></div>
+                </div>
+                <div className="comp-right">
+                  <div className="comp-chevron"><ChevRight /></div>
+                </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+type ArchivedCompetitionViewProps = {
+  competitionId: string;
+  onBack: () => void;
+};
+
+type ArchivedResultat = {
+  categorie: string; rang: number | null; nom: string; club: string | null;
+  temps: string | null; dns: boolean; dnf: boolean; dsq: boolean;
+};
+
+function ArchivedCompetitionView({ competitionId, onBack }: ArchivedCompetitionViewProps) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [comp, setComp] = useState<{ nom: string; date: string | null; lieu: string | null } | null>(null);
+  const [categories, setCategories] = useState<Record<string, ArchivedResultat[]>>({});
+
+  useEffect(() => {
+    setLoading(true);
+    setError("");
+    fetch(`/api/public/competitions/${competitionId}/resultats`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Erreur");
+        return res.json();
+      })
+      .then((data) => { setComp(data.competition); setCategories(data.categories ?? {}); })
+      .catch(() => setError("Impossible de charger les résultats de cette compétition."))
+      .finally(() => setLoading(false));
+  }, [competitionId]);
+
+  const sortedCategories = Object.keys(categories).sort();
+
+  return (
+    <>
+      <button className="player-back" onClick={onBack}>
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        Retour aux compétitions
+      </button>
+
+      {loading && <p style={{ color: "var(--sub, #5c7c8c)", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>Chargement des résultats…</p>}
+      {!loading && error && <p style={{ color: "#FF7A45", fontFamily: "var(--font-archivo)", padding: "24px 0" }}>{error}</p>}
+
+      {!loading && !error && comp && (
+        <>
+          <div className="view-header">
+            <h1>{comp.nom}</h1>
+            <p>
+              {comp.lieu && `${comp.lieu} · `}
+              {comp.date && fmtDate(comp.date)}
+            </p>
           </div>
-        ))}
-      </div>
+
+          {sortedCategories.map((cat) => (
+            <div key={cat} className="profil-section">
+              <div className="profil-section-head">
+                <span>{cat}</span>
+                <span className="ps-count">{categories[cat].length} athlète{categories[cat].length > 1 ? "s" : ""}</span>
+              </div>
+              <div className="lb-list">
+                {categories[cat].map((r, i) => (
+                  <div key={i} className="lb-row">
+                    <span className="lb-rank">{r.dsq ? "Dsq" : r.dnf ? "Abd" : r.dns ? "Abs" : (r.rang ?? "—")}</span>
+                    <span className="lb-name">{r.nom}{r.club && <small style={{ display: "block", color: "var(--sub)", fontWeight: 600 }}>{r.club}</small>}</span>
+                    {r.temps && <span className="lb-bal">{r.temps}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </>
   );
 }
@@ -1827,6 +1951,7 @@ export default function DashboardPage() {
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [seasonLabel,   setSeasonLabel]   = useState("Saison en cours");
   const [viewedCompetitionId, setViewedCompetitionId] = useState<{ compId: string; compNom: string; from: View } | null>(null);
+  const [viewedArchiveId, setViewedArchiveId] = useState<string | null>(null);
   const [viewedPlayerId, setViewedPlayerId] = useState<string | null>(null);
   const [viewedLeagueId, setViewedLeagueId] = useState<string | null>(null);
   const [leagueFrom,     setLeagueFrom]     = useState<View>("profil");
@@ -2239,6 +2364,11 @@ export default function DashboardPage() {
     navigate("competition-detail");
   }
 
+  function openArchive(compId: string) {
+    setViewedArchiveId(compId);
+    navigate("archive-detail");
+  }
+
   function openPlayerProfile(id: string) {
     setViewedPlayerId(id);
     navigate("joueur");
@@ -2381,8 +2511,8 @@ export default function DashboardPage() {
     window.scrollTo(0, 0);
   }
 
-  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;
-  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4, joueur: -1, ligue: -1, "competition-detail": -1 }[view] ?? -1;
+  const topActive = { home: 0, competitions: 1, classement: 2, profil: -1, joueur: -1, ligue: -1, "competition-detail": -1, "archive-detail": 1 }[view] ?? -1;
+  const botActive = { home: 0, competitions: 1, classement: 3, profil: 4, joueur: -1, ligue: -1, "competition-detail": -1, "archive-detail": 1 }[view] ?? -1;
 
   useLayoutEffect(() => {
     const nav  = navRef.current;
@@ -2498,7 +2628,11 @@ export default function DashboardPage() {
             <CompetitionsView
               competitions={competitions}
               openBetModal={openBetModal}
+              onOpenArchive={openArchive}
             />
+          )}
+          {view === "archive-detail" && viewedArchiveId && (
+            <ArchivedCompetitionView competitionId={viewedArchiveId} onBack={() => navigate("competitions")} />
           )}
           {view === "classement" && <ClassementView effectiveLb={effectiveLb} onOpenProfile={openPlayerProfile} onOpenLeague={openLeague} seasonLabel={seasonLabel} />}
           {view === "competition-detail" && viewedCompetitionId && (

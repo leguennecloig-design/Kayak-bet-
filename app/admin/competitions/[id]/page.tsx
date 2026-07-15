@@ -19,7 +19,7 @@ export default async function EditCompetition({
 
   const { data: comp, error } = await supabase
     .from("competitions")
-    .select("id, nom, date, discipline, lieu, status, created_at, ffck_inscription_code, ffck_match_status, type_competition, algo_type, type_epreuve, paris_ouverts_a, debute_a, leaderboard_visible")
+    .select("id, nom, date, discipline, lieu, status, created_at, ffck_inscription_code, ffck_match_status, type_competition, algo_type, type_epreuve, paris_ouverts_a, debute_a, leaderboard_visible, archived")
     .eq("id", params.id)
     .single();
 
@@ -95,6 +95,7 @@ export default async function EditCompetition({
         paris_ouverts_a:       comp.paris_ouverts_a as string | null,
         debute_a:              comp.debute_a as string | null,
         leaderboard_visible:   (comp.leaderboard_visible as boolean | null) ?? false,
+        archived:              (comp.archived as boolean | null) ?? false,
       }}
       initialParticipants={participants}
       inscriptions={inscriptions}

@@ -26,6 +26,7 @@ export async function PATCH(
   if (body.paris_ouverts_a !== undefined) allowed.paris_ouverts_a = body.paris_ouverts_a || null;
   if (body.debute_a !== undefined) allowed.debute_a = body.debute_a || null;
   if (body.leaderboard_visible !== undefined) allowed.leaderboard_visible = !!body.leaderboard_visible;
+  if (body.archived !== undefined) allowed.archived = !!body.archived;
 
   const supabase = createAdminSupabase();
 
