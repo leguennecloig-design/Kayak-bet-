@@ -229,7 +229,7 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.txt"
+            accept=".pdf,.txt,.md"
             className="hidden"
             onChange={handleFileChange}
           />
@@ -254,7 +254,7 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
                 <path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
-            {importState === "uploading" ? "Import…" : "Importer PDF / TXT"}
+            {importState === "uploading" ? "Import…" : "Importer PDF / TXT / MD"}
           </button>
 
           {/* Saisie manuelle */}
@@ -459,7 +459,7 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
       {/* ── Résultats par catégorie ── */}
       {!loading && sortedCategories.length === 0 && !showManual && (
         <p className="font-archivo text-[13px] text-[#5c7c8c]">
-          Importe le PDF de résultats FFCK ou utilise la saisie manuelle.
+          Importe le PDF/Markdown de résultats FFCK ou utilise la saisie manuelle.
         </p>
       )}
 

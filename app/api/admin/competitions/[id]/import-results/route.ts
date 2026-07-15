@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { parseResultatsPDF } from "@/lib/parsers/resultats-pdf";
+import { parseResultatsMarkdown, looksLikeMarkdownResultats } from "@/lib/parsers/resultats-markdown";
 // pdf-parse is a CommonJS module — must import with require at call site
 // (already declared as serverExternalPackages in next.config)
 
 // POST /api/admin/competitions/[id]/import-results
-// Accepte multipart/form-data avec un fichier PDF ou TXT de résultats FFCK.
-// Extrait les résultats avec le parser compétFFCK et les insère en base.
+// Accepte multipart/form-data avec un fichier de résultats : PDF/TXT export
+// brut compétFFCK, ou Markdown (tableaux par catégorie + listes Abs/Abd/Dsq,
+// voir lib/parsers/resultats-markdown.ts) — détecté automatiquement.
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -28,7 +30,7 @@ export async function POST(
   let rawText = "";
 
   const fileName = file.name.toLowerCase();
-  if (fileName.endsWith(".txt")) {
+  if (fileName.endsWith(".txt") || fileName.endsWith(".md")) {
     rawText = new TextDecoder("utf-8").decode(buffer);
   } else {
     // PDF — utiliser pdf-parse
@@ -50,12 +52,16 @@ export async function POST(
     return NextResponse.json({ error: "Le fichier ne contient aucun texte" }, { status: 422 });
   }
 
-  // Parser
-  const parsed = parseResultatsPDF(rawText);
+  // Parser — deux formats possibles : tableaux Markdown "nettoyés" (si .md,
+  // ou si le contenu ressemble à un tableau Markdown quelle que soit
+  // l'extension) ou export texte brut compétFFCK (PDF/TXT).
+  const parsed = fileName.endsWith(".md") || looksLikeMarkdownResultats(rawText)
+    ? parseResultatsMarkdown(rawText)
+    : parseResultatsPDF(rawText);
 
   if (parsed.length === 0) {
     return NextResponse.json(
-      { error: "Aucun résultat détecté dans le fichier. Vérifie le format (compétFFCK v6)." },
+      { error: "Aucun résultat détecté dans le fichier. Vérifie le format (compétFFCK v6, ou tableaux Markdown par catégorie)." },
       { status: 422 }
     );
   }

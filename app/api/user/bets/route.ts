@@ -33,7 +33,7 @@ export async function GET() {
 
   const { data: bets, error } = await adminSb
     .from("bets")
-    .select("id, selections, stake, cote_totale, gain_potentiel, gain_reel, status, created_at")
+    .select("id, selections, stake, cote_totale, gain_potentiel, gain_reel, status, created_at, settled_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -67,6 +67,7 @@ export async function GET() {
       gainPotentiel: Number(b.gain_potentiel),
       gainReel:      b.gain_reel != null ? Number(b.gain_reel) : null,
       selections:    sels,
+      settledAt:     b.settled_at as string | null,
     };
   });
 

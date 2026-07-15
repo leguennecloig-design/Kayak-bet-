@@ -15,6 +15,7 @@ import AppUpdatePopup from "@/app/components/AppUpdatePopup";
 import SimpleNudgeModal from "@/app/components/SimpleNudgeModal";
 import InstagramNudgeModal from "@/app/components/InstagramNudgeModal";
 import ReferralNudgeModal from "@/app/components/ReferralNudgeModal";
+import ResultsRecapModal, { type RecapBet } from "@/app/components/ResultsRecapModal";
 import { comboBonusFor } from "@/lib/bets/combo";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import "./dashboard.css";
@@ -263,6 +264,7 @@ type BetRecord = {
   gainPotentiel?: number;
   gainReel?: number | null;
   selections?: BetSelection[];
+  settledAt?: string | null;
 };
 
 /* ----------------------------------------------------------------
@@ -1820,6 +1822,8 @@ export default function DashboardPage() {
   const [instagramRewardStatus, setInstagramRewardStatus] = useState<IgRewardStatus>("loading");
   const [instagramRewardBusy,    setInstagramRewardBusy]    = useState(false);
   const [betHistory,    setBetHistory]    = useState<BetRecord[]>([]);
+  const [resultsRecapBets, setResultsRecapBets] = useState<RecapBet[]>([]);
+  const [resultsRecapOpen, setResultsRecapOpen] = useState(false);
   const [dbLeaderboard, setDbLeaderboard] = useState<Player[]>([]);
   const [seasonLabel,   setSeasonLabel]   = useState("Saison en cours");
   const [viewedCompetitionId, setViewedCompetitionId] = useState<{ compId: string; compNom: string; from: View } | null>(null);
@@ -1975,6 +1979,50 @@ export default function DashboardPage() {
       .then(res => res.json())
       .then(data => setMyReferralCode(data.code ?? null))
       .catch(() => {});
+  }, []);
+
+  // Pop-up "Résultats disponibles" : dès qu'un ou plusieurs paris en attente
+  // viennent d'être réglés (gagné/perdu) depuis la dernière visite — comparé
+  // via settledAt à un horodatage mémorisé en localStorage. Les notifications
+  // "Pari gagné/perdu" pointent vers /app?view=profil (voir plus bas) ; ce
+  // même mécanisme s'affiche aussi spontanément à la prochaine ouverture de
+  // l'app, sans dépendre du clic sur la notif.
+  useEffect(() => {
+    if (betHistory.length === 0) return;
+    const lastSeenRaw = typeof window !== "undefined" ? window.localStorage.getItem("kb_results_seen_at") : null;
+    const lastSeen = lastSeenRaw ? new Date(lastSeenRaw).getTime() : 0;
+    const newlySettled = betHistory.filter(b =>
+      (b.result === "win" || b.result === "loss") && b.settledAt && new Date(b.settledAt).getTime() > lastSeen
+    );
+    if (newlySettled.length > 0) {
+      setResultsRecapBets(newlySettled.map(b => ({
+        id: b.id, athlete: b.athlete, event: b.event, result: b.result as "win" | "loss",
+        stake: b.stake, gainReel: b.gainReel ?? null,
+      })));
+      setResultsRecapOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [betHistory]);
+
+  function dismissResultsRecap() {
+    window.localStorage.setItem("kb_results_seen_at", new Date().toISOString());
+    setResultsRecapOpen(false);
+  }
+  function goToProfileFromRecap() {
+    dismissResultsRecap();
+    navigate("profil");
+  }
+
+  // Deep-link depuis une notification "Pari gagné/perdu" (url /app?view=profil)
+  // vers l'onglet Profil, où l'historique des paris est visible.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "profil") {
+      navigate("profil");
+      window.history.replaceState(null, "", "/app");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -2581,6 +2629,12 @@ export default function DashboardPage() {
 
       <CouponInfoModal open={couponInfoOpen} onClose={() => setCouponInfoOpen(false)} />
       <AppUpdatePopup />
+      <ResultsRecapModal
+        open={resultsRecapOpen}
+        onClose={dismissResultsRecap}
+        bets={resultsRecapBets}
+        onGoToProfile={goToProfileFromRecap}
+      />
 
       <InstagramNudgeModal
         open={activeNudge === "instagram"}

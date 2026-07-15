@@ -266,7 +266,7 @@ export async function POST(
         type: "bet_lost",
         title: "Pari perdu",
         body: `${competitionNom} — dommage, ce sera pour la prochaine !`,
-        url: "/app",
+        url: "/app?view=profil",
       });
       continue;
     }
@@ -361,7 +361,7 @@ export async function POST(
       type: "bet_won",
       title: "Pari gagné 🎉",
       body: `${competitionNom} — tu remportes ${Math.round(adjustedGain).toLocaleString("fr-FR")} crédits !`,
-      url: "/app",
+      url: "/app?view=profil",
     });
   }
 

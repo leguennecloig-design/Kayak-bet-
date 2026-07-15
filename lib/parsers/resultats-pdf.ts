@@ -32,7 +32,7 @@ const CP1252_HIGH: Record<number, number> = {
 // (retourne le texte d'origine) si la reconstruction échoue — jamais de risque
 // de corrompre un texte déjà correctement encodé.
 function fixMojibake(text: string): string {
-  if (!/Ã[-¿]/.test(text)) return text;
+  if (!/Ã./.test(text)) return text;
   const bytes: number[] = [];
   for (const ch of text) {
     const cp = ch.codePointAt(0)!;
