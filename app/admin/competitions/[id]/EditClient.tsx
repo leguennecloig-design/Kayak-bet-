@@ -295,7 +295,21 @@ export default function EditClient({
       const res  = await fetch(`/api/admin/competitions/${compId}/close`, { method: "POST" });
       const text = await res.text();
       let json: Record<string, unknown> = {};
-      try { json = JSON.parse(text); } catch { throw new Error(`Réponse invalide (${res.status})`); }
+      try {
+        json = JSON.parse(text);
+      } catch {
+        // Un 502/503/504 (timeout de la plateforme) n'a pas de corps JSON —
+        // le traitement côté serveur a pu quand même se terminer (ou se
+        // poursuivre) malgré l'erreur affichée au client. La clôture est
+        // sûre à relancer : les paris déjà réglés sont ignorés au prochain
+        // appel (recherche uniquement les paris encore "pending").
+        if ([502, 503, 504].includes(res.status)) {
+          throw new Error(
+            `Le serveur a mis trop de temps à répondre (${res.status}) mais a pu continuer le règlement en arrière-plan. Reclique sur "Clôturer" pour vérifier/terminer — les paris déjà réglés ne seront pas touchés deux fois.`
+          );
+        }
+        throw new Error(`Réponse invalide (${res.status})`);
+      }
       if (!res.ok) throw new Error((json.error as string) ?? "Erreur serveur");
       const failed = json.failedSettlements as { betId: string }[] | undefined;
       const failedMsg = failed && failed.length > 0

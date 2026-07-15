@@ -6,6 +6,15 @@ import { parseTempsToSeconds } from "@/lib/utils/time";
 import { comboBonusFor } from "@/lib/bets/combo";
 import type { BetType } from "@/lib/algo/types";
 
+// Clôturer une compétition avec beaucoup de paris en attente peut dépasser
+// la durée par défaut d'une fonction serverless (chaque pari fait plusieurs
+// allers-retours DB séquentiels) — le client reçoit alors un 504 alors que
+// le traitement continue côté serveur jusqu'au bout (d'où des crédits déjà
+// reçus malgré l'erreur affichée). Ce réglage augmente la limite sur les
+// plateformes qui le respectent (Vercel Pro+) ; le vrai fix est le
+// traitement en parallèle des paris plus bas (settleAllBets).
+export const maxDuration = 300;
+
 type Selection = {
   participantId:  string;
   nom:            string;
@@ -109,10 +118,29 @@ function normalize(s: string) {
   return s.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+// Exécute `worker` sur chaque élément avec au plus `concurrency` en vol
+// simultanément — évite à la fois le traitement strictement séquentiel (trop
+// lent, cause du 504 sur une compétition à beaucoup de paris) et une rafale
+// totalement non bornée (risque de saturer le pool de connexions Supabase).
+async function runWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
+  let index = 0;
+  async function next(): Promise<void> {
+    const i = index++;
+    if (i >= items.length) return;
+    await worker(items[i]);
+    return next();
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => next()));
+}
+
 // POST /api/admin/competitions/[id]/close
 // 1. Vérifie que des résultats existent
 // 2. Règle tous les paris en attente sur cette compétition
 // 3. Marque la compétition comme "closed"
+//
+// Idempotent et sûr à relancer : ne traite que les paris encore "pending"
+// (les paris déjà réglés lors d'un appel précédent — ex. interrompu par un
+// 504 — sont automatiquement ignorés au prochain appel, sans double crédit).
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -190,7 +218,11 @@ export async function POST(
   const totalPaid: Record<string, number> = {};
   const failedSettlements: { betId: string; userId: string; error: string }[] = [];
 
-  for (const bet of bets) {
+  // Traités en parallèle (bornés) : chaque pari ne touche que sa propre
+  // ligne + le solde de SON joueur (RPC atomique déjà en place), donc aucune
+  // contention entre paris différents — seul le débit/crédit multiple sur
+  // UN MÊME joueur reste sérialisé par l'atomicité de la RPC en base.
+  async function settleBet(bet: BetRow): Promise<void> {
     // Évaluer chaque sélection de cette compétition
     let anyLost = false;
     let hasSelFromThisComp = false;
@@ -211,7 +243,7 @@ export async function POST(
       if (outcome === "void") voidSelections.push(sel);
     }
 
-    if (!hasSelFromThisComp) continue;
+    if (!hasSelFromThisComp) return;
 
     // Pari multi-compétition (accumulateur) : une jambe gagnée dans CETTE
     // compétition ne suffit pas à régler le pari — il faut connaître le sort
@@ -236,7 +268,7 @@ export async function POST(
           // Une autre jambe du pari n'a pas encore eu lieu — on ne règle
           // rien pour l'instant, le pari reste "pending".
           deferred++;
-          continue;
+          return;
         }
 
         // Toutes les autres compétitions référencées sont déjà clôturées :
@@ -268,7 +300,7 @@ export async function POST(
         body: `${competitionNom} — dommage, ce sera pour la prochaine !`,
         url: "/app?view=profil",
       });
-      continue;
+      return;
     }
 
     const remainingCount = bet.selections.length - voidSelections.length;
@@ -285,7 +317,7 @@ export async function POST(
       if (refundErr) {
         console.error(`[close] remboursement (void) échoué pour le pari ${bet.id}:`, refundErr);
         failedSettlements.push({ betId: bet.id, userId: bet.user_id, error: refundErr.message });
-        continue;
+        return;
       }
       void refundBalance;
 
@@ -309,7 +341,7 @@ export async function POST(
         body: `${competitionNom} — athlète absent des résultats, ta mise de ${bet.stake.toLocaleString("fr-FR")} cr t'est remboursée.`,
         url: "/app",
       });
-      continue;
+      return;
     }
 
     // ── Toutes les sélections restantes (hors void) ont gagné ──────────
@@ -334,7 +366,7 @@ export async function POST(
     if (balErr) {
       console.error(`[close] increment_user_balance échoué pour le pari ${bet.id}:`, balErr);
       failedSettlements.push({ betId: bet.id, userId: bet.user_id, error: balErr.message });
-      continue;
+      return;
     }
 
     await supabase
@@ -364,6 +396,8 @@ export async function POST(
       url: "/app?view=profil",
     });
   }
+
+  await runWithConcurrency(bets, 10, settleBet);
 
   // ── 4. Marquer la compétition comme terminée ────────────────────
   await supabase
