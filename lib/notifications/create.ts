@@ -9,6 +9,7 @@ export type NotificationType =
   | "referral_used"
   | "bet_won"
   | "bet_lost"
+  | "bet_cancelled"
   | "competition"
   | "broadcast"
   | "instagram_reward_approved"

@@ -77,6 +77,7 @@ export async function POST(
     points:         r.points ?? null,
     dns:            r.dns,
     dnf:            r.dnf,
+    dsq:            r.dsq,
   }));
 
   const CHUNK = 200;

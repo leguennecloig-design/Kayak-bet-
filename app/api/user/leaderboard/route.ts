@@ -46,12 +46,16 @@ export async function GET(req: NextRequest) {
   const wonGainsMap   = new Map<string, number>();
   const lostGainsMap  = new Map<string, number>();
   for (const b of (bets ?? [])) {
-    totalMap.set(b.user_id, (totalMap.get(b.user_id) ?? 0) + 1);
+    // Un pari "cancelled" (annulé/remboursé — absent aux résultats ou
+    // annulation manuelle) n'a jamais été réellement joué : il ne doit
+    // compter ni dans le total (dénominateur du winrate), ni comme gain/perte.
     if (b.status === "won") {
+      totalMap.set(b.user_id, (totalMap.get(b.user_id) ?? 0) + 1);
       winsMap.set(b.user_id, (winsMap.get(b.user_id) ?? 0) + 1);
       wonGainsMap.set(b.user_id, (wonGainsMap.get(b.user_id) ?? 0) + Number(b.gain_reel ?? 0));
     }
     if (b.status === "lost") {
+      totalMap.set(b.user_id, (totalMap.get(b.user_id) ?? 0) + 1);
       lostGainsMap.set(b.user_id, (lostGainsMap.get(b.user_id) ?? 0) + Number(b.stake ?? 0));
     }
     if (b.status === "pending") {

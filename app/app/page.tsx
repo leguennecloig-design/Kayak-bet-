@@ -1298,7 +1298,9 @@ function LeagueView({ leagueId, onBack }: LeagueViewProps) {
 }
 
 function ProfilView({ name, initials, userEmail, myRank, balance, effectiveBets, signOut, avatarUrl, bio, instagram, onEditProfile, linkedAthlete, onLinkAthlete, onOpenProfile, onOpenLeague, instagramRewardStatus, instagramRewardBusy, onRequestInstagramReward, seasonLabel, onEditBet, onCancelBet }: ProfilViewProps) {
-  const countedBets = effectiveBets.filter((b) => b.result !== "cancelled");
+  // Winrate calculé uniquement sur les paris RÉGLÉS (gagné/perdu) — un pari
+  // encore en attente ou annulé/remboursé ne doit pas gonfler le dénominateur.
+  const countedBets = effectiveBets.filter((b) => b.result === "win" || b.result === "loss");
   const totalWins = countedBets.filter((b) => b.result === "win").length;
   const totalBets = countedBets.length;
   const winRate   = totalBets > 0 ? Math.round((totalWins / totalBets) * 100) : 0;
@@ -1840,7 +1842,9 @@ export default function DashboardPage() {
   const streak        = (() => {
     let s = 0;
     for (const b of effectiveBets) {
-      if (b.result === "pending") continue;
+      // Un pari annulé/remboursé (absent aux résultats) n'a jamais été
+      // vraiment joué : il ne doit ni compter ni casser la série en cours.
+      if (b.result === "pending" || b.result === "cancelled") continue;
       if (b.result === "win") s++; else break;
     }
     return s;

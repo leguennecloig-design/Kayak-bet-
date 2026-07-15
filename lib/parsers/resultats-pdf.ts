@@ -58,6 +58,7 @@ export interface ParsedResultat {
   points:     number | null;
   dns:        boolean;         // Absent = did not start
   dnf:        boolean;         // Abandonné = did not finish
+  dsq:        boolean;         // Disqualifié
 }
 
 // Lignes à ignorer systématiquement
@@ -78,8 +79,8 @@ const SKIP_RE = [
 // Regex : code club FFCK — 4 chiffres, optionnellement /4 chiffres, puis " - "
 const CLUB_CODE_RE = /\d{4}(?:\/\d{4})*\s*-\s/;
 
-// Regex : temps au format M:SS.ss, ou Abs / Abd
-const TIME_TOKEN_RE = /(\d+:\d+\.\d+|Abs|Abd)/g;
+// Regex : temps au format M:SS.ss, ou Abs / Abd / Dsq
+const TIME_TOKEN_RE = /(\d+:\d+\.\d+|Abs|Abd|Dsq)/g;
 
 function parseAthletePrefix(tokens: string[]): {
   rang: number | null; dossard: number | null; nomParts: string[];
@@ -104,7 +105,7 @@ function parseAthletePrefix(tokens: string[]): {
 }
 
 function parseTimesAndPoints(fromClub: string): {
-  temps: string | null; dns: boolean; dnf: boolean; points: number | null;
+  temps: string | null; dns: boolean; dnf: boolean; dsq: boolean; points: number | null;
 } {
   const timeTokens: string[] = [];
   let m: RegExpExecArray | null;
@@ -112,21 +113,22 @@ function parseTimesAndPoints(fromClub: string): {
   while ((m = re.exec(fromClub)) !== null) timeTokens.push(m[1]);
 
   const dns = timeTokens.length > 0 && timeTokens.every(t => t === 'Abs');
-  const dnf = !dns && timeTokens.some(t => t === 'Abd');
+  const dsq = !dns && timeTokens.some(t => t === 'Dsq');
+  const dnf = !dns && !dsq && timeTokens.some(t => t === 'Abd');
 
   // Meilleur temps = 3e colonne temps (index 2), sinon 1er
   const meilRaw = timeTokens.length >= 3 ? timeTokens[2] : (timeTokens[0] ?? null);
-  const temps = meilRaw && meilRaw !== 'Abs' && meilRaw !== 'Abd' ? meilRaw : null;
+  const temps = meilRaw && meilRaw !== 'Abs' && meilRaw !== 'Abd' && meilRaw !== 'Dsq' ? meilRaw : null;
 
   // Points = dernier entier sur la ligne (après les temps et l'écart)
   const stripped = fromClub
-    .replace(/\d+:\d+\.\d+|Abs|Abd/g, '')
+    .replace(/\d+:\d+\.\d+|Abs|Abd|Dsq/g, '')
     .replace(/\+[\d:.]+|00\.00/g, '')
     .trim();
   const ptMatch = /(\d+)\s*$/.exec(stripped);
   const points = ptMatch ? parseInt(ptMatch[1], 10) : null;
 
-  return { temps, dns, dnf, points };
+  return { temps, dns, dnf, dsq, points };
 }
 
 // Une ligne compte comme "ligne de données" (catégorie ou athlète) plutôt
@@ -198,10 +200,10 @@ export function parseResultatsPDF(rawText: string): ParsedResultat[] {
         ? fromClub.slice(0, clubEndMatch.index).trim().replace(/\s+$/, '')
         : fromClub.split(/\s{2,}/)[0].trim();
 
-      const { temps, dns, dnf, points } = parseTimesAndPoints(fromClub);
+      const { temps, dns, dnf, dsq, points } = parseTimesAndPoints(fromClub);
 
       if (dossard !== null && nom) {
-        results.push({ categorie: currentCategorie, rang, dossard, nom, club, temps, points, dns, dnf });
+        results.push({ categorie: currentCategorie, rang, dossard, nom, club, temps, points, dns, dnf, dsq });
       }
       continue;
     }

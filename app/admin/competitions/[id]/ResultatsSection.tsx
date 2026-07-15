@@ -14,6 +14,7 @@ type Resultat = {
   points:    number | null;
   dns:       boolean;
   dnf:       boolean;
+  dsq:       boolean;
 };
 
 type FormEntry = {
@@ -26,6 +27,7 @@ type FormEntry = {
   points:    string;
   dns:       boolean;
   dnf:       boolean;
+  dsq:       boolean;
 };
 
 type Partant = {
@@ -36,7 +38,7 @@ type Partant = {
 };
 
 const EMPTY_FORM: FormEntry = {
-  categorie: "", nom: "", club: "", dossard: "", rang: "", temps: "", points: "", dns: false, dnf: false,
+  categorie: "", nom: "", club: "", dossard: "", rang: "", temps: "", points: "", dns: false, dnf: false, dsq: false,
 };
 
 const ATHLETE_CATEGORIES = [
@@ -140,13 +142,14 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
     const entry = {
       categorie: form.categorie.trim().toUpperCase(),
       nom:       form.nom.trim(),
-      rang:      form.dns || form.dnf || !form.rang ? null : parseInt(form.rang, 10),
+      rang:      form.dns || form.dnf || form.dsq || !form.rang ? null : parseInt(form.rang, 10),
       dossard:   form.dossard ? parseInt(form.dossard, 10) : null,
       club:      form.club.trim() || null,
       temps:     form.temps.trim() || null,
       points:    form.points ? parseInt(form.points, 10) : null,
       dns:       form.dns,
       dnf:       form.dnf,
+      dsq:       form.dsq,
     };
 
     const res  = await fetch(`/api/admin/competitions/${competitionId}/resultats`, {
@@ -402,7 +405,7 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
                 className={`${inputCls} disabled:opacity-40`}
               />
             </div>
-            {/* DNS / DNF */}
+            {/* DNS / DNF / DSQ */}
             <div className="col-span-1 flex flex-col gap-1.5">
               <label className={labelCls}>Statut</label>
               <div className="flex flex-col gap-1.5 pt-1">
@@ -410,7 +413,7 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
                   <input
                     type="checkbox"
                     checked={form.dns}
-                    onChange={e => setForm(f => ({ ...f, dns: e.target.checked, dnf: false, rang: "", temps: "", points: "" }))}
+                    onChange={e => setForm(f => ({ ...f, dns: e.target.checked, dnf: false, dsq: false, rang: "", temps: "", points: "" }))}
                     className="rounded"
                   />
                   <span className="font-archivo text-[11px] text-[#7c9aaa]">Abs</span>
@@ -419,10 +422,19 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
                   <input
                     type="checkbox"
                     checked={form.dnf}
-                    onChange={e => setForm(f => ({ ...f, dnf: e.target.checked, dns: false, rang: "" }))}
+                    onChange={e => setForm(f => ({ ...f, dnf: e.target.checked, dns: false, dsq: false, rang: "" }))}
                     className="rounded"
                   />
                   <span className="font-archivo text-[11px] text-[#7c9aaa]">Abd</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.dsq}
+                    onChange={e => setForm(f => ({ ...f, dsq: e.target.checked, dns: false, dnf: false, rang: "" }))}
+                    className="rounded"
+                  />
+                  <span className="font-archivo text-[11px] text-[#7c9aaa]">Dsq</span>
                 </label>
               </div>
             </div>
@@ -532,6 +544,7 @@ export default function ResultatsSection({ competitionId, competitionNom }: { co
                           <td className="px-3 py-2 font-bold text-[#28D7E6] w-10">
                             {r.dns ? <span className="text-[#5c7c8c] font-normal">Abs</span>
                               : r.dnf ? <span className="text-[#FF7A45] font-normal">Abd</span>
+                              : r.dsq ? <span className="text-red-400 font-normal">Dsq</span>
                               : (r.rang ?? "—")}
                           </td>
                           <td className="px-3 py-2 font-semibold text-white">{r.nom}</td>

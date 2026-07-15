@@ -15,7 +15,7 @@ export async function GET(
   const supabase = createAdminSupabase();
   const { data, error } = await supabase
     .from("resultats")
-    .select("id, categorie, rang, dossard, nom, club, temps, points, dns, dnf")
+    .select("id, categorie, rang, dossard, nom, club, temps, points, dns, dnf, dsq")
     .eq("competition_id", params.id)
     .order("categorie", { ascending: true })
     .order("rang",       { ascending: true, nullsFirst: false });
@@ -47,6 +47,7 @@ export async function POST(
     points?:   number | null;
     dns?:      boolean;
     dnf?:      boolean;
+    dsq?:      boolean;
   }[] = body.resultats ?? [];
 
   if (!rows.length) {
@@ -76,6 +77,7 @@ export async function POST(
     points:         r.points ?? null,
     dns:            r.dns    ?? false,
     dnf:            r.dnf    ?? false,
+    dsq:            r.dsq    ?? false,
   }));
 
   const { error: insErr, count } = await supabase

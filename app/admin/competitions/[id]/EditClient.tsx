@@ -305,7 +305,9 @@ export default function EditClient({
       const deferredMsg = deferred > 0
         ? ` · ${deferred} pari(s) multi-compétitions en attente d'une autre compétition`
         : "";
-      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés${deferredMsg}${failedMsg}`);
+      const cancelled = Number(json.cancelled ?? 0);
+      const cancelledMsg = cancelled > 0 ? ` · ${cancelled} annulé(s) (absent) remboursé(s)` : "";
+      setCloseMsg(`${json.betsSettled} paris réglés · ${json.won} gagnants · ${json.lost} perdants · ${Math.round(Number(json.totalPaid)).toLocaleString("fr-FR")} cr. versés${cancelledMsg}${deferredMsg}${failedMsg}`);
       setCloseState(failed && failed.length > 0 ? "error" : "ok");
       setStatus("closed");
     } catch (e) {

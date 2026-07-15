@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { notifyUser } from "@/lib/notifications/create";
 import { parseTempsToSeconds } from "@/lib/utils/time";
+import { comboBonusFor } from "@/lib/bets/combo";
 import type { BetType } from "@/lib/algo/types";
 
 type Selection = {
@@ -17,20 +18,31 @@ type Selection = {
   predictedTimeSeconds?: number;
 };
 
-type ResultEntry = { rang: number; tempsSeconds: number | null };
+type ResultEntry = {
+  rang: number | null;
+  tempsSeconds: number | null;
+  dns: boolean; // Absent — void, ne pénalise pas
+  dnf: boolean; // Abandon — perte sèche
+  dsq: boolean; // Disqualifié — perte sèche
+};
 
-// Détermine si une sélection est gagnante selon sa vraie règle de pari (et
-// non plus systématiquement "l'athlète a-t-il fini 1er ?", comme avant ce
-// correctif). "void" = athlète absent des résultats importés pour cette
-// catégorie — ne pénalise pas le parieur, comme le comportement déjà en
-// place quand une catégorie entière n'a pas de résultat.
-function selectionWins(
+// Détermine l'issue d'une sélection selon sa vraie règle de pari. "void" =
+// neutre : ne fait ni gagner ni perdre, et compte comme une cote de 1 (donc
+// ne casse pas un pari combiné) — cas d'un athlète absent des résultats
+// importés (catégorie/nom introuvable) OU explicitement marqué Abs (DNS).
+// Dsq et Abd (DNF) sont en revanche une perte sèche, quel que soit le type
+// de pari : aucun classement valide à faire valoir sur cet athlète.
+function selectionOutcome(
   sel: Selection,
   catMap: Map<string, ResultEntry> | undefined
 ): "won" | "lost" | "void" {
   if (!catMap) return "void";
   const entry = catMap.get(normalize(sel.nom));
   if (!entry) return "void";
+
+  if (entry.dsq || entry.dnf) return "lost";
+  if (entry.dns) return "void";
+  if (entry.rang == null) return "void"; // filet de sécurité (ligne sans rang ni statut)
 
   const betType: BetType = sel.betType ?? "TOP_1";
   switch (betType) {
@@ -54,25 +66,30 @@ function selectionWins(
 }
 
 // Construit, pour une compétition donnée, une map catégorie → (nom normalisé
-// → résultat). Remplace l'ancienne requête filtrée sur rang=1 (qui ne
-// permettait de vérifier que les paris "Vainqueur") par la récupération de
-// TOUS les résultats classés, nécessaire pour évaluer Top 3/5/10/20, place
-// exacte et temps exact.
+// → résultat). Récupère TOUTES les lignes (y compris Abs/Abd/Dsq, sans rang)
+// pour pouvoir distinguer void (Abs) de perte sèche (Abd/Dsq) — avant ce
+// correctif, ces trois statuts étaient tous traités comme "athlète introuvable"
+// (void), ce qui ne pénalisait jamais un abandon ou une disqualification.
 async function fetchResultsByCategory(
   supabase: ReturnType<typeof createAdminSupabase>,
   competitionId: string
 ): Promise<Map<string, Map<string, ResultEntry>>> {
   const { data } = await supabase
     .from("resultats")
-    .select("categorie, nom, rang, temps")
-    .eq("competition_id", competitionId)
-    .not("rang", "is", null);
+    .select("categorie, nom, rang, temps, dns, dnf, dsq")
+    .eq("competition_id", competitionId);
 
   const resultsByCategory = new Map<string, Map<string, ResultEntry>>();
   for (const r of (data ?? [])) {
-    if (!r.categorie || !r.nom || r.rang == null) continue;
+    if (!r.categorie || !r.nom) continue;
     const catMap = resultsByCategory.get(r.categorie) ?? new Map<string, ResultEntry>();
-    catMap.set(normalize(r.nom), { rang: r.rang, tempsSeconds: parseTempsToSeconds(r.temps) });
+    catMap.set(normalize(r.nom), {
+      rang:         r.rang,
+      tempsSeconds: parseTempsToSeconds(r.temps),
+      dns:          !!r.dns,
+      dnf:          !!r.dnf,
+      dsq:          !!r.dsq,
+    });
     resultsByCategory.set(r.categorie, catMap);
   }
   return resultsByCategory;
@@ -85,6 +102,7 @@ type BetRow = {
   selections:     Selection[];
   stake:          number;
   gain_potentiel: number;
+  cote_totale:    number;
 };
 
 function normalize(s: string) {
@@ -127,8 +145,6 @@ export async function POST(
   }
 
   // ── 2. Récupérer tous les résultats classés par catégorie ────────
-  // (avant ce fix, seul rang=1 était récupéré, ce qui ne permettait de
-  // régler que les paris "Vainqueur" — voir selectionWins() plus haut)
   const resultsByCategory = await fetchResultsByCategory(supabase, competitionId);
 
   if (resultsByCategory.size === 0) {
@@ -150,7 +166,7 @@ export async function POST(
   // JSONB "cs." attendu par selections (jsonb, tableau d'objets).
   const { data: pendingBets, error: pendingBetsErr } = await supabase
     .from("bets")
-    .select("id, user_id, competition_id, selections, stake, gain_potentiel")
+    .select("id, user_id, competition_id, selections, stake, gain_potentiel, cote_totale")
     .eq("status", "pending")
     .contains("selections", JSON.stringify([{ competitionId }]));
 
@@ -166,10 +182,11 @@ export async function POST(
     selections:     Array.isArray(b.selections) ? b.selections : [],
     stake:          Number(b.stake),
     gain_potentiel: Number(b.gain_potentiel),
+    cote_totale:    Number(b.cote_totale),
   }));
 
   const now = new Date().toISOString();
-  let won = 0, lost = 0, deferred = 0;
+  let won = 0, lost = 0, deferred = 0, cancelled = 0;
   const totalPaid: Record<string, number> = {};
   const failedSettlements: { betId: string; userId: string; error: string }[] = [];
 
@@ -178,17 +195,20 @@ export async function POST(
     let anyLost = false;
     let hasSelFromThisComp = false;
     let competitionNom = "";
+    // Sélections "void" (Abs/DNS) : ne perdent ni ne gagnent, comptent pour
+    // une cote de 1 dans le calcul du gain (voir plus bas) plutôt que leur
+    // cote d'origine — un athlète absent n'aurait jamais dû faire gagner ni
+    // perdre un combiné.
+    const voidSelections: Selection[] = [];
 
     for (const sel of bet.selections) {
       if (sel.competitionId !== competitionId) continue;
       hasSelFromThisComp = true;
       competitionNom = sel.competitionNom;
 
-      const outcome = selectionWins(sel, resultsByCategory.get(sel.categorie));
+      const outcome = selectionOutcome(sel, resultsByCategory.get(sel.categorie));
       if (outcome === "lost") anyLost = true;
-      // "won" et "void" ne marquent pas anyLost (comportement déjà en place
-      // pour "void" : ne pénalise pas le parieur pour une catégorie/athlète
-      // non trouvé dans l'import des résultats)
+      if (outcome === "void") voidSelections.push(sel);
     }
 
     if (!hasSelFromThisComp) continue;
@@ -227,8 +247,9 @@ export async function POST(
           const otherResultsByCategory = await fetchResultsByCategory(supabase, otherCompId);
           for (const sel of bet.selections) {
             if (sel.competitionId !== otherCompId) continue;
-            const outcome = selectionWins(sel, otherResultsByCategory.get(sel.categorie));
+            const outcome = selectionOutcome(sel, otherResultsByCategory.get(sel.categorie));
             if (outcome === "lost") allWon = false;
+            if (outcome === "void") voidSelections.push(sel);
           }
         }
       }
@@ -247,44 +268,101 @@ export async function POST(
         body: `${competitionNom} — dommage, ce sera pour la prochaine !`,
         url: "/app",
       });
-    } else {
-      // ── Toutes les sélections (de toutes les compétitions référencées) ont gagné ──
-      // Créditer le gain — si le RPC échoue, on ne marque PAS le pari
-      // gagné ni n'insère de transaction : mieux vaut le laisser en
-      // attente (traitable manuellement) qu'afficher un gain jamais crédité.
-      const { error: balErr } = await supabase.rpc("increment_user_balance", {
+      continue;
+    }
+
+    const remainingCount = bet.selections.length - voidSelections.length;
+
+    if (remainingCount <= 0) {
+      // ── Coupon entièrement void (tous les athlètes absents) ────────
+      // Ni gagné ni perdu : mise remboursée intégralement, comme une
+      // annulation (voir DELETE /api/user/bets/[id]).
+      const { data: refundBalance, error: refundErr } = await supabase.rpc("increment_user_balance", {
         user_uuid: bet.user_id,
-        delta:     bet.gain_potentiel,
+        delta:     bet.stake,
       });
 
-      if (balErr) {
-        console.error(`[close] increment_user_balance échoué pour le pari ${bet.id}:`, balErr);
-        failedSettlements.push({ betId: bet.id, userId: bet.user_id, error: balErr.message });
+      if (refundErr) {
+        console.error(`[close] remboursement (void) échoué pour le pari ${bet.id}:`, refundErr);
+        failedSettlements.push({ betId: bet.id, userId: bet.user_id, error: refundErr.message });
         continue;
       }
+      void refundBalance;
 
       await supabase
         .from("bets")
-        .update({ status: "won", gain_reel: bet.gain_potentiel, settled_at: now })
+        .update({ status: "cancelled", settled_at: now })
         .eq("id", bet.id);
 
       await supabase.from("transactions").insert({
         user_id:     bet.user_id,
-        type:        "win",
-        amount:      bet.gain_potentiel,
+        type:        "refund",
+        amount:      bet.stake,
         bet_id:      bet.id,
-        description: `Victoire · ${bet.selections.map(s => s.nom).join(", ")}`,
+        description: `Absent(s) aux résultats · ${bet.selections.map(s => s.nom).join(", ")}`,
       });
 
-      won++;
-      totalPaid[bet.user_id] = (totalPaid[bet.user_id] ?? 0) + bet.gain_potentiel;
+      cancelled++;
       await notifyUser(supabase, bet.user_id, {
-        type: "bet_won",
-        title: "Pari gagné 🎉",
-        body: `${competitionNom} — tu remportes ${Math.round(bet.gain_potentiel).toLocaleString("fr-FR")} crédits !`,
+        type: "bet_cancelled",
+        title: "Pari annulé",
+        body: `${competitionNom} — athlète absent des résultats, ta mise de ${bet.stake.toLocaleString("fr-FR")} cr t'est remboursée.`,
         url: "/app",
       });
+      continue;
     }
+
+    // ── Toutes les sélections restantes (hors void) ont gagné ──────────
+    // Neutralise chaque jambe void en excluant sa cote d'origine du produit
+    // (équivalent à une cote de 1) et recalcule le bonus combiné sur le
+    // nombre de sélections RÉELLEMENT en jeu — une jambe void "ne compte
+    // pour rien", elle ne doit donc plus peser ni dans la cote totale ni
+    // dans le palier de bonus. Le gain_potentiel figé à la mise ne peut pas
+    // être utilisé tel quel : il incluait encore la cote de la jambe void.
+    const voidCoteProduct = voidSelections.reduce((p, s) => p * s.cote, 1);
+    const adjustedCoteTotale = voidCoteProduct > 0 ? bet.cote_totale / voidCoteProduct : bet.cote_totale;
+    const adjustedGain = Math.round(bet.stake * adjustedCoteTotale * comboBonusFor(remainingCount) * 100) / 100;
+
+    // Créditer le gain — si le RPC échoue, on ne marque PAS le pari
+    // gagné ni n'insère de transaction : mieux vaut le laisser en
+    // attente (traitable manuellement) qu'afficher un gain jamais crédité.
+    const { error: balErr } = await supabase.rpc("increment_user_balance", {
+      user_uuid: bet.user_id,
+      delta:     adjustedGain,
+    });
+
+    if (balErr) {
+      console.error(`[close] increment_user_balance échoué pour le pari ${bet.id}:`, balErr);
+      failedSettlements.push({ betId: bet.id, userId: bet.user_id, error: balErr.message });
+      continue;
+    }
+
+    await supabase
+      .from("bets")
+      .update({
+        status:         "won",
+        gain_reel:      adjustedGain,
+        cote_totale:    Math.round(adjustedCoteTotale * 10000) / 10000,
+        settled_at:     now,
+      })
+      .eq("id", bet.id);
+
+    await supabase.from("transactions").insert({
+      user_id:     bet.user_id,
+      type:        "win",
+      amount:      adjustedGain,
+      bet_id:      bet.id,
+      description: `Victoire · ${bet.selections.map(s => s.nom).join(", ")}`,
+    });
+
+    won++;
+    totalPaid[bet.user_id] = (totalPaid[bet.user_id] ?? 0) + adjustedGain;
+    await notifyUser(supabase, bet.user_id, {
+      type: "bet_won",
+      title: "Pari gagné 🎉",
+      body: `${competitionNom} — tu remportes ${Math.round(adjustedGain).toLocaleString("fr-FR")} crédits !`,
+      url: "/app",
+    });
   }
 
   // ── 4. Marquer la compétition comme terminée ────────────────────
@@ -295,9 +373,10 @@ export async function POST(
 
   return NextResponse.json({
     ok:           true,
-    betsSettled:  won + lost,
+    betsSettled:  won + lost + cancelled,
     won,
     lost,
+    cancelled,
     deferred,
     categories:   resultsByCategory.size,
     totalPaid:    Object.values(totalPaid).reduce((a, b) => a + b, 0),

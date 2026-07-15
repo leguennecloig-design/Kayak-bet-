@@ -43,7 +43,10 @@ export async function GET(
     .select("status, gain_reel")
     .eq("user_id", targetId);
 
-  const countedBets = statsRows?.filter(b => b.status !== "cancelled") ?? [];
+  // Winrate calculé uniquement sur les paris RÉGLÉS (gagné/perdu) — un pari
+  // encore en attente ou annulé/remboursé (absent aux résultats) n'a jamais
+  // eu d'issue et ne doit pas gonfler le dénominateur.
+  const countedBets = statsRows?.filter(b => b.status === "won" || b.status === "lost") ?? [];
   const totalBets = countedBets.length;
   const wins      = countedBets.filter(b => b.status === "won").length;
   const winRate   = totalBets > 0 ? Math.round((wins / totalBets) * 100) : 0;
