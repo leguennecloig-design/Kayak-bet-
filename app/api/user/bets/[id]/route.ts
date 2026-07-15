@@ -10,6 +10,7 @@ import {
   checkMaxPerCategory,
   checkPendingConflicts,
   revalidateSelections,
+  checkCompetitionsNotStarted,
 } from "@/lib/bets/validate-selections";
 
 // PATCH /api/user/bets/[id]
@@ -58,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     ...selections,
     ...previousSelections.filter(s => !seen.has(s.participantId)),
   ];
-  const startCheckError = await revalidateSelections(adminSb, combinedForStartCheck, { blockIfStarted: true });
+  const startCheckError = await revalidateSelections(adminSb, combinedForStartCheck);
   if (startCheckError) return NextResponse.json({ error: startCheckError.error }, { status: startCheckError.status });
 
   const coteTotale = selections.reduce((t, s) => t * s.cote, 1);
@@ -158,10 +159,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const selections: Selection[] = Array.isArray(existing.selections) ? existing.selections : [];
   const compIds = [...new Set(selections.map(s => s.competitionId))];
-  const { data: comps } = await adminSb.from("competitions").select("id, date").in("id", compIds);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const alreadyStarted = (comps ?? []).some(c => c.date && c.date <= todayStr);
-  if (alreadyStarted) {
+  const startedError = await checkCompetitionsNotStarted(adminSb, compIds);
+  if (startedError) {
     return NextResponse.json(
       { error: "Cette compétition a déjà commencé, impossible d'annuler ce pari" },
       { status: 400 }

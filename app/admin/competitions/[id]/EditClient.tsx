@@ -17,6 +17,7 @@ type Competition = {
   algo_type: string | null;
   type_epreuve: string | null;
   paris_ouverts_a: string | null;
+  debute_a: string | null;
   leaderboard_visible?: boolean;
 };
 
@@ -106,6 +107,7 @@ export default function EditClient({
   const [algoType, setAlgoType] = useState(competition.algo_type ?? competition.type_competition ?? "");
   const [lieu,       setLieu]       = useState(competition.lieu ?? "");
   const [parisOuvertsA, setParisOuvertsA] = useState(toDatetimeLocal(competition.paris_ouverts_a));
+  const [debuteA, setDebuteA] = useState(toDatetimeLocal(competition.debute_a));
   const [leaderboardVisible, setLeaderboardVisible] = useState(competition.leaderboard_visible ?? false);
   const [status,     setStatus]     = useState(competition.status);
   const [saving,     setSaving]     = useState(false);
@@ -170,6 +172,7 @@ export default function EditClient({
         type_competition: typeCompetition || null,
         algo_type: algoType || null,
         paris_ouverts_a: parisOuvertsA ? new Date(parisOuvertsA).toISOString() : null,
+        debute_a: debuteA ? new Date(debuteA).toISOString() : null,
         leaderboard_visible: leaderboardVisible,
       }),
     });
@@ -506,6 +509,17 @@ export default function EditClient({
               type="datetime-local"
               value={parisOuvertsA}
               onChange={(e) => setParisOuvertsA(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div className="sm:col-span-2 flex flex-col gap-1.5">
+            <label className={labelCls}>
+              Début précis de la compétition <span className="normal-case text-[#FF7A45]">(important — bloque paris/modif/annulation dès cette heure)</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={debuteA}
+              onChange={(e) => setDebuteA(e.target.value)}
               className={inputCls}
             />
           </div>

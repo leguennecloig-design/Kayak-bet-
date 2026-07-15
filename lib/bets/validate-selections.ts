@@ -168,15 +168,40 @@ export async function checkPendingConflicts(
   return null;
 }
 
+// Une compétition est considérée "commencée" à partir de `debute_a`
+// (TIMESTAMPTZ précis, réglé par l'admin) si renseigné ; sinon repli sur
+// `date` (granularité jour, faute d'heure en base) pour protéger quand même
+// les compétitions déjà publiées avant que l'admin n'ait précisé l'heure.
+export function hasCompetitionStarted(comp: { date: string | null; debute_a: string | null }): boolean {
+  if (comp.debute_a) return new Date(comp.debute_a).getTime() <= Date.now();
+  if (comp.date) return comp.date <= new Date().toISOString().slice(0, 10);
+  return false;
+}
+
+// Refuse toute action (nouveau pari, modification, annulation) sur une
+// compétition déjà commencée — utilisé directement par DELETE (annulation),
+// qui n'a pas besoin du reste de revalidateSelections (pas de cotes à recalculer).
+export async function checkCompetitionsNotStarted(
+  adminSb: AdminSupabase,
+  competitionIds: string[]
+): Promise<string | null> {
+  if (competitionIds.length === 0) return null;
+  const { data: comps } = await adminSb
+    .from("competitions")
+    .select("id, date, debute_a")
+    .in("id", competitionIds);
+  const started = (comps ?? []).some(c => hasCompetitionStarted(c as { date: string | null; debute_a: string | null }));
+  return started ? "Cette compétition a déjà commencé, action impossible" : null;
+}
+
 // Revalidation serveur : ne jamais faire confiance à la cote envoyée par le
 // client. Recharge participants + cotes et recalcule chaque cote côté serveur
-// (mutation en place de `s.cote`) avant d'accepter le pari. `blockIfStarted`
-// (modification uniquement) refuse toute modif une fois le jour de la
-// compétition arrivé (`competitions.date`, granularité jour — pas d'heure en base).
+// (mutation en place de `s.cote`) avant d'accepter le pari. Refuse aussi
+// systématiquement toute compétition déjà commencée (nouveau pari ET
+// modification) — voir hasCompetitionStarted.
 export async function revalidateSelections(
   adminSb: AdminSupabase,
-  selections: Selection[],
-  opts: { blockIfStarted?: boolean } = {}
+  selections: Selection[]
 ): Promise<{ error: string; status: number } | null> {
   const participantIds = [...new Set(selections.map(s => s.participantId))];
   const { data: participantsRows, error: partErr } = await adminSb
@@ -190,11 +215,13 @@ export async function revalidateSelections(
   const compIds = [...new Set(selections.map(s => s.competitionId))];
   const { data: compsRows } = await adminSb
     .from("competitions")
-    .select("id, status, paris_ouverts_a, date")
+    .select("id, status, paris_ouverts_a, date, debute_a")
     .in("id", compIds);
   const compStatusById  = new Map((compsRows ?? []).map(c => [c.id, c.status]));
   const compOpensAtById = new Map((compsRows ?? []).map(c => [c.id, c.paris_ouverts_a as string | null]));
-  const compDateById    = new Map((compsRows ?? []).map(c => [c.id, c.date as string | null]));
+  const compByIdForStart = new Map(
+    (compsRows ?? []).map(c => [c.id, { date: c.date as string | null, debute_a: c.debute_a as string | null }])
+  );
 
   const { data: cotesRows } = await adminSb
     .from("cotes")
@@ -203,8 +230,6 @@ export async function revalidateSelections(
   const cotesByKey = new Map(
     (cotesRows ?? []).map(c => [`${c.competition_id}:${c.code_bateau}`, c])
   );
-
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   for (const s of selections) {
     const participant = participantsById.get(s.participantId);
@@ -221,11 +246,9 @@ export async function revalidateSelections(
         status: 400,
       };
     }
-    if (opts.blockIfStarted) {
-      const compDate = compDateById.get(participant.competition_id);
-      if (compDate && compDate <= todayStr) {
-        return { error: "Cette compétition a déjà commencé, le coupon ne peut plus être modifié", status: 400 };
-      }
+    const compForStart = compByIdForStart.get(participant.competition_id);
+    if (compForStart && hasCompetitionStarted(compForStart)) {
+      return { error: "Cette compétition a déjà commencé, il n'est plus possible de parier ou de modifier ce coupon", status: 400 };
     }
 
     const betType: BetType = s.betType ?? "TOP_1";
