@@ -3,9 +3,10 @@
 import { useState } from "react";
 import ManualCreationClient from "./ManualCreationClient";
 import ImportCotesFileClient from "./ImportCotesFileClient";
+import ImportCotesQualifFileClient from "./ImportCotesQualifFileClient";
 import InscriptionsClient from "../../inscriptions/InscriptionsClient";
 
-type Mode = "ffck" | "manuel" | "cotes" | null;
+type Mode = "ffck" | "manuel" | "cotes" | "qualif" | null;
 
 export default function NouvelleCompetitionClient() {
   const [mode, setMode] = useState<Mode>(null);
@@ -16,6 +17,10 @@ export default function NouvelleCompetitionClient() {
 
   if (mode === "cotes") {
     return <ImportCotesFileClient onBack={() => setMode(null)} />;
+  }
+
+  if (mode === "qualif") {
+    return <ImportCotesQualifFileClient onBack={() => setMode(null)} />;
   }
 
   if (mode === "ffck") {
@@ -60,6 +65,23 @@ export default function NouvelleCompetitionClient() {
             La liste de départ ET les cotes (Top1/Top3/Top5/Top10) ont déjà été
             calculées ailleurs — importe le fichier .txt directement, sans repasser
             par l&apos;algo interne.
+          </p>
+        </button>
+
+        <button
+          onClick={() => setMode("qualif")}
+          className="text-left bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] hover:border-[rgba(40,215,230,.4)] rounded-[18px] p-6 transition-colors group sm:col-span-2"
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-cyan mb-4">
+            <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="font-archivo font-extrabold text-[16px] text-white group-hover:text-cyan transition-colors">
+            Compétition qualif → finale (.txt)
+          </p>
+          <p className="font-archivo text-[12.5px] text-[#7c9aaa] mt-2 leading-relaxed">
+            Manche de qualification avant une finale séparée — un seul marché de
+            pari : la cote de passage en finale (quota fixe par catégorie), déjà
+            calculée ailleurs. Pas de Top1/3/5/10 ni place/temps exact.
           </p>
         </button>
 

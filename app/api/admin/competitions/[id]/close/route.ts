@@ -41,9 +41,15 @@ type ResultEntry = {
 // importés (catégorie/nom introuvable) OU explicitement marqué Abs (DNS).
 // Dsq et Abd (DNF) sont en revanche une perte sèche, quel que soit le type
 // de pari : aucun classement valide à faire valoir sur cet athlète.
+//
+// `qualifiesFinaleByCategory` : uniquement pour une compétition QUALIF (voir
+// competitions.marche_qualif_finale) — remplace la règle normale par "rang
+// dans le quota de qualifiés pour cette catégorie" quel que soit le betType
+// (le seul marché proposé pour ce type de compétition est QUALIF_FINALE).
 function selectionOutcome(
   sel: Selection,
-  catMap: Map<string, ResultEntry> | undefined
+  catMap: Map<string, ResultEntry> | undefined,
+  qualifiesFinaleByCategory: Map<string, number> | null
 ): "won" | "lost" | "void" {
   if (!catMap) return "void";
   const entry = catMap.get(normalize(sel.nom));
@@ -52,6 +58,11 @@ function selectionOutcome(
   if (entry.dsq || entry.dnf) return "lost";
   if (entry.dns) return "void";
   if (entry.rang == null) return "void"; // filet de sécurité (ligne sans rang ni statut)
+
+  if (qualifiesFinaleByCategory) {
+    const nbQualifies = qualifiesFinaleByCategory.get(sel.categorie) ?? 0;
+    return entry.rang <= nbQualifies ? "won" : "lost";
+  }
 
   const betType: BetType = sel.betType ?? "TOP_1";
   switch (betType) {
@@ -70,8 +81,37 @@ function selectionOutcome(
       // à la seconde : on compare les temps arrondis à la seconde entière
       return sel.predictedTimeSeconds != null && entry.tempsSeconds != null
         && Math.round(entry.tempsSeconds) === Math.round(sel.predictedTimeSeconds) ? "won" : "lost";
+    case "QUALIF_FINALE":
+      return "lost"; // ne devrait survenir que si qualifiesFinaleByCategory n'a pas pu être chargé
     default: return "lost";
   }
+}
+
+// Compétition QUALIF (marche_qualif_finale=true) uniquement : nombre de
+// qualifiés en finale par catégorie, dupliqué sur chaque ligne participants
+// de cette catégorie (voir migration 20260730_qualif_finale.sql). Retourne
+// null pour une compétition normale (comportement de règlement inchangé).
+async function fetchQualifiesFinaleByCategory(
+  supabase: ReturnType<typeof createAdminSupabase>,
+  competitionId: string
+): Promise<Map<string, number> | null> {
+  const { data: comp } = await supabase
+    .from("competitions")
+    .select("marche_qualif_finale")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!comp?.marche_qualif_finale) return null;
+
+  const { data: parts } = await supabase
+    .from("participants")
+    .select("categorie, qualifies_finale")
+    .eq("competition_id", competitionId);
+
+  const map = new Map<string, number>();
+  for (const p of (parts ?? [])) {
+    if (p.categorie && p.qualifies_finale != null) map.set(p.categorie, p.qualifies_finale);
+  }
+  return map;
 }
 
 // Construit, pour une compétition donnée, une map catégorie → (nom normalisé
@@ -174,6 +214,7 @@ export async function POST(
 
   // ── 2. Récupérer tous les résultats classés par catégorie ────────
   const resultsByCategory = await fetchResultsByCategory(supabase, competitionId);
+  const qualifInfo = await fetchQualifiesFinaleByCategory(supabase, competitionId);
 
   if (resultsByCategory.size === 0) {
     return NextResponse.json(
@@ -238,7 +279,7 @@ export async function POST(
       hasSelFromThisComp = true;
       competitionNom = sel.competitionNom;
 
-      const outcome = selectionOutcome(sel, resultsByCategory.get(sel.categorie));
+      const outcome = selectionOutcome(sel, resultsByCategory.get(sel.categorie), qualifInfo);
       if (outcome === "lost") anyLost = true;
       if (outcome === "void") voidSelections.push(sel);
     }
@@ -277,9 +318,10 @@ export async function POST(
         // clôture — on complète donc la vérification ici).
         for (const otherCompId of otherCompIds) {
           const otherResultsByCategory = await fetchResultsByCategory(supabase, otherCompId);
+          const otherQualifInfo = await fetchQualifiesFinaleByCategory(supabase, otherCompId);
           for (const sel of bet.selections) {
             if (sel.competitionId !== otherCompId) continue;
-            const outcome = selectionOutcome(sel, otherResultsByCategory.get(sel.categorie));
+            const outcome = selectionOutcome(sel, otherResultsByCategory.get(sel.categorie), otherQualifInfo);
             if (outcome === "lost") allWon = false;
             if (outcome === "void") voidSelections.push(sel);
           }

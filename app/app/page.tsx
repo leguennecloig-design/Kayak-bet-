@@ -26,6 +26,7 @@ const BET_LABELS: Record<BetType, string> = {
   TOP_5: "Top 5",
   TOP_10: "Top 10",
   TOP_20: "Top 20",
+  QUALIF_FINALE: "Qualif finale",
   EXACT_PLACE: "Place exacte",
   EXACT_TIME: "Temps exact",
   EXACT_TIME_SECOND: "Temps à la seconde",
@@ -203,6 +204,7 @@ type Odd = {
   codeBateau?:    string | null;
   targetPlace?:          number; // EXACT_PLACE uniquement
   predictedTimeSeconds?: number; // EXACT_TIME uniquement
+  qualifiesFinale?: number | null; // compétition qualif uniquement
 };
 
 type Competition = {
@@ -217,6 +219,7 @@ type Competition = {
   odds: Odd[];
   typeCompetition?: string | null;
   parisOuvertsA?: string | null;
+  marcheQualifFinale?: boolean;
 };
 
 type Player = {
@@ -2155,7 +2158,7 @@ export default function DashboardPage() {
       const [{ data }, bettorsRes] = await Promise.all([
         supabase
           .from("competitions")
-          .select("id, nom, date, discipline, lieu, type_competition, paris_ouverts_a, participants(id, nom, pays, cote, categorie, code_bateau)")
+          .select("id, nom, date, discipline, lieu, type_competition, paris_ouverts_a, marche_qualif_finale, participants(id, nom, pays, cote, categorie, code_bateau, qualifies_finale)")
           .eq("status", "published")
           .order("date", { ascending: true }),
         fetch("/api/competitions/bettors-count").then(r => r.ok ? r.json() : {}).catch(() => ({})),
@@ -2166,6 +2169,8 @@ export default function DashboardPage() {
         const parts: any[] = c.participants ?? [];
         parts.sort((a: any, b: any) => (a.cote ?? 99) - (b.cote ?? 99));
         const minCote = parts[0]?.cote ?? null;
+        const isQualif = !!c.marche_qualif_finale;
+        const baseBetType = isQualif ? "QUALIF_FINALE" as const : "TOP_1" as const;
         return {
           id: c.id,
           name: c.nom,
@@ -2177,11 +2182,12 @@ export default function DashboardPage() {
           featured: i === 0,
           typeCompetition: c.type_competition ?? null,
           parisOuvertsA: c.paris_ouverts_a ?? null,
+          marcheQualifFinale: isQualif,
           odds: parts.map((p: any) => ({
-            id:            `${p.id}:TOP_1`,
+            id:            `${p.id}:${baseBetType}`,
             participantId: p.id,
-            betType:       "TOP_1" as const,
-            betLabel:      BET_LABELS.TOP_1,
+            betType:       baseBetType,
+            betLabel:      BET_LABELS[baseBetType],
             nm:            p.nom,
             ctry:          "FR",
             note:          cleanPays(p.pays ?? ""),
@@ -2190,6 +2196,7 @@ export default function DashboardPage() {
             competitionId: c.id,
             categorie:     p.categorie ?? "",
             codeBateau:    p.code_bateau ?? null,
+            qualifiesFinale: p.qualifies_finale ?? null,
           })),
         };
       });
@@ -2643,6 +2650,7 @@ export default function DashboardPage() {
               odds={competitions.find(c => c.id === viewedCompetitionId.compId)?.odds ?? []}
               typeCompetition={competitions.find(c => c.id === viewedCompetitionId.compId)?.typeCompetition}
               parisOuvertsA={competitions.find(c => c.id === viewedCompetitionId.compId)?.parisOuvertsA}
+              marcheQualifFinale={competitions.find(c => c.id === viewedCompetitionId.compId)?.marcheQualifFinale}
               coupon={coupon}
               toggle={toggle}
               couponCount={count}

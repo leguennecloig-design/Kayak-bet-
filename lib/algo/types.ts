@@ -59,4 +59,5 @@ export type BetType =
   | "TOP_20"          // legacy — idem
   | "EXACT_PLACE"
   | "EXACT_TIME"           // temps au dixième
-  | "EXACT_TIME_SECOND";   // temps à la seconde (v4, plafond 4)
+  | "EXACT_TIME_SECOND"    // temps à la seconde (v4, plafond 4)
+  | "QUALIF_FINALE";       // compétition qualif : passage en finale (quota par catégorie)

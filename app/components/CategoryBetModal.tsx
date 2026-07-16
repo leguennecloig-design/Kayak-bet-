@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import type { BetType } from "@/lib/algo/types";
 import { probExactPlace, probToCote, ALGO_PARAMS } from "@/lib/algo/bradley-terry";
 import OddsInfoModal from "./OddsInfoModal";
+import QualifOddsInfoModal from "./QualifOddsInfoModal";
 import AlgoBetaInfoModal from "./AlgoBetaInfoModal";
 import CompetitionReferralModal from "./CompetitionReferralModal";
 
 const BETA_INFO_SEEN_KEY = "kb_algo_beta_seen_v1";
 const COMBO_INFO_SEEN_KEY = "kb_combo_info_seen_v1";
 const COMP_REFERRAL_SEEN_KEY = "kb_comp_referral_seen_v1";
+const QUALIF_INFO_SEEN_KEY = "kb_qualif_info_seen_v1";
 
 // Cote "place exacte" DYNAMIQUE : recalculée selon la place choisie et la
 // distribution de l'athlète (rang espéré + sigma), même formule que le serveur.
@@ -33,6 +35,7 @@ export type BetOdd = {
   codeBateau?: string | null;
   targetPlace?: number;
   predictedTimeSeconds?: number;
+  qualifiesFinale?: number | null; // compétition qualif uniquement — nb de qualifiés en finale pour cette catégorie
 };
 
 type CotesRow = {
@@ -61,6 +64,12 @@ const BET_TYPES: { type: BetType; label: string }[] = [
   { type: "EXACT_TIME_SECOND", label: "Temps à la seconde" },
 ];
 
+// Compétition qualif → finale : un seul marché possible, pas de Top3/5/exact
+// place/temps (voir competitions.marche_qualif_finale).
+const QUALIF_BET_TYPES: { type: BetType; label: string }[] = [
+  { type: "QUALIF_FINALE", label: "Qualif finale" },
+];
+
 // Exhaustif sur BetType (Top10/20 conservés pour compat même si non affichés).
 const COTE_FIELD: Record<BetType, keyof CotesRow> = {
   TOP_1: "cote_top1",
@@ -71,7 +80,14 @@ const COTE_FIELD: Record<BetType, keyof CotesRow> = {
   EXACT_PLACE: "cote_exact_place",
   EXACT_TIME: "cote_exact_time",
   EXACT_TIME_SECOND: "cote_exact_time_second",
+  QUALIF_FINALE: "cote_top1", // jamais lu : voir "always" ci-dessous (val = p.val)
 };
+
+// Types dont la cote vient directement de `p.val` (participants.cote), sans
+// besoin de la ligne `cotes` (recalcul avancé) — Vainqueur ET Qualif finale.
+function isAlwaysAvailable(type: BetType): boolean {
+  return type === "TOP_1" || type === "QUALIF_FINALE";
+}
 
 const TYPE_LABEL: Record<string, string> = { sprint: "Sprint", classique: "Classique" };
 
@@ -82,6 +98,7 @@ type Props = {
   odds: BetOdd[]; // toutes catégories confondues — la startlist complète de la compétition
   typeCompetition?: string | null;
   parisOuvertsA?: string | null;
+  marcheQualifFinale?: boolean;
   coupon: Record<string, BetOdd>;
   toggle: (o: BetOdd) => void;
   couponCount: number;
@@ -95,7 +112,7 @@ function fmtOpensAt(iso: string) {
 }
 
 export default function CategoryBetModal({
-  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, coupon, toggle, couponCount, onOpenCoupon, onOpenComboInfo, referralCode,
+  onBack, competitionId, competitionNom, odds, typeCompetition, parisOuvertsA, marcheQualifFinale, coupon, toggle, couponCount, onOpenCoupon, onOpenComboInfo, referralCode,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState("");
   const [search, setSearch] = useState("");
@@ -104,6 +121,7 @@ export default function CategoryBetModal({
   const [error, setError] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
   const [betaInfoOpen, setBetaInfoOpen] = useState(false);
+  const [qualifInfoOpen, setQualifInfoOpen] = useState(false);
   const [referralModalOpen, setReferralModalOpen] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<string | null>(
     parisOuvertsA && new Date(parisOuvertsA).getTime() > Date.now() ? parisOuvertsA : null
@@ -111,11 +129,16 @@ export default function CategoryBetModal({
 
   // Pop-ups d'info affichées une seule fois chacune (mémorisées en
   // localStorage), jamais deux en même temps — chacune attend son tour au
-  // prochain passage si une précédente vient de s'afficher : bêta/algo,
-  // puis pari combiné (partagée avec le coupon, voir onOpenComboInfo), puis
-  // parrainage compétition.
+  // prochain passage si une précédente vient de s'afficher : qualif (si
+  // compétition qualif), puis bêta/algo, puis pari combiné (partagée avec le
+  // coupon, voir onOpenComboInfo), puis parrainage compétition.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (marcheQualifFinale && !window.localStorage.getItem(QUALIF_INFO_SEEN_KEY)) {
+      setQualifInfoOpen(true);
+      window.localStorage.setItem(QUALIF_INFO_SEEN_KEY, "1");
+      return;
+    }
     if (!window.localStorage.getItem(BETA_INFO_SEEN_KEY)) {
       setBetaInfoOpen(true);
       window.localStorage.setItem(BETA_INFO_SEEN_KEY, "1");
@@ -182,6 +205,7 @@ export default function CategoryBetModal({
   const participants = odds
     .filter(o => o.categorie === selectedCat)
     .filter(p => !q || p.nm.toLowerCase().includes(q) || p.ctry.toLowerCase().includes(q));
+  const qualifiesFinaleForCat = odds.find(o => o.categorie === selectedCat)?.qualifiesFinale ?? null;
 
   return (
     <>
@@ -194,6 +218,9 @@ export default function CategoryBetModal({
             {selectedCat}
             {typeCompetition && TYPE_LABEL[typeCompetition] && (
               <span className="catmodal-type"> · {TYPE_LABEL[typeCompetition]}</span>
+            )}
+            {marcheQualifFinale && qualifiesFinaleForCat != null && (
+              <span className="catmodal-type"> · {qualifiesFinaleForCat} qualifié{qualifiesFinaleForCat > 1 ? "s" : ""} en finale</span>
             )}
           </div>
           <h3>{competitionNom}</h3>
@@ -264,10 +291,10 @@ export default function CategoryBetModal({
                   <span className="nm">{p.nm}</span>
                 </div>
                 <div className="catmodal-bets">
-                  {BET_TYPES.map(({ type, label }) => {
-                    const available = type === "TOP_1" ? true : !!cotesRow;
+                  {(marcheQualifFinale ? QUALIF_BET_TYPES : BET_TYPES).map(({ type, label }) => {
+                    const available = isAlwaysAvailable(type) ? true : !!cotesRow;
                     if (!available) return null;
-                    const val = type === "TOP_1" ? p.val : Number(cotesRow![COTE_FIELD[type]]);
+                    const val = isAlwaysAvailable(type) ? p.val : Number(cotesRow![COTE_FIELD[type]]);
                     const id = `${p.participantId}:${type}`;
                     const sel = !!coupon[id];
                     const needsInput = type === "EXACT_PLACE" || type === "EXACT_TIME" || type === "EXACT_TIME_SECOND";
@@ -434,7 +461,10 @@ export default function CategoryBetModal({
         </div>
       )}
 
-      <OddsInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+      {marcheQualifFinale
+        ? <QualifOddsInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+        : <OddsInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />}
+      <QualifOddsInfoModal open={qualifInfoOpen} onClose={() => setQualifInfoOpen(false)} />
       <AlgoBetaInfoModal open={betaInfoOpen} onClose={() => setBetaInfoOpen(false)} />
       <CompetitionReferralModal
         open={referralModalOpen}

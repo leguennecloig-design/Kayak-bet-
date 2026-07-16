@@ -21,7 +21,7 @@ export type Selection = {
   predictedTimeSeconds?: number; // EXACT_TIME/EXACT_TIME_SECOND uniquement
 };
 
-export const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME", "EXACT_TIME_SECOND"];
+export const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20", "EXACT_PLACE", "EXACT_TIME", "EXACT_TIME_SECOND", "QUALIF_FINALE"];
 export const MIN_STAKE = 100;
 export const MAX_STAKE = 1_000_000;
 export const BALANCE_FLOOR = 200;
@@ -40,6 +40,10 @@ export function coteColumn(betType: BetType, row: Record<string, unknown>): numb
     case "EXACT_PLACE":        return Number(row.cote_exact_place); // repli, normalement dynamique
     case "EXACT_TIME":         return Number(row.cote_exact_time);
     case "EXACT_TIME_SECOND":  return Number(row.cote_exact_time_second);
+    // QUALIF_FINALE ne passe jamais par ici : sa cote vient directement de
+    // participants.cote (même branche que TOP_1 dans revalidateSelections),
+    // il n'existe pas de ligne `cotes` pour une compétition qualif.
+    case "QUALIF_FINALE":      return Number(row.cote_top1);
   }
 }
 
@@ -253,9 +257,11 @@ export async function revalidateSelections(
 
     const betType: BetType = s.betType ?? "TOP_1";
     let serverCote: number;
-    if (betType === "TOP_1") {
-      // Vainqueur : source de vérité = participants.cote (couvre aussi les
-      // participants ajoutés manuellement, sans code_bateau/ligne cotes).
+    if (betType === "TOP_1" || betType === "QUALIF_FINALE") {
+      // Vainqueur (ou "passage en finale" pour une compétition qualif) :
+      // source de vérité = participants.cote — couvre aussi les participants
+      // ajoutés manuellement, sans code_bateau/ligne cotes, et c'est le SEUL
+      // marché existant pour une compétition qualif (pas de ligne `cotes`).
       serverCote = Number(participant.cote);
     } else {
       if (!participant.code_bateau) {
