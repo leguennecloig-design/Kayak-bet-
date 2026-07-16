@@ -3,6 +3,32 @@ import { isAdmin } from "@/lib/auth/admin-guard";
 import { createAdminSupabase } from "@/lib/supabase-server";
 import { notifyAllUsers } from "@/lib/notifications/create";
 
+type AdminSupabase = ReturnType<typeof createAdminSupabase>;
+
+// Si une migration récente (debute_a, archived...) n'a pas encore été
+// appliquée en base, Postgres refuse l'UPDATE entier pour une colonne
+// inconnue — ce qui bloquerait la sauvegarde de TOUS les champs, y compris
+// ceux qui n'ont rien à voir. On retire la colonne manquante et on
+// réessaie, pour que le reste se sauvegarde quand même en attendant que la
+// migration soit appliquée.
+async function updateCompetitionResilient(
+  supabase: AdminSupabase,
+  id: string,
+  fields: Record<string, unknown>
+): Promise<{ message: string } | null> {
+  const attempt = { ...fields };
+  for (let i = 0; i < Object.keys(fields).length + 1; i++) {
+    if (Object.keys(attempt).length === 0) return null;
+    const { error } = await supabase.from("competitions").update(attempt).eq("id", id);
+    if (!error) return null;
+    const missingCol = /column "(\w+)" of relation "competitions" does not exist/.exec(error.message)?.[1];
+    if (!missingCol || !(missingCol in attempt)) return error;
+    console.warn(`[admin competitions PATCH] colonne "${missingCol}" absente en base (migration pas encore appliquée) — ignorée pour cette sauvegarde`);
+    delete attempt[missingCol];
+  }
+  return { message: "Échec de la sauvegarde (colonnes manquantes)" };
+}
+
 // PATCH /api/admin/competitions/[id] — met à jour les infos ou le statut
 export async function PATCH(
   req: NextRequest,
@@ -44,10 +70,7 @@ export async function PATCH(
     nom = before?.nom ?? "";
   }
 
-  const { error } = await supabase
-    .from("competitions")
-    .update(allowed)
-    .eq("id", params.id);
+  const error = await updateCompetitionResilient(supabase, params.id, allowed);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

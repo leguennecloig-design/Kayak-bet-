@@ -17,9 +17,15 @@ export default async function EditCompetition({
 
   const supabase = createAdminSupabase();
 
+  // select("*") plutôt qu'une liste de colonnes explicite : une migration
+  // récente pas encore appliquée en base (debute_a / archived / etc.) ferait
+  // échouer TOUTE la requête sur une colonne nommée qui n'existe pas encore
+  // et 404 la page — select("*") ne dépend d'aucune colonne en particulier,
+  // les champs absents sont simplement gérés via les valeurs par défaut
+  // ci-dessous.
   const { data: comp, error } = await supabase
     .from("competitions")
-    .select("id, nom, date, discipline, lieu, status, created_at, ffck_inscription_code, ffck_match_status, type_competition, algo_type, type_epreuve, paris_ouverts_a, debute_a, leaderboard_visible, archived")
+    .select("*")
     .eq("id", params.id)
     .single();
 
