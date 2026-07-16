@@ -25,6 +25,7 @@ export const VALID_BET_TYPES: BetType[] = ["TOP_1", "TOP_3", "TOP_5", "TOP_10", 
 export const MIN_STAKE = 100;
 export const MAX_STAKE = 1_000_000;
 export const BALANCE_FLOOR = 200;
+export const MAX_SELECTIONS_PER_COUPON = 10;
 const RANK_TIERS = new Set(["TOP_1", "TOP_3", "TOP_5", "TOP_10", "TOP_20"]);
 const MAX_PER_CATEGORY: Record<string, number> = { TOP_1: 1, TOP_3: 3, TOP_5: 5, TOP_10: 10 };
 
@@ -57,6 +58,7 @@ export function isAlwaysStackable(s: Selection): boolean {
 
 export function validateShape(selections: Selection[], stake: number): string | null {
   if (selections.length === 0) return "Aucune sélection";
+  if (selections.length > MAX_SELECTIONS_PER_COUPON) return `Maximum ${MAX_SELECTIONS_PER_COUPON} sélections par coupon`;
   if (stake < MIN_STAKE) return `Mise minimum : ${MIN_STAKE} cr`;
   if (stake > MAX_STAKE) return `Mise maximum : ${MAX_STAKE.toLocaleString("fr-FR")} cr`;
   if (selections.some(s => !s.participantId || !s.cote || s.cote <= 1)) return "Sélection invalide";

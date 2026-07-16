@@ -2298,6 +2298,13 @@ export default function DashboardPage() {
         return prev;
       }
 
+      // Plafond dur : 10 sélections maximum par coupon combiné, quel que
+      // soit le contexte (revalidé aussi côté serveur, voir MAX_SELECTIONS_PER_COUPON).
+      if (Object.keys(next).length >= 10) {
+        showToast(<XIcon c="#FF7A45" />, "Maximum 10 sélections par coupon", true);
+        return prev;
+      }
+
       next[o.id] = o;
       return next;
     });
