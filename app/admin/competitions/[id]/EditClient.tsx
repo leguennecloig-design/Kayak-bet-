@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import ResultatsSection from "./ResultatsSection";
+import QualifResultsSection from "./QualifResultsSection";
 
 type Competition = {
   id: string;
@@ -20,6 +21,7 @@ type Competition = {
   debute_a: string | null;
   leaderboard_visible?: boolean;
   archived?: boolean;
+  marche_qualif_finale?: boolean;
 };
 
 // ISO -> "YYYY-MM-DDTHH:mm" pour <input type="datetime-local"> (en heure locale)
@@ -892,7 +894,9 @@ export default function EditClient({
       </div>
 
       {/* ---- Section Résultats ---- */}
-      <ResultatsSection competitionId={compId} competitionNom={nom} />
+      {competition.marche_qualif_finale
+        ? <QualifResultsSection competitionId={compId} competitionNom={nom} />
+        : <ResultatsSection competitionId={compId} competitionNom={nom} />}
 
       {/* ---- Clôture & règlement des paris ---- */}
       <div className="bg-[rgba(255,255,255,.03)] border border-[var(--border-2)] rounded-[18px] p-6 mt-6">

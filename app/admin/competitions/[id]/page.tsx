@@ -102,6 +102,7 @@ export default async function EditCompetition({
         debute_a:              comp.debute_a as string | null,
         leaderboard_visible:   (comp.leaderboard_visible as boolean | null) ?? false,
         archived:              (comp.archived as boolean | null) ?? false,
+        marche_qualif_finale:  (comp.marche_qualif_finale as boolean | null) ?? false,
       }}
       initialParticipants={participants}
       inscriptions={inscriptions}

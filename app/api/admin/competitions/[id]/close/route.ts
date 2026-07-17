@@ -35,6 +35,8 @@ type ResultEntry = {
   dsq: boolean; // Disqualifié — perte sèche
 };
 
+type QualifStatus = { qualified: boolean | null; dns: boolean };
+
 // Détermine l'issue d'une sélection selon sa vraie règle de pari. "void" =
 // neutre : ne fait ni gagner ni perdre, et compte comme une cote de 1 (donc
 // ne casse pas un pari combiné) — cas d'un athlète absent des résultats
@@ -42,15 +44,22 @@ type ResultEntry = {
 // Dsq et Abd (DNF) sont en revanche une perte sèche, quel que soit le type
 // de pari : aucun classement valide à faire valoir sur cet athlète.
 //
-// `qualifiesFinaleByCategory` : uniquement pour une compétition QUALIF (voir
-// competitions.marche_qualif_finale) — remplace la règle normale par "rang
-// dans le quota de qualifiés pour cette catégorie" quel que soit le betType
-// (le seul marché proposé pour ce type de compétition est QUALIF_FINALE).
+// `qualifStatusById` : uniquement pour une compétition QUALIF (voir
+// competitions.marche_qualif_finale) — remplace entièrement la règle
+// normale basée sur `catMap`/rang : le seul marché proposé pour ce type de
+// compétition (QUALIF_FINALE) se règle directement sur participants.qualified_finale
+// / dns (voir lib/algo/qualif-results-parser.ts), sans résultats classés.
 function selectionOutcome(
   sel: Selection,
   catMap: Map<string, ResultEntry> | undefined,
-  qualifiesFinaleByCategory: Map<string, number> | null
+  qualifStatusById: Map<string, QualifStatus> | null
 ): "won" | "lost" | "void" {
+  if (qualifStatusById) {
+    const status = qualifStatusById.get(sel.participantId);
+    if (!status || status.dns || status.qualified == null) return "void";
+    return status.qualified ? "won" : "lost";
+  }
+
   if (!catMap) return "void";
   const entry = catMap.get(normalize(sel.nom));
   if (!entry) return "void";
@@ -58,11 +67,6 @@ function selectionOutcome(
   if (entry.dsq || entry.dnf) return "lost";
   if (entry.dns) return "void";
   if (entry.rang == null) return "void"; // filet de sécurité (ligne sans rang ni statut)
-
-  if (qualifiesFinaleByCategory) {
-    const nbQualifies = qualifiesFinaleByCategory.get(sel.categorie) ?? 0;
-    return entry.rang <= nbQualifies ? "won" : "lost";
-  }
 
   const betType: BetType = sel.betType ?? "TOP_1";
   switch (betType) {
@@ -82,19 +86,19 @@ function selectionOutcome(
       return sel.predictedTimeSeconds != null && entry.tempsSeconds != null
         && Math.round(entry.tempsSeconds) === Math.round(sel.predictedTimeSeconds) ? "won" : "lost";
     case "QUALIF_FINALE":
-      return "lost"; // ne devrait survenir que si qualifiesFinaleByCategory n'a pas pu être chargé
+      return "void"; // ne devrait survenir que si qualifStatusById n'a pas pu être chargé
     default: return "lost";
   }
 }
 
-// Compétition QUALIF (marche_qualif_finale=true) uniquement : nombre de
-// qualifiés en finale par catégorie, dupliqué sur chaque ligne participants
-// de cette catégorie (voir migration 20260730_qualif_finale.sql). Retourne
-// null pour une compétition normale (comportement de règlement inchangé).
-async function fetchQualifiesFinaleByCategory(
+// Compétition QUALIF (marche_qualif_finale=true) uniquement : statut de
+// qualification par participant, importé directement (voir
+// lib/algo/qualif-results-parser.ts) — pas de rang/résultats classés.
+// Retourne null pour une compétition normale (comportement inchangé).
+async function fetchQualifStatusById(
   supabase: ReturnType<typeof createAdminSupabase>,
   competitionId: string
-): Promise<Map<string, number> | null> {
+): Promise<{ statusById: Map<string, QualifStatus>; categoriesCount: number } | null> {
   const { data: comp } = await supabase
     .from("competitions")
     .select("marche_qualif_finale")
@@ -104,14 +108,16 @@ async function fetchQualifiesFinaleByCategory(
 
   const { data: parts } = await supabase
     .from("participants")
-    .select("categorie, qualifies_finale")
+    .select("id, categorie, qualified_finale, dns")
     .eq("competition_id", competitionId);
 
-  const map = new Map<string, number>();
+  const statusById = new Map<string, QualifStatus>();
+  const categories = new Set<string>();
   for (const p of (parts ?? [])) {
-    if (p.categorie && p.qualifies_finale != null) map.set(p.categorie, p.qualifies_finale);
+    statusById.set(p.id, { qualified: p.qualified_finale, dns: !!p.dns });
+    if (p.categorie) categories.add(p.categorie);
   }
-  return map;
+  return { statusById, categoriesCount: categories.size };
 }
 
 // Construit, pour une compétition donnée, une map catégorie → (nom normalisé
@@ -192,35 +198,55 @@ export async function POST(
   const competitionId = params.id;
   const supabase = createAdminSupabase();
 
-  // ── 1. Vérifier que des résultats existent ──────────────────────
-  const { count: resultCount, error: resultCountErr } = await supabase
-    .from("resultats")
-    .select("id", { count: "exact", head: true })
-    .eq("competition_id", competitionId);
+  // ── 1/2. Vérifier que des résultats existent, et les charger ─────
+  // Une compétition QUALIF n'importe jamais de résultats classés (rang) —
+  // le statut de qualification est importé directement par participant
+  // (voir lib/algo/qualif-results-parser.ts) — donc un chemin de vérification
+  // entièrement différent des compétitions normales.
+  let resultsByCategory = new Map<string, Map<string, ResultEntry>>();
+  let qualifInfo: Map<string, QualifStatus> | null = null;
+  let categoriesCount = 0;
 
-  if (resultCountErr) {
-    return NextResponse.json(
-      { error: `Erreur lors de la vérification des résultats : ${resultCountErr.message}` },
-      { status: 500 }
-    );
-  }
+  const qualif = await fetchQualifStatusById(supabase, competitionId);
+  if (qualif) {
+    const anyDecided = [...qualif.statusById.values()].some(s => s.qualified != null || s.dns);
+    if (!anyDecided) {
+      return NextResponse.json(
+        { error: "Aucun résultat qualif importé. Importe la liste des qualifiés avant de clôturer." },
+        { status: 422 }
+      );
+    }
+    qualifInfo = qualif.statusById;
+    categoriesCount = qualif.categoriesCount;
+  } else {
+    const { count: resultCount, error: resultCountErr } = await supabase
+      .from("resultats")
+      .select("id", { count: "exact", head: true })
+      .eq("competition_id", competitionId);
 
-  if (!resultCount || resultCount === 0) {
-    return NextResponse.json(
-      { error: "Aucun résultat importé. Importe les résultats avant de clôturer." },
-      { status: 422 }
-    );
-  }
+    if (resultCountErr) {
+      return NextResponse.json(
+        { error: `Erreur lors de la vérification des résultats : ${resultCountErr.message}` },
+        { status: 500 }
+      );
+    }
 
-  // ── 2. Récupérer tous les résultats classés par catégorie ────────
-  const resultsByCategory = await fetchResultsByCategory(supabase, competitionId);
-  const qualifInfo = await fetchQualifiesFinaleByCategory(supabase, competitionId);
+    if (!resultCount || resultCount === 0) {
+      return NextResponse.json(
+        { error: "Aucun résultat importé. Importe les résultats avant de clôturer." },
+        { status: 422 }
+      );
+    }
 
-  if (resultsByCategory.size === 0) {
-    return NextResponse.json(
-      { error: "Aucun résultat classé (rang) trouvé dans les résultats. Vérifie l'import." },
-      { status: 422 }
-    );
+    resultsByCategory = await fetchResultsByCategory(supabase, competitionId);
+
+    if (resultsByCategory.size === 0) {
+      return NextResponse.json(
+        { error: "Aucun résultat classé (rang) trouvé dans les résultats. Vérifie l'import." },
+        { status: 422 }
+      );
+    }
+    categoriesCount = resultsByCategory.size;
   }
 
   // ── 3. Récupérer les paris en attente touchant cette compétition ─
@@ -317,11 +343,11 @@ export async function POST(
         // avant ce fix, ne trouvaient jamais ce pari lors de leur propre
         // clôture — on complète donc la vérification ici).
         for (const otherCompId of otherCompIds) {
-          const otherResultsByCategory = await fetchResultsByCategory(supabase, otherCompId);
-          const otherQualifInfo = await fetchQualifiesFinaleByCategory(supabase, otherCompId);
+          const otherQualif = await fetchQualifStatusById(supabase, otherCompId);
+          const otherResultsByCategory = otherQualif ? new Map<string, Map<string, ResultEntry>>() : await fetchResultsByCategory(supabase, otherCompId);
           for (const sel of bet.selections) {
             if (sel.competitionId !== otherCompId) continue;
-            const outcome = selectionOutcome(sel, otherResultsByCategory.get(sel.categorie), otherQualifInfo);
+            const outcome = selectionOutcome(sel, otherResultsByCategory.get(sel.categorie), otherQualif?.statusById ?? null);
             if (outcome === "lost") allWon = false;
             if (outcome === "void") voidSelections.push(sel);
           }
@@ -454,7 +480,7 @@ export async function POST(
     lost,
     cancelled,
     deferred,
-    categories:   resultsByCategory.size,
+    categories:   categoriesCount,
     totalPaid:    Object.values(totalPaid).reduce((a, b) => a + b, 0),
     ...(failedSettlements.length > 0 ? { failedSettlements } : {}),
   });
