@@ -7,6 +7,58 @@ function normalize(s: string) {
   return s.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+// Découpe "AUVOLAT G." ou "AUVOLAT Gabriel" en { surname: "AUVOLAT", first: "G" | "GABRIEL" }
+// — dernier "mot" = prénom (ou son initiale), le reste = nom de famille
+// (potentiellement plusieurs mots : "LE ROUZES", "DE HASQUE"...).
+function surnameAndFirst(raw: string): { surname: string; first: string } {
+  // "*" isolé = marqueur "aucune donnée" (voir external-cotes-parser-qualif.ts)
+  // qui a pu se retrouver collé au nom sur une compétition créée avant ce
+  // correctif — jamais un vrai token de nom, à ignorer pour le rapprochement.
+  const tokens = raw.trim().split(/\s+/).filter(t => t && t !== "*");
+  if (tokens.length <= 1) return { surname: normalize(raw.replace(/\*/g, "")), first: "" };
+  const first = tokens[tokens.length - 1].replace(/\.$/, "");
+  const surname = tokens.slice(0, -1).join(" ");
+  return { surname: normalize(surname), first: normalize(first) };
+}
+
+// Même personne si le nom de famille est identique ET que les prénoms
+// correspondent — exactement, ou l'un est l'initiale de l'autre (le fichier
+// de cotes équipage abrège en "AUVOLAT G." alors que les résultats qualif
+// donnent le prénom complet "AUVOLAT Gabriel").
+function sameAthlete(a: string, b: string): boolean {
+  const A = surnameAndFirst(a);
+  const B = surnameAndFirst(b);
+  if (!A.surname || A.surname !== B.surname) return false;
+  if (A.first === B.first) return true;
+  if (A.first.length === 1 && B.first.startsWith(A.first)) return true;
+  if (B.first.length === 1 && A.first.startsWith(B.first)) return true;
+  return false;
+}
+
+// Retrouve le participant correspondant à un nom donné dans une catégorie :
+// d'abord une égalité exacte (cas normal, monoplace), puis, pour un
+// équipage biplace ("NOM1 P1 / NOM2 P2"), une correspondance floue
+// nom+initiale sur CHACUN des deux équipiers séparément — le fichier de
+// résultats qualif liste souvent chaque équipier sur sa propre ligne, avec
+// son prénom complet, alors que le fichier de cotes (création de la
+// startlist) abrège le prénom en initiale dans le nom d'équipage.
+function findParticipantId(
+  categoryParticipants: { id: string; nom: string }[],
+  rawName: string
+): string | null {
+  const target = normalize(rawName);
+  const exact = categoryParticipants.find(p => normalize(p.nom) === target);
+  if (exact) return exact.id;
+
+  for (const p of categoryParticipants) {
+    if (!p.nom.includes(" / ")) continue;
+    for (const part of p.nom.split(" / ")) {
+      if (sameAthlete(part, rawName)) return p.id;
+    }
+  }
+  return null;
+}
+
 // POST /api/admin/competitions/[id]/import-qualif-results
 // Compétition QUALIF uniquement (voir competitions.marche_qualif_finale) —
 // importe juste la liste des qualifiés (+ Abs éventuels) par catégorie, voir
@@ -52,21 +104,21 @@ export async function POST(
     .eq("competition_id", params.id);
   if (partErr) return NextResponse.json({ error: partErr.message }, { status: 500 });
 
-  const byCategoryByName = new Map<string, Map<string, string>>(); // categorie -> normalized nom -> participant id
+  const byCategory = new Map<string, { id: string; nom: string }[]>();
   for (const p of participants ?? []) {
-    const map = byCategoryByName.get(p.categorie) ?? new Map<string, string>();
-    map.set(normalize(p.nom), p.id);
-    byCategoryByName.set(p.categorie, map);
+    const list = byCategory.get(p.categorie) ?? [];
+    list.push({ id: p.id, nom: p.nom });
+    byCategory.set(p.categorie, list);
   }
 
   const unmatched: string[] = [];
-  let qualifiedCount = 0;
-  let absCount = 0;
+  const qualifiedIds = new Set<string>();
+  const absIds = new Set<string>();
   let nonQualifiedCount = 0;
 
   for (const cat of parsed.categories) {
-    const nameMap = byCategoryByName.get(cat.code);
-    if (!nameMap) {
+    const categoryParticipants = byCategory.get(cat.code);
+    if (!categoryParticipants) {
       unmatched.push(`Catégorie "${cat.code}" introuvable dans la startlist de cette compétition`);
       continue;
     }
@@ -74,25 +126,29 @@ export async function POST(
     const decided = new Set<string>(); // participant ids déjà traités (qualifié ou abs)
 
     for (const rawName of cat.qualifies) {
-      const id = nameMap.get(normalize(rawName));
+      const id = findParticipantId(categoryParticipants, rawName);
       if (!id) { unmatched.push(`"${rawName}" (${cat.code}) : aucun participant correspondant`); continue; }
-      await supabase.from("participants").update({ qualified_finale: true, dns: false }).eq("id", id);
+      if (!qualifiedIds.has(id)) {
+        await supabase.from("participants").update({ qualified_finale: true, dns: false }).eq("id", id);
+      }
       decided.add(id);
-      qualifiedCount++;
+      qualifiedIds.add(id);
     }
 
     for (const rawName of cat.abs) {
-      const id = nameMap.get(normalize(rawName));
+      const id = findParticipantId(categoryParticipants, rawName);
       if (!id) { unmatched.push(`"${rawName}" (${cat.code}, Abs) : aucun participant correspondant`); continue; }
-      await supabase.from("participants").update({ qualified_finale: false, dns: true }).eq("id", id);
+      if (!absIds.has(id)) {
+        await supabase.from("participants").update({ qualified_finale: false, dns: true }).eq("id", id);
+      }
       decided.add(id);
-      absCount++;
+      absIds.add(id);
     }
 
     // Tout le reste de la catégorie = présent mais non qualifié (perdu).
-    for (const [, id] of nameMap) {
-      if (decided.has(id)) continue;
-      await supabase.from("participants").update({ qualified_finale: false, dns: false }).eq("id", id);
+    for (const p of categoryParticipants) {
+      if (decided.has(p.id)) continue;
+      await supabase.from("participants").update({ qualified_finale: false, dns: false }).eq("id", p.id);
       nonQualifiedCount++;
     }
   }
@@ -100,9 +156,9 @@ export async function POST(
   return NextResponse.json({
     ok: true,
     categories: parsed.categories.length,
-    qualified: qualifiedCount,
+    qualified: qualifiedIds.size,
     nonQualified: nonQualifiedCount,
-    abs: absCount,
+    abs: absIds.size,
     unmatched,
     parseErrors: parsed.errors,
   });

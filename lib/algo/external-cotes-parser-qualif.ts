@@ -91,7 +91,10 @@ function parseDataRow(line: string): RowResult {
   const cote_qualif_finale = Number.isFinite(cote) ? cote : null;
 
   const parts = middle.split(/\s{2,}/).filter(Boolean);
-  const nom = parts[0] ?? middle;
+  // "*" en fin de nom = marqueur "aucune donnée" (même convention que
+  // external-cotes-parser.ts) — jamais utile dans le nom stocké, et casserait
+  // sinon le rapprochement nom+initiale avec les résultats qualif plus tard.
+  const nom = (parts[0] ?? middle).replace(/\s*\*\s*$/, "").trim();
   const club = parts.slice(1).join(" ").trim();
 
   if (!club && nom.includes(" / ")) {
