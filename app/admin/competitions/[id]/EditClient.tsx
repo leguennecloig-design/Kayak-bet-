@@ -130,6 +130,12 @@ export default function EditClient({
   const [editId,   setEditId]   = useState<string | null>(null);
   const [editCote, setEditCote] = useState("");
 
+  // Edit nom inline — utile notamment pour corriger un nom d'équipage
+  // approximatif créé par l'import cotes qualif quand nom+club étaient
+  // collés sans espace dans le fichier source (voir external-cotes-parser-qualif.ts).
+  const [editNomId,    setEditNomId]    = useState<string | null>(null);
+  const [editNomValue, setEditNomValue] = useState("");
+
   // Edit cotes avancées (T3/T5/T10) inline — vivent dans la table `cotes`,
   // pas `participants` (voir saveAdvancedCote).
   const [editAdv,      setEditAdv]      = useState<{ pid: string; field: AdvancedCoteField } | null>(null);
@@ -258,6 +264,21 @@ export default function EditClient({
           .sort((a, b) => (a.cote ?? 99) - (b.cote ?? 99))
       );
       setEditId(null);
+    }
+  }
+
+  /* ---- Modifier le nom d'un participant ---- */
+  async function saveNom(pid: string) {
+    const value = editNomValue.trim();
+    if (!value) return;
+    const res = await fetch(`/api/admin/competitions/${compId}/participants/${pid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom: value }),
+    });
+    if (res.ok) {
+      setParticipants((prev) => prev.map((p) => p.id === pid ? { ...p, nom: value } : p));
+      setEditNomId(null);
     }
   }
 
@@ -668,9 +689,29 @@ export default function EditClient({
                   </button>
                 )}
 
-                {/* Nom + club/pays */}
+                {/* Nom + club/pays — cliquable pour éditer */}
                 <div className="flex-1 min-w-0">
-                  <div className="font-archivo font-extrabold text-[14px] text-white truncate">{p.nom}</div>
+                  {editNomId === p.id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editNomValue}
+                        onChange={(e) => setEditNomValue(e.target.value)}
+                        autoFocus
+                        className="w-full bg-[rgba(40,215,230,.08)] border border-[rgba(40,215,230,.5)] rounded-[8px] px-2 py-1 text-white font-archivo font-extrabold text-[14px] outline-none"
+                      />
+                      <button onClick={() => saveNom(p.id)} className="text-[#28D7E6] font-archivo font-bold text-[11px] hover:underline flex-none">✓</button>
+                      <button onClick={() => setEditNomId(null)} className="text-[#5c7c8c] font-archivo text-[11px] hover:text-white flex-none">✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditNomId(p.id); setEditNomValue(p.nom); }}
+                      className="text-left w-full hover:opacity-80"
+                      title="Cliquer pour modifier le nom"
+                    >
+                      <div className="font-archivo font-extrabold text-[14px] text-white truncate">{p.nom}</div>
+                    </button>
+                  )}
                   {p.pays && (
                     <div className="font-grotesk font-bold text-[9px] tracking-[.1em] text-[#7c9aaa] mt-0.5 uppercase truncate">{p.pays}</div>
                   )}

@@ -12,6 +12,13 @@ type ImportSummary = {
   parseErrors: string[];
 };
 
+type RepairSummary = {
+  ok: boolean;
+  added: number;
+  alreadyPresent: number;
+  parseErrors: string[];
+};
+
 // Import des résultats pour une compétition QUALIF (voir
 // competitions.marche_qualif_finale) — remplace ResultatsSection pour ce
 // type de compétition : pas de rang/temps/club, juste la liste des
@@ -23,6 +30,11 @@ export default function QualifResultsSection({ competitionId, competitionNom }: 
   const [importState, setImportState] = useState<"idle" | "uploading" | "ok" | "error">("idle");
   const [error, setError] = useState("");
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+
+  const repairFileRef = useRef<HTMLInputElement>(null);
+  const [repairState, setRepairState] = useState<"idle" | "uploading" | "ok" | "error">("idle");
+  const [repairError, setRepairError] = useState("");
+  const [repairSummary, setRepairSummary] = useState<RepairSummary | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -50,6 +62,34 @@ export default function QualifResultsSection({ competitionId, competitionNom }: 
     }
 
     if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function handleRepairFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setRepairState("uploading");
+    setRepairError("");
+    setRepairSummary(null);
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    try {
+      const res = await fetch(`/api/admin/competitions/${competitionId}/repair-qualif-participants`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `Erreur ${res.status}`);
+      setRepairSummary(json);
+      setRepairState("ok");
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : "Erreur inconnue");
+      setRepairState("error");
+    }
+
+    if (repairFileRef.current) repairFileRef.current.value = "";
   }
 
   return (
@@ -129,6 +169,70 @@ export default function QualifResultsSection({ competitionId, competitionNom }: 
           départ non listé est automatiquement marqué non qualifié.
         </p>
       )}
+
+      {/* Réparation : ré-uploader le fichier de cotes ORIGINAL pour ajouter les
+          participants qui avaient été rejetés à la création (nom d'équipage
+          collé au club dans le fichier source) — idempotent, ne duplique jamais
+          un participant déjà présent. */}
+      <div className="mt-6 pt-5 border-t border-[var(--border-2)]">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="font-grotesk font-bold text-[10px] tracking-[.14em] uppercase text-[#7c9aaa]">
+              Participants manquants
+            </p>
+            <p className="font-archivo text-[12px] text-[#5c7c8c] mt-0.5">
+              Ré-importe le fichier de cotes original pour ajouter les équipages rejetés à la création (nom collé au club) — sans dupliquer les participants déjà présents.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              ref={repairFileRef}
+              type="file"
+              accept=".txt,.md"
+              className="hidden"
+              onChange={handleRepairFileChange}
+            />
+            <button
+              onClick={() => repairFileRef.current?.click()}
+              disabled={repairState === "uploading"}
+              className={`inline-flex items-center gap-2 font-archivo font-bold text-[12.5px] px-4 py-2 rounded-[10px] border transition-colors disabled:opacity-50 ${
+                repairState === "ok"
+                  ? "text-[#a0f0a0] border-[rgba(160,240,160,.3)] bg-[rgba(160,240,160,.07)]"
+                  : repairState === "error"
+                    ? "text-red-400 border-red-500/30 bg-red-500/08"
+                    : "text-[#9fbac6] border-[var(--border-2)] hover:border-[rgba(40,215,230,.4)] hover:text-white"
+              }`}
+            >
+              {repairState === "uploading" ? "Import…" : "Réparer les participants manquants"}
+            </button>
+          </div>
+        </div>
+
+        {repairError && (
+          <div className="bg-[rgba(255,122,69,.1)] border border-[rgba(255,122,69,.3)] rounded-xl px-4 py-3 font-archivo text-[13px] text-[#FF7A45] mt-3">
+            {repairError}
+          </div>
+        )}
+
+        {repairSummary && (
+          <div className="mt-3 space-y-2">
+            <p className="font-archivo text-[13px] text-[#a0f0a0]">
+              {repairSummary.added} participant(s) ajouté(s) · {repairSummary.alreadyPresent} déjà présents.
+              {repairSummary.added > 0 && " Pense à corriger leur nom (approximatif) dans la liste des participants ci-dessous, puis à ré-importer la liste des qualifiés."}
+            </p>
+            {repairSummary.parseErrors.length > 0 && (
+              <div className="bg-[rgba(255,122,69,.06)] border border-[rgba(255,122,69,.2)] rounded-xl p-3">
+                <p className="font-grotesk font-bold text-[10px] uppercase tracking-[.1em] text-[#FF7A45] mb-1.5">
+                  Avertissements de parsing
+                </p>
+                <div className="text-[11px] font-archivo text-[#e0a080] space-y-0.5 max-h-32 overflow-y-auto">
+                  {repairSummary.parseErrors.slice(0, 15).map((msg, i) => <p key={i}>{msg}</p>)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

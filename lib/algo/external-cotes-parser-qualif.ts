@@ -77,8 +77,17 @@ type RowResult = { athlete: QualifAthlete | null; reason?: string };
 
 // Même limite documentée que external-cotes-parser.ts::parseDataRow : un nom
 // d'équipage qui déborde peut se retrouver collé au club SANS espace
-// séparateur — détecté (aucun gap ≥2 espaces trouvé) et signalé plutôt que
-// deviné, la quantité de texte perdue n'étant pas prévisible.
+// séparateur, avec une quantité de texte perdue imprévisible (parfois juste
+// un point, parfois toute une initiale, parfois plusieurs lettres du nom).
+// Reconstruire ce texte automatiquement serait deviner — risqué pour
+// l'identité de l'athlète. Mais SUPPRIMER complètement la ligne perdait
+// aussi le dossard et la cote (pourtant fiables), et empêchait ensuite
+// TOUT rapprochement avec les résultats qualif, même pour le premier
+// équipier (dont le nom, lui, est intact avant le " / "). On crée donc
+// quand même le participant — avec le texte brut (non coupé) comme nom
+// provisoire — et on le signale comme avertissement (pas un rejet) pour
+// que l'admin corrige le nom affiché ensuite (voir EditClient.tsx, nom
+// cliquable pour éditer).
 function parseDataRow(line: string): RowResult {
   const m = ROW_RE.exec(line.trim());
   if (!m) return { athlete: null };
@@ -99,8 +108,8 @@ function parseDataRow(line: string): RowResult {
 
   if (!club && nom.includes(" / ")) {
     return {
-      athlete: null,
-      reason: `nom et club fusionnés (colonne "Nom" trop étroite dans le fichier source pour "${nom}") — corrige la ligne dans le fichier ou ajoute ce participant manuellement après import`,
+      athlete: { dossard, nom, club: "", cote_qualif_finale },
+      reason: `nom et club fusionnés (colonne "Nom" trop étroite dans le fichier source pour "${nom}") — participant créé avec ce nom provisoire, à corriger dans la startlist admin (le nom est cliquable)`,
     };
   }
 
@@ -159,6 +168,7 @@ export function parseQualifCotesFile(content: string): ParsedQualifCotes {
     const { athlete, reason } = parseDataRow(line);
     if (athlete) {
       current.athletes.push(athlete);
+      if (reason) errors.push(`Ligne ${i + 1} dans "${current.libelle}" : ${reason}.`);
     } else if (reason) {
       errors.push(`Ligne ${i + 1} dans "${current.libelle}" : ${reason}.`);
     } else {
