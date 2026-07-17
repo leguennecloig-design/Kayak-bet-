@@ -8,6 +8,7 @@ type ImportSummary = {
   qualified: number;
   nonQualified: number;
   abs: number;
+  undetermined: number;
   unmatched: string[];
   parseErrors: string[];
 };
@@ -136,11 +137,12 @@ export default function QualifResultsSection({ competitionId, competitionNom }: 
 
       {summary && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
               { value: summary.qualified, label: "Qualifiés", color: "text-cyan" },
               { value: summary.nonQualified, label: "Non qualifiés", color: "text-white" },
               { value: summary.abs, label: "Absents", color: "text-[#7c9aaa]" },
+              { value: summary.undetermined, label: "Indéterminés", color: "text-[#FF7A45]" },
             ].map(({ value, label, color }) => (
               <div key={label} className="bg-[rgba(40,215,230,.05)] border border-[rgba(40,215,230,.12)] rounded-xl px-3 py-3.5 text-center">
                 <p className={`text-[22px] font-bold ${color}`}>{value}</p>
@@ -148,6 +150,12 @@ export default function QualifResultsSection({ competitionId, competitionNom }: 
               </div>
             ))}
           </div>
+
+          {summary.undetermined > 0 && (
+            <p className="font-archivo text-[12px] text-[#FF7A45]">
+              {summary.undetermined} participant(s) dans une catégorie avec des noms non reconnus n&apos;ont pas été tranchés par prudence (pas de non-qualifié par défaut) — leurs paris seront automatiquement remboursés à la clôture. Corrige les noms "à vérifier" ci-dessous puis réimporte pour les trancher correctement.
+            </p>
+          )}
 
           {(summary.unmatched.length > 0 || summary.parseErrors.length > 0) && (
             <div className="bg-[rgba(255,122,69,.06)] border border-[rgba(255,122,69,.2)] rounded-xl p-4">

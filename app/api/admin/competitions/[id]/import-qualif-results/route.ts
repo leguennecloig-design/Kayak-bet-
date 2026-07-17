@@ -115,6 +115,7 @@ export async function POST(
   const qualifiedIds = new Set<string>();
   const absIds = new Set<string>();
   let nonQualifiedCount = 0;
+  let undeterminedCount = 0;
 
   for (const cat of parsed.categories) {
     const categoryParticipants = byCategory.get(cat.code);
@@ -124,10 +125,19 @@ export async function POST(
     }
 
     const decided = new Set<string>(); // participant ids déjà traités (qualifié ou abs)
+    // Un nom de la liste qui ne trouve aucun participant correspondant rend
+    // le reste de la catégorie incertain : on ne peut plus supposer que
+    // "personne d'autre = non qualifié" en confiance (ce nom manquant
+    // pourrait être justement l'un des participants qu'on s'apprête à
+    // classer par défaut). Dans ce cas on laisse le reste de la catégorie
+    // indéterminé (qualified_finale reste null) plutôt que de risquer de
+    // déclarer perdant à tort — le règlement (close/route.ts) traite déjà
+    // qualified_finale=null comme void/remboursé.
+    let categoryHasUnmatched = false;
 
     for (const rawName of cat.qualifies) {
       const id = findParticipantId(categoryParticipants, rawName);
-      if (!id) { unmatched.push(`"${rawName}" (${cat.code}) : aucun participant correspondant`); continue; }
+      if (!id) { unmatched.push(`"${rawName}" (${cat.code}) : aucun participant correspondant`); categoryHasUnmatched = true; continue; }
       if (!qualifiedIds.has(id)) {
         await supabase.from("participants").update({ qualified_finale: true, dns: false }).eq("id", id);
       }
@@ -137,7 +147,7 @@ export async function POST(
 
     for (const rawName of cat.abs) {
       const id = findParticipantId(categoryParticipants, rawName);
-      if (!id) { unmatched.push(`"${rawName}" (${cat.code}, Abs) : aucun participant correspondant`); continue; }
+      if (!id) { unmatched.push(`"${rawName}" (${cat.code}, Abs) : aucun participant correspondant`); categoryHasUnmatched = true; continue; }
       if (!absIds.has(id)) {
         await supabase.from("participants").update({ qualified_finale: false, dns: true }).eq("id", id);
       }
@@ -145,7 +155,13 @@ export async function POST(
       absIds.add(id);
     }
 
-    // Tout le reste de la catégorie = présent mais non qualifié (perdu).
+    if (categoryHasUnmatched) {
+      undeterminedCount += categoryParticipants.filter(p => !decided.has(p.id)).length;
+      continue;
+    }
+
+    // Tout le reste de la catégorie = présent mais non qualifié (perdu) —
+    // fiable uniquement quand TOUS les noms de la catégorie ont été trouvés.
     for (const p of categoryParticipants) {
       if (decided.has(p.id)) continue;
       await supabase.from("participants").update({ qualified_finale: false, dns: false }).eq("id", p.id);
@@ -159,6 +175,7 @@ export async function POST(
     qualified: qualifiedIds.size,
     nonQualified: nonQualifiedCount,
     abs: absIds.size,
+    undetermined: undeterminedCount,
     unmatched,
     parseErrors: parsed.errors,
   });
